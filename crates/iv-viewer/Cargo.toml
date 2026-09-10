@@ -1,0 +1,21 @@
+[package]
+name = "iv-viewer"
+description = "ImageView 主程序：egui UI + wgpu GPU 渲染"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "imageview"
+path = "src/main.rs"
+
+[dependencies]
+iv-core = { path = "../iv-core" }
+eframe = { version = "0.27", default-features = false, features = [
+    "wgpu",
+    "default_fonts",
+] }
+crossbeam-channel = "0.5"
+rfd = "0.13"
+bytemuck = { version = "1", features = ["derive"] }

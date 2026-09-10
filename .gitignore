@@ -1,0 +1,12 @@
+# Rust 构建产物
+/target/
+
+# 测试图（可用 tools/gen_test_images.ps1 重新生成）
+/test_images/
+
+# 安装器残留
+rustup-init.exe
+
+# IDE
+.idea/
+.vscode/

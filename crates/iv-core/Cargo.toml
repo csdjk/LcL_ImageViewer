@@ -1,0 +1,23 @@
+[package]
+name = "iv-core"
+description = "ImageView 核心解码库：常规格式 + 游戏格式（TGA/DDS/BC 压缩/PSD 合成图），供查看器与 Shell 缩略图扩展共用"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = [
+    "png",
+    "jpeg",
+    "tga",
+    "gif",
+    "webp",
+    "bmp",
+    "ico",
+    "tiff",
+    "hdr",
+    "qoi",
+    "pnm",
+] }
+texture2ddecoder = "0.1"
