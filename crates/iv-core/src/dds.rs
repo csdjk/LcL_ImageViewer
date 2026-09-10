@@ -310,6 +310,7 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         } else {
             None
         },
+        frames: Vec::new(),
     })
 }
 

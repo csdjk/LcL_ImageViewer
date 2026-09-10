@@ -20,6 +20,17 @@ pub struct DecodedImage {
     pub is_hdr: bool,
     /// 附加说明（如 cubemap、PSB 降级信息等）。
     pub extra_meta: Option<String>,
+    /// 动画帧序列（GIF / WebP / APNG；静态图为空，>1 帧即为动画）。
+    /// 帧均为合成后的完整帧，尺寸与 width/height 一致；mips[0] 与 frames[0] 内容相同。
+    pub frames: Vec<AnimatedFrame>,
+}
+
+/// 一个动画帧。
+#[derive(Debug, Clone)]
+pub struct AnimatedFrame {
+    pub data: PixelData,
+    /// 显示时长（毫秒；解码层已把过短延时修正为 100ms）
+    pub delay_ms: u32,
 }
 
 /// 单个 mip 层级。
@@ -34,11 +45,32 @@ impl MipLevel {
     /// 取 (x, y) 处的 RGBA（u8 形式；HDR 值会被 clamp 到 0..255）。
     /// 越界坐标返回 None。
     pub fn rgba8_at(&self, x: u32, y: u32) -> Option<[u8; 4]> {
-        if x >= self.width || y >= self.height {
+        self.data.rgba8_at(self.width, self.height, x, y)
+    }
+
+    /// 取 (x, y) 处的 RGBA f32（0..1 线性；LDR 值按 sRGB 数值直接除以 255）。
+    pub fn rgba_f32_at(&self, x: u32, y: u32) -> Option<[f32; 4]> {
+        self.data.rgba_f32_at(self.width, self.height, x, y)
+    }
+}
+
+/// 像素数据。
+#[derive(Debug, Clone)]
+pub enum PixelData {
+    /// RGBA，每像素 4 字节
+    Rgba8(Vec<u8>),
+    /// RGBA f32，每像素 16 字节（线性空间）
+    RgbaF32(Vec<f32>),
+}
+
+impl PixelData {
+    /// 取 (x, y) 处的 RGBA（u8 形式；HDR clamp）。`width/height` 为图像尺寸。
+    pub fn rgba8_at(&self, width: u32, height: u32, x: u32, y: u32) -> Option<[u8; 4]> {
+        if x >= width || y >= height {
             return None;
         }
-        let i = (y as usize * self.width as usize + x as usize) * 4;
-        match &self.data {
+        let i = (y as usize * width as usize + x as usize) * 4;
+        match self {
             PixelData::Rgba8(v) => v.get(i..i + 4).map(|s| [s[0], s[1], s[2], s[3]]),
             PixelData::RgbaF32(v) => {
                 let r = v.get(i)?;
@@ -55,13 +87,13 @@ impl MipLevel {
         }
     }
 
-    /// 取 (x, y) 处的 RGBA f32（0..1 线性；LDR 值按 sRGB 数值直接除以 255）。
-    pub fn rgba_f32_at(&self, x: u32, y: u32) -> Option<[f32; 4]> {
-        if x >= self.width || y >= self.height {
+    /// 取 (x, y) 处的 RGBA f32（LDR 按 /255）。
+    pub fn rgba_f32_at(&self, width: u32, height: u32, x: u32, y: u32) -> Option<[f32; 4]> {
+        if x >= width || y >= height {
             return None;
         }
-        let i = (y as usize * self.width as usize + x as usize) * 4;
-        match &self.data {
+        let i = (y as usize * width as usize + x as usize) * 4;
+        match self {
             PixelData::Rgba8(v) => {
                 let s = v.get(i..i + 4)?;
                 Some([
@@ -79,15 +111,6 @@ impl MipLevel {
             ]),
         }
     }
-}
-
-/// 像素数据。
-#[derive(Debug, Clone)]
-pub enum PixelData {
-    /// RGBA，每像素 4 字节
-    Rgba8(Vec<u8>),
-    /// RGBA f32，每像素 16 字节（线性空间）
-    RgbaF32(Vec<f32>),
 }
 
 /// 文件格式标识（UI 显示用）。
@@ -185,6 +208,10 @@ fn decode_with_format(bytes: &[u8], fmt: ImageFormat) -> Result<DecodedImage, De
         ImageFormat::Psd => crate::psd_composite::decode_psd(bytes),
         ImageFormat::Tga => decode_image_crate(bytes, ImageFormat::Tga),
         ImageFormat::Hdr => decode_hdr(bytes),
+        // 动画感知格式：GIF / WebP / APNG
+        ImageFormat::Gif => decode_gif(bytes),
+        ImageFormat::WebP => decode_webp(bytes),
+        ImageFormat::Png => decode_png(bytes),
         ImageFormat::Unknown => Err(DecodeError::NotAnImage(
             "无法识别的图像格式".into(),
         )),
@@ -244,7 +271,108 @@ fn decode_image_crate(bytes: &[u8], fmt: ImageFormat) -> Result<DecodedImage, De
         has_alpha,
         is_hdr: false,
         extra_meta: None,
+        frames: Vec::new(),
     })
+}
+
+/// 收集 image crate 的动画帧（GIF / WebP / APNG 统一走这里）。
+/// 单帧时自动退化为静态图（frames 为空）。
+fn collect_animation(
+    frames: image::Frames,
+    kind: ImageKind,
+) -> Result<DecodedImage, DecodeError> {
+    const MAX_FRAMES: usize = 4096; // 防恶意文件撑爆内存
+    let mut list: Vec<AnimatedFrame> = Vec::new();
+    let mut size: Option<(u32, u32)> = None;
+    for fr in frames.into_iter() {
+        let fr = fr.map_err(|e| DecodeError::Decode(e.to_string()))?;
+        let buf = fr.buffer();
+        let (fw, fh) = (buf.width(), buf.height());
+        match size {
+            None => size = Some((fw, fh)),
+            Some((w, h)) => {
+                if fw != w || fh != h {
+                    continue; // 防御：尺寸不一致的帧跳过
+                }
+            }
+        }
+        let (num, den) = fr.delay().numer_denom_ms();
+        // numer_denom_ms 返回的就是毫秒分数：delay_ms = num / den（不要再乘 1000）
+        let ms = if den == 0 {
+            0
+        } else {
+            (num as u64 / den as u64) as u32
+        };
+        // 浏览器惯例：过短延时（GIF 里常见 0）按 100ms
+        let delay_ms = if ms < 10 { 100 } else { ms };
+        list.push(AnimatedFrame {
+            data: PixelData::Rgba8(buf.clone().into_raw()),
+            delay_ms,
+        });
+        if list.len() >= MAX_FRAMES {
+            break;
+        }
+    }
+    let (w, h) = size.ok_or_else(|| DecodeError::Decode("动画无有效帧".into()))?;
+    let Some(first) = list.first().map(|f| f.data.clone()) else {
+        return Err(DecodeError::Decode("动画无有效帧".into()));
+    };
+    // 第一帧扫描是否真有透明像素
+    let has_alpha = match &first {
+        PixelData::Rgba8(v) => v.chunks_exact(4).any(|p| p[3] != 255),
+        PixelData::RgbaF32(v) => v.chunks_exact(4).any(|p| p[3] < 1.0),
+    };
+    let animated = list.len() > 1;
+    Ok(DecodedImage {
+        width: w,
+        height: h,
+        mips: vec![MipLevel {
+            width: w,
+            height: h,
+            data: first,
+        }],
+        kind,
+        compression: None,
+        has_alpha,
+        is_hdr: false,
+        extra_meta: if animated {
+            Some(format!("动画 · {} 帧", list.len()))
+        } else {
+            None
+        },
+        frames: if animated { list } else { Vec::new() },
+    })
+}
+
+/// GIF：统一走动画收集（静态 GIF 自动退化为单帧静态图）。
+fn decode_gif(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
+    use image::codecs::gif::GifDecoder;
+    use image::AnimationDecoder;
+    let dec = GifDecoder::new(std::io::Cursor::new(bytes))
+        .map_err(|e| DecodeError::Decode(e.to_string()))?;
+    collect_animation(dec.into_frames(), ImageKind::Gif)
+}
+
+/// WebP：统一走动画收集（image-webp 0.2 对静态图也返回单帧）。
+fn decode_webp(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
+    use image::codecs::webp::WebPDecoder;
+    use image::AnimationDecoder;
+    let dec = WebPDecoder::new(std::io::Cursor::new(bytes))
+        .map_err(|e| DecodeError::Decode(e.to_string()))?;
+    collect_animation(dec.into_frames(), ImageKind::WebP)
+}
+
+/// PNG：静态走常规路径；APNG 转 ApngDecoder 收帧。
+fn decode_png(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
+    use image::codecs::png::PngDecoder;
+    use image::AnimationDecoder;
+    let dec = PngDecoder::new(std::io::Cursor::new(bytes))
+        .map_err(|e| DecodeError::Decode(e.to_string()))?;
+    if dec.is_apng().unwrap_or(false) {
+        let apng = dec.apng().map_err(|e| DecodeError::Decode(e.to_string()))?;
+        return collect_animation(apng.into_frames(), ImageKind::Png);
+    }
+    decode_image_crate(bytes, ImageFormat::Png)
 }
 
 /// Radiance HDR：保留 f32 线性数据（查看器做曝光/tonemap）。
@@ -285,5 +413,6 @@ fn decode_hdr(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         has_alpha: false,
         is_hdr: true,
         extra_meta: None,
+        frames: Vec::new(),
     })
 }

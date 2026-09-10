@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/iv-core", "crates/iv-viewer"]
+members = ["crates/iv-core", "crates/iv-viewer", "crates/iv-shell"]
 
 [workspace.package]
 version = "0.1.0"

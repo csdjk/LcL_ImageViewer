@@ -113,6 +113,17 @@ pub struct Renderer {
     sampler_linear: wgpu::Sampler,
     sampler_nearest: wgpu::Sampler,
     has_image: bool,
+    /// 复用中的图像纹理（动画帧/同尺寸换图时避免重建纹理与 bind group）
+    tex: Option<TexReuse>,
+}
+
+/// 可复用的纹理槽位（bind group 由 callback_resources 持有并引用纹理，
+/// 这里只需保留 texture 句柄用于 write_texture）。
+struct TexReuse {
+    texture: wgpu::Texture,
+    width: u32,
+    height: u32,
+    format: wgpu::TextureFormat,
 }
 
 impl Renderer {
@@ -254,6 +265,7 @@ impl Renderer {
             sampler_linear,
             sampler_nearest,
             has_image: false,
+            tex: None,
         }
     }
 
@@ -261,10 +273,10 @@ impl Renderer {
         self.has_image
     }
 
-    /// 上传一个 mip 的像素数据（替换旧纹理与 bind group）。
+    /// 上传一个 mip 的像素数据（同尺寸同格式时复用纹理，只写数据）。
     pub fn upload_texture(&mut self, width: u32, height: u32, data: &PixelData) {
-        let device = &*self.rs.device;
-        let queue = &*self.rs.queue;
+        let device = self.rs.device.clone();
+        let queue = self.rs.queue.clone();
 
         let (format, bytes, bytes_per_pixel): (wgpu::TextureFormat, Vec<u8>, u32) = match data {
             PixelData::Rgba8(v) => (wgpu::TextureFormat::Rgba8Unorm, v.clone(), 4),
@@ -278,13 +290,38 @@ impl Renderer {
             }
         };
 
+        let tex_size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+        let data_layout = wgpu::ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(bytes_per_pixel * width),
+            rows_per_image: Some(height),
+        };
+
+        // 尺寸/格式一致：复用纹理与 bind group，仅重写纹素（动画帧热路径）
+        if let Some(t) = &self.tex {
+            if t.width == width && t.height == height && t.format == format {
+                queue.write_texture(
+                    wgpu::ImageCopyTexture {
+                        texture: &t.texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &bytes,
+                    data_layout,
+                    tex_size,
+                );
+                return;
+            }
+        }
+
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("iv-image-tex"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
+            size: tex_size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -300,16 +337,8 @@ impl Renderer {
                 aspect: wgpu::TextureAspect::All,
             },
             &bytes,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(bytes_per_pixel * width),
-                rows_per_image: Some(height),
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
+            data_layout,
+            tex_size,
         );
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -340,6 +369,14 @@ impl Renderer {
             .write()
             .callback_resources
             .insert(CurrentBindGroup(Some(bind_group)));
+        // 注意：bind group 的所有权已移交 callback_resources，
+        // 其内部的 texture view 会保活纹理；这里仅保留 texture 句柄供复用写入。
+        self.tex = Some(TexReuse {
+            texture,
+            width,
+            height,
+            format,
+        });
         self.has_image = true;
     }
 

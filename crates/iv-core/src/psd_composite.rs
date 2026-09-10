@@ -156,6 +156,7 @@ pub fn decode_psd(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         has_alpha,
         is_hdr: false,
         extra_meta: None,
+        frames: Vec::new(),
     })
 }
 

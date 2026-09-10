@@ -51,12 +51,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4f {
         c = textureSample(t_image, s_linear, uv);
     }
 
-    // HDR：曝光 → Reinhard tonemap → gamma
+    // HDR：曝光 → Reinhard tonemap → gamma（WGSL 不支持 swizzle 赋值，用局部变量）
     if ((u.flags & 4u) != 0u) {
         let e = max(u.exposure, 0.0001);
-        c.rgb = c.rgb * e;
-        c.rgb = c.rgb / (vec3f(1.0) + c.rgb);
-        c.rgb = pow(max(c.rgb, vec3f(0.0)), vec3f(1.0 / 2.2));
+        var hdr = c.rgb * e;
+        hdr = hdr / (vec3f(1.0) + hdr);
+        hdr = pow(max(hdr, vec3f(0.0)), vec3f(1.0 / 2.2));
+        c = vec4f(hdr, c.a);
     }
 
     // 通道模式
@@ -65,7 +66,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4f {
         case 2u: { c = vec4f(c.ggg, 1.0); }
         case 3u: { c = vec4f(c.bbb, 1.0); }
         case 4u: { c = vec4f(c.aaa, 1.0); }
-        case 5u: { c.a = 1.0; }
+        case 5u: { c = vec4f(c.rgb, 1.0); }
         default: {}
     }
 

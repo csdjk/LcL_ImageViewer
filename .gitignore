@@ -1,6 +1,9 @@
 # Rust 构建产物
 /target/
 
+# 打包产物
+/dist/
+
 # 测试图（可用 tools/gen_test_images.ps1 重新生成）
 /test_images/
 

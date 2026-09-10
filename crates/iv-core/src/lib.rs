@@ -9,4 +9,4 @@ pub mod decode;
 pub mod format;
 pub mod psd_composite;
 
-pub use decode::{decode_bytes, decode_path, DecodedImage, DecodeError, ImageKind, MipLevel, PixelData};
+pub use decode::{decode_bytes, decode_path, AnimatedFrame, DecodedImage, DecodeError, ImageKind, MipLevel, PixelData};
