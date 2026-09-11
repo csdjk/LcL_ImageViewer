@@ -8,6 +8,7 @@ mod app;
 mod loader;
 mod render;
 mod ui;
+mod winassoc;
 
 fn main() -> eframe::Result<()> {
     // 命令行参数：可选的初始文件路径（文件关联 / 拖到 exe 上打开）
@@ -29,7 +30,7 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "LcL ImageView",
+        "LcL ImageViewer",
         options,
         Box::new(move |cc| Box::new(app::App::new(cc, initial_path))),
     )

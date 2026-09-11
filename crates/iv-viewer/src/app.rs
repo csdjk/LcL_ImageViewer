@@ -15,6 +15,7 @@ use iv_core::format::has_supported_ext;
 use crate::loader::{Loader, Msg};
 use crate::render::{ChannelMode, Renderer, Uniforms};
 use crate::ui::{self, Icon, Palette, ThemeMode};
+use crate::winassoc;
 
 /// 预读缓存内存预算（解码后像素总量）
 const CACHE_BUDGET_BYTES: usize = 192 * 1024 * 1024;
@@ -113,6 +114,12 @@ pub struct App {
     probe_color: Option<[u8; 4]>,
     /// 图像属性窗口是否打开
     show_props: bool,
+    /// 设置窗口是否打开
+    show_settings: bool,
+    /// 半透明图像背景：true=棋盘格，false=纯画布背景色
+    checkerboard: bool,
+    /// "打开方式"注册状态缓存（打开设置窗口时刷新）
+    assoc_registered: bool,
     /// 画布上一帧尺寸（检测 resize）
     last_canvas_size: Vec2,
     /// 缩放百分比浮层剩余显示时间（秒）与值
@@ -170,6 +177,13 @@ impl App {
             probe_text: String::new(),
             probe_color: None,
             show_props: false,
+            show_settings: false,
+            checkerboard: cc
+                .storage
+                .and_then(|s| s.get_string("iv-checkerboard"))
+                .as_deref()
+                != Some("off"),
+            assoc_registered: false,
             last_canvas_size: Vec2::ZERO,
             zoom_flash: None,
             pending_fit: false,
@@ -442,7 +456,7 @@ impl App {
     }
 
     fn handle_global_input(&mut self, ctx: &egui::Context, canvas: Vec2) {
-        // Esc 逐层关闭：右键菜单 → 下拉弹窗 → 属性窗口 → 退出程序
+        // Esc 逐层关闭：右键菜单 → 下拉弹窗 → 属性/设置窗口 → 退出程序
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             if self.ctx_menu_pos.is_some() {
                 self.ctx_menu_pos = None;
@@ -454,6 +468,10 @@ impl App {
             }
             if self.show_props {
                 self.show_props = false;
+                return;
+            }
+            if self.show_settings {
+                self.show_settings = false;
                 return;
             }
             ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -577,9 +595,9 @@ impl App {
         let title = match &self.current {
             Some(c) => {
                 let name = c.path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-                format!("{name} — LcL ImageView")
+                format!("{name} — LcL ImageViewer")
             }
-            None => "LcL ImageView".to_string(),
+            None => "LcL ImageViewer".to_string(),
         };
         if title != self.last_title {
             ctx.send_viewport_cmd(ViewportCommand::Title(title.clone()));
@@ -615,6 +633,7 @@ impl App {
             || ctx.memory(|m| m.any_popup_open())
             || self.ctx_menu_pos.is_some()
             || self.show_props
+            || self.show_settings
             || self.error_msg.is_some();
         let top_show = !has_image || recent || busy;
         let bot_show = has_image && (recent || busy);
@@ -662,7 +681,7 @@ impl App {
                             self.open_dialog();
                         }
                         if self.current.is_none() && self.pending.is_none() {
-                            ui.label(RichText::new("打开或拖入图片").size(12.5).color(pal.dim));
+                            ui::bar_label(ui, "打开或拖入图片", 12.5, pal.dim);
                         }
 
                         // —— 目录导航 ——
@@ -679,12 +698,7 @@ impl App {
                             {
                                 self.step(-1);
                             }
-                            ui.label(
-                                RichText::new(format!("{}/{}", i + 1, n))
-                                    .monospace()
-                                    .size(11.5)
-                                    .color(pal.dim),
-                            );
+                            ui::bar_label_mono(ui, format!("{}/{}", i + 1, n), 11.5, pal.dim);
                             if ui::icon_btn(ui, Icon::Next, false, pal)
                                 .on_hover_text("下一张 (→)")
                                 .clicked()
@@ -708,30 +722,30 @@ impl App {
                             let file_size = std::fs::metadata(&cur.path)
                                 .map(|m| fmt_size(m.len()))
                                 .unwrap_or_default();
-                            ui.label(RichText::new(name).size(13.0).strong().color(pal.text));
+                            ui::bar_label(ui, name, 13.0, pal.text_bright);
                             ui::badge(ui, img.kind.label(), pal)
                                 .on_hover_text(format!("文件大小 {file_size}"));
                             if let Some(c) = &img.compression {
                                 ui::badge(ui, c, pal);
                             }
-                            ui.label(
-                                RichText::new(format!("{}×{}", img.width, img.height))
-                                    .monospace()
-                                    .size(11.5)
-                                    .color(pal.dim),
+                            ui::bar_label_mono(
+                                ui,
+                                format!("{}×{}", img.width, img.height),
+                                11.5,
+                                pal.dim,
                             );
                             if let Some(e) = &img.extra_meta {
-                                ui.label(RichText::new(e).size(11.0).color(pal.faint));
+                                ui::bar_label(ui, e, 11.0, pal.faint);
                             }
                         } else if self.pending.is_some() {
                             ui::sep(ui, pal);
-                            ui.label(RichText::new("加载中…").size(12.5).color(pal.dim));
+                            ui::bar_label(ui, "加载中…", 12.5, pal.dim);
                         }
 
                         if self.current.is_some() {
                             // —— 通道 ——
                             ui::sep(ui, pal);
-                            ui.label(RichText::new("通道").size(11.0).color(pal.faint));
+                            ui::bar_label(ui, "通道", 11.0, pal.faint);
                             for (target, label, tip) in [
                                 (ChannelMode::Rgb, "RGB", "完整 RGBA（5 或 C），O 键忽略 Alpha"),
                                 (ChannelMode::R, "R", "红通道 (1)"),
@@ -886,7 +900,7 @@ impl App {
                             }
                         }
 
-                        // —— 主题切换 ——
+                        // —— 主题切换 + 设置 ——
                         ui::sep(ui, pal);
                         let (icon, tip) = match self.theme {
                             ThemeMode::Dark => (Icon::Sun, "切换到浅色主题 (T)"),
@@ -894,6 +908,13 @@ impl App {
                         };
                         if ui::icon_btn(ui, icon, false, pal).on_hover_text(tip).clicked() {
                             self.toggle_theme(ctx);
+                        }
+                        if ui::icon_btn(ui, Icon::Settings, false, pal)
+                            .on_hover_text("设置")
+                            .clicked()
+                        {
+                            self.show_settings = true;
+                            self.assoc_registered = winassoc::is_registered();
                         }
                     });
                 });
@@ -1179,6 +1200,11 @@ impl App {
             self.open_dialog();
             self.ctx_menu_pos = None;
         }
+        if ui.button("设置…").clicked() {
+            self.show_settings = true;
+            self.assoc_registered = winassoc::is_registered();
+            self.ctx_menu_pos = None;
+        }
 
         // 目录导航
         if self
@@ -1382,10 +1408,135 @@ impl App {
         }
         self.show_props = open;
     }
+
+    /// 设置窗口（顶栏齿轮 / 右键菜单打开）：外观 + Windows 集成 + 关于。
+    fn draw_settings_window(&mut self, ctx: &egui::Context, pal: &Palette) {
+        if !self.show_settings {
+            return;
+        }
+        let mut open = self.show_settings;
+        egui::Window::new("设置")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .default_width(330.0)
+            .show(ctx, |ui| {
+                // —— 外观 ——
+                ui.label(RichText::new("外观").color(pal.text).strong());
+                ui.add_space(2.0);
+                egui::Grid::new("iv-settings-look")
+                    .num_columns(2)
+                    .spacing([16.0, 9.0])
+                    .show(ui, |ui| {
+                        ui.label(RichText::new("主题").color(pal.dim));
+                        ui.horizontal(|ui| {
+                            let mut mode = self.theme;
+                            let changed = ui
+                                .selectable_value(&mut mode, ThemeMode::Dark, "深色")
+                                .changed()
+                                | ui.selectable_value(&mut mode, ThemeMode::Light, "浅色")
+                                    .changed();
+                            if changed && mode != self.theme {
+                                ThemeMode::apply_to(ctx, mode);
+                                self.theme = mode;
+                            }
+                        });
+                        ui.end_row();
+
+                        ui.label(RichText::new("透明背景").color(pal.dim))
+                            .on_hover_text("含 Alpha 通道图片的背景");
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut self.checkerboard, true, "棋盘格");
+                            ui.selectable_value(&mut self.checkerboard, false, "纯色");
+                        });
+                        ui.end_row();
+                    });
+
+                ui.add_space(4.0);
+                ui.separator();
+                ui.add_space(4.0);
+
+                // —— Windows 集成 ——
+                ui.label(RichText::new("Windows 集成").color(pal.text).strong());
+                ui.add_space(2.0);
+                let (status, tip) = if self.assoc_registered {
+                    ("已注册到「打开方式」", "列表中将显示图标与名称，可选「始终」")
+                } else {
+                    ("未注册", "注册后才能出现在打开方式列表并支持「始终」")
+                };
+                ui.horizontal(|ui| {
+                    let status_color = if self.assoc_registered { pal.accent } else { pal.faint };
+                    ui.label(RichText::new(status).color(status_color));
+                    ui.label(RichText::new(tip).small().color(pal.faint));
+                });
+                ui.horizontal(|ui| {
+                    if self.assoc_registered {
+                        if ui
+                            .button("解除注册")
+                            .on_hover_text("从打开方式列表与默认应用候选中移除")
+                            .clicked()
+                        {
+                            if let Err(e) = winassoc::unregister() {
+                                self.error_msg = Some(e);
+                            }
+                            self.assoc_registered = winassoc::is_registered();
+                        }
+                    } else if ui
+                        .button("注册到「打开方式」")
+                        .on_hover_text("写入 HKCU，无需管理员权限")
+                        .clicked()
+                    {
+                        if let Err(e) = winassoc::register() {
+                            self.error_msg = Some(e);
+                        }
+                        self.assoc_registered = winassoc::is_registered();
+                    }
+                    if ui
+                        .button("设为默认看图软件…")
+                        .on_hover_text("打开系统「默认应用」设置页")
+                        .clicked()
+                    {
+                        // 未注册时先补注册，否则系统默认应用页里找不到本应用
+                        if !self.assoc_registered {
+                            if let Err(e) = winassoc::register() {
+                                self.error_msg = Some(e);
+                            }
+                            self.assoc_registered = winassoc::is_registered();
+                        }
+                        winassoc::open_default_apps_settings();
+                    }
+                });
+                ui.label(
+                    RichText::new("Win10/11 的默认关联需在系统设置页确认，程序无法代为设置")
+                        .small()
+                        .color(pal.faint),
+                );
+
+                ui.add_space(4.0);
+                ui.separator();
+                ui.add_space(4.0);
+
+                // —— 关于 ——
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(winassoc::APP_NAME).color(pal.text).strong());
+                    ui.label(
+                        RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                            .small()
+                            .color(pal.faint),
+                    );
+                });
+                ui.label(
+                    RichText::new("轻量级游戏美术看图工具 · DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG")
+                        .small()
+                        .color(pal.faint),
+                );
+            });
+        self.show_settings = open;
+    }
 }
 
 impl eframe::App for App {
-    /// 退出时持久化主题（eframe persistence）。
+    /// 退出时持久化主题与外观设置（eframe persistence）。
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string(
             "iv-theme",
@@ -1393,6 +1544,10 @@ impl eframe::App for App {
                 ThemeMode::Dark => "dark".into(),
                 ThemeMode::Light => "light".into(),
             },
+        );
+        storage.set_string(
+            "iv-checkerboard",
+            if self.checkerboard { "on" } else { "off" }.into(),
         );
     }
 
@@ -1495,6 +1650,7 @@ impl eframe::App for App {
         self.over_overlay = over_top || over_err || over_bot;
         self.draw_ctx_menu_overlay(ctx, &pal, canvas_rect);
         self.draw_props_window(ctx, &pal);
+        self.draw_settings_window(ctx, &pal);
 
         // 像素检查器（光标 → 图像坐标 → 像素值）
         // 右键菜单弹出 / 拖拽时 hover 消失 → 冻结上一帧值；指针离开窗口才清空
@@ -1552,7 +1708,8 @@ impl eframe::App for App {
                         .as_ref()
                         .map(|c| c.img.has_alpha)
                         .unwrap_or(false);
-                    if has_alpha {
+                    // 半透明背景：棋盘格或纯画布背景色（ALPHA_BLENDING 透出底色）
+                    if has_alpha && self.checkerboard {
                         flags |= 2;
                     }
                     let is_hdr = self

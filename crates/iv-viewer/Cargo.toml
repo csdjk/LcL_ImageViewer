@@ -25,3 +25,5 @@ rfd = "0.13"
 bytemuck = { version = "1", features = ["derive"] }
 # 仅用于启动时解码窗口图标 PNG
 image = { version = "0.25", default-features = false, features = ["png"] }
+# HKCU 文件关联注册（设置面板"打开方式"集成）
+winreg = "0.52"

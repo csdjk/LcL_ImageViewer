@@ -74,8 +74,6 @@ pub struct Palette {
     pub icon: Color32,
     /// 图标按钮悬停底
     pub btn_hover: Color32,
-    /// 开关按钮激活底
-    pub btn_on_bg: Color32,
     /// 常规控件（下拉框/滑条）底色
     pub w_bg: Color32,
     /// 常规控件悬停底
@@ -118,7 +116,6 @@ pub fn palette(ctx: &egui::Context) -> Palette {
             overlay_border: Color32::from_white_alpha(22),
             icon: rgb(0xbd, 0xca, 0xc1),
             btn_hover: Color32::from_white_alpha(14),
-            btn_on_bg: Color32::from_rgba_unmultiplied(0x8f, 0xbc, 0xa4, 38),
             w_bg: rgb(0x2d, 0x35, 0x30),
             w_hover: rgb(0x36, 0x40, 0x3a),
             w_border: rgb(0x3d, 0x48, 0x42),
@@ -151,7 +148,6 @@ pub fn palette(ctx: &egui::Context) -> Palette {
             overlay_border: Color32::from_white_alpha(130),
             icon: rgb(0x5a, 0x6f, 0x62),
             btn_hover: Color32::from_white_alpha(70),
-            btn_on_bg: Color32::from_rgba_unmultiplied(0x5d, 0x8f, 0x74, 26),
             w_bg: rgb(0xdf, 0xe8, 0xe1),
             w_hover: rgb(0xd5, 0xe1, 0xd8),
             w_border: rgb(0xc3, 0xd1, 0xc7),
@@ -281,6 +277,7 @@ pub enum Icon {
     Sun,
     Moon,
     Close,
+    Settings,
 }
 
 /// 在 rect 内绘制图标。
@@ -413,7 +410,44 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
                 st,
             );
         }
+        Icon::Settings => {
+            // 齿轮：外圈 8 齿 + 中心圆孔
+            for i in 0..8 {
+                let a = i as f32 * std::f32::consts::TAU / 8.0;
+                p.line_segment(
+                    [
+                        Pos2::new(c.x + a.cos() * 4.6 * u, c.y + a.sin() * 4.6 * u),
+                        Pos2::new(c.x + a.cos() * 6.6 * u, c.y + a.sin() * 6.6 * u),
+                    ],
+                    Stroke::new(2.2 * u, color),
+                );
+            }
+            p.circle_stroke(c, 4.2 * u, st);
+        }
     }
+}
+
+/// 工具栏文本：固定 26px 高（与图标按钮同高），galley 垂直居中绘制。
+/// 避免不同字号文本直接 ui.label 时因 rect 高度不一、中心对齐后基线参差不齐。
+pub fn bar_label(ui: &mut egui::Ui, text: impl Into<String>, size: f32, color: Color32) -> egui::Response {
+    let font = FontId::new(size, FontFamily::Proportional);
+    let galley = ui.fonts(|f| f.layout_no_wrap(text.into(), font, color));
+    let (rect, resp) =
+        ui.allocate_exact_size(Vec2::new(galley.size().x, 26.0), Sense::hover());
+    let gp = Pos2::new(rect.left(), rect.center().y - galley.size().y / 2.0);
+    ui.painter().galley(gp, galley, color);
+    resp
+}
+
+/// 等宽字体的工具栏文本（数字读数），同 bar_label 但用 Monospace 族。
+pub fn bar_label_mono(ui: &mut egui::Ui, text: impl Into<String>, size: f32, color: Color32) -> egui::Response {
+    let font = FontId::new(size, FontFamily::Monospace);
+    let galley = ui.fonts(|f| f.layout_no_wrap(text.into(), font, color));
+    let (rect, resp) =
+        ui.allocate_exact_size(Vec2::new(galley.size().x, 26.0), Sense::hover());
+    let gp = Pos2::new(rect.left(), rect.center().y - galley.size().y / 2.0);
+    ui.painter().galley(gp, galley, color);
+    resp
 }
 
 /* ============================== 图标按钮 ============================== */
@@ -524,15 +558,20 @@ fn badge_colors(text: &str, dark: bool) -> (Color32, Color32) {
     }
 }
 
-/// 画一个小圆角徽章（格式/压缩标签），返回其响应（hover tooltip 可叠加）。
+/// 徽章：固定 26px 高（与图标按钮同高），底色块与文字在行内垂直居中。
 pub fn badge(ui: &mut egui::Ui, text: &str, pal: &Palette) -> egui::Response {
     let (fg, bg) = badge_colors(text, pal.is_dark);
     let font = egui::FontId::new(11.0, FontFamily::Proportional);
     // layout_no_wrap：徽章文字绝不换行
     let galley = ui.fonts(|f| f.layout_no_wrap(format!(" {text} "), font, fg));
-    let (rect, resp) = ui.allocate_exact_size(galley.size(), Sense::hover());
-    ui.painter().rect_filled(rect, Rounding::same(4.0), bg);
-    ui.painter().galley(rect.left_top(), galley, fg);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(galley.size().x, 26.0), Sense::hover());
+    // 色块高度取文字高度 + 上下各 2px，垂直居中于行
+    let pill = Rect::from_center_size(
+        rect.center(),
+        Vec2::new(galley.size().x, galley.size().y + 4.0),
+    );
+    ui.painter().rect_filled(pill, Rounding::same(4.0), bg);
+    ui.painter().galley(pill.left_top(), galley, fg);
     resp
 }
 

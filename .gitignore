@@ -13,3 +13,7 @@ rustup-init.exe
 # IDE
 .idea/
 .vscode/
+
+# 开发验证截图与本地设计稿
+/ui-verify-shots/
+/wellness-landing/

@@ -10,7 +10,7 @@ $dll = (Resolve-Path $dll).Path
 # CLSID registration
 $base = "HKCU:\Software\Classes\CLSID\$clsid"
 New-Item -Path "$base\InprocServer32" -Force | Out-Null
-Set-ItemProperty -Path $base -Name '(Default)' -Value 'LcL ImageView Thumbnail Provider'
+Set-ItemProperty -Path $base -Name '(Default)' -Value 'LcL ImageViewer Thumbnail Provider'
 Set-ItemProperty -Path "$base\InprocServer32" -Name '(Default)' -Value $dll
 Set-ItemProperty -Path "$base\InprocServer32" -Name 'ThreadingModel' -Value 'Apartment'
 
