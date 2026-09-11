@@ -1,9 +1,9 @@
 ; LcL ImageView 安装包脚本（Inno Setup 7）
-; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageView-Setup-v0.1.0-win64.exe
+; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageView-Setup-v0.2.0-win64.exe
 ; 免管理员：装到 {localappdata}\Programs，注册表全走 HKCU
 
 #define MyAppName "LcL ImageView"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.2.0"
 #define MyAppExe "imageview.exe"
 #define ThumbClsid "7A3E9B21-4C5D-4E8F-9A6B-1D2C3E4F5A6B"
 

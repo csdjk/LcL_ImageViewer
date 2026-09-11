@@ -89,6 +89,10 @@ pub struct Palette {
     pub err_text: Color32,
     /// 悬浮胶囊投影
     pub shadow: egui::epaint::Shadow,
+    /// 新拟态：右下暗阴影色（软凸起/凹陷的暗侧）
+    pub neu_dark: Color32,
+    /// 新拟态：左上亮高光色（软凸起的亮侧）
+    pub neu_light: Color32,
 }
 
 const fn rgb(r: u8, g: u8, b: u8) -> Color32 {
@@ -98,65 +102,71 @@ const fn rgb(r: u8, g: u8, b: u8) -> Color32 {
 /// 当前主题配色板。
 pub fn palette(ctx: &egui::Context) -> Palette {
     match ThemeMode::current(ctx) {
+        // 深色新拟态：深绿灰底 + 柔和黑影 + 微亮高光，accent 为浅苔绿
         ThemeMode::Dark => Palette {
             is_dark: true,
-            bg: rgb(0x16, 0x18, 0x1d),
-            bar: rgb(0x1d, 0x20, 0x27),
-            canvas: rgb(0x0d, 0x0e, 0x12),
-            text: rgb(0xd7, 0xda, 0xe0),
+            bg: rgb(0x26, 0x2d, 0x29),
+            bar: rgb(0x26, 0x2d, 0x29),
+            canvas: rgb(0x20, 0x27, 0x24),
+            text: rgb(0xd3, 0xde, 0xd6),
             text_bright: Color32::WHITE,
-            dim: rgb(0x8b, 0x8f, 0x98),
-            faint: rgb(0x55, 0x5a, 0x64),
-            border: rgb(0x2a, 0x2e, 0x37),
-            accent: rgb(0x4c, 0x8d, 0xff),
-            overlay: Color32::from_rgba_unmultiplied(0x20, 0x24, 0x2c, 232),
-            overlay_border: Color32::from_rgba_unmultiplied(0x46, 0x4d, 0x5c, 160),
-            icon: rgb(0xc2, 0xc6, 0xce),
-            btn_hover: Color32::from_white_alpha(20),
-            btn_on_bg: Color32::from_rgba_unmultiplied(0x4c, 0x8d, 0xff, 44),
-            w_bg: rgb(0x26, 0x2b, 0x35),
-            w_hover: rgb(0x33, 0x39, 0x47),
-            w_border: rgb(0x33, 0x38, 0x44),
-            extreme: rgb(0x10, 0x12, 0x16),
-            err_bg: rgb(0x3a, 0x20, 0x28),
-            err_border: rgb(0x6e, 0x36, 0x44),
-            err_text: rgb(0xff, 0x7b, 0x72),
+            dim: rgb(0x8b, 0x9a, 0x90),
+            faint: rgb(0x5c, 0x6a, 0x61),
+            border: rgb(0x37, 0x41, 0x3b),
+            accent: rgb(0x8f, 0xbc, 0xa4),
+            overlay: Color32::from_rgba_unmultiplied(0x2a, 0x32, 0x2d, 242),
+            overlay_border: Color32::from_white_alpha(22),
+            icon: rgb(0xbd, 0xca, 0xc1),
+            btn_hover: Color32::from_white_alpha(14),
+            btn_on_bg: Color32::from_rgba_unmultiplied(0x8f, 0xbc, 0xa4, 38),
+            w_bg: rgb(0x2d, 0x35, 0x30),
+            w_hover: rgb(0x36, 0x40, 0x3a),
+            w_border: rgb(0x3d, 0x48, 0x42),
+            extreme: rgb(0x1c, 0x22, 0x1f),
+            err_bg: rgb(0x3d, 0x2a, 0x28),
+            err_border: rgb(0x6b, 0x40, 0x3b),
+            err_text: rgb(0xe8, 0x9a, 0x90),
             shadow: egui::epaint::Shadow {
-                offset: egui::vec2(0.0, 6.0),
-                blur: 18.0,
+                offset: egui::vec2(0.0, 8.0),
+                blur: 22.0,
                 spread: 0.0,
-                color: Color32::from_black_alpha(110),
+                color: Color32::from_black_alpha(85),
             },
+            neu_dark: Color32::from_black_alpha(120),
+            neu_light: Color32::from_rgba_unmultiplied(0x46, 0x52, 0x4b, 110),
         },
+        // 浅色新拟态（治愈系主场）：雾感鼠尾草绿底，元素与底同色、靠双向软阴影塑形
         ThemeMode::Light => Palette {
             is_dark: false,
-            bg: rgb(0xf2, 0xf3, 0xf6),
-            bar: rgb(0xfb, 0xfc, 0xfe),
-            canvas: rgb(0xe6, 0xe8, 0xed),
-            text: rgb(0x24, 0x27, 0x2d),
-            text_bright: rgb(0x0a, 0x0c, 0x10),
-            dim: rgb(0x64, 0x69, 0x72),
-            faint: rgb(0x9b, 0xa0, 0xaa),
-            border: rgb(0xd4, 0xd7, 0xde),
-            accent: rgb(0x2f, 0x6f, 0xde),
-            overlay: Color32::from_rgba_unmultiplied(0xfc, 0xfd, 0xff, 240),
-            overlay_border: Color32::from_black_alpha(16),
-            icon: rgb(0x4c, 0x51, 0x5a),
-            btn_hover: Color32::from_black_alpha(10),
-            btn_on_bg: Color32::from_rgba_unmultiplied(0x2f, 0x6f, 0xde, 30),
-            w_bg: rgb(0xe7, 0xe9, 0xef),
-            w_hover: rgb(0xdb, 0xde, 0xe5),
-            w_border: rgb(0xc8, 0xcc, 0xd4),
-            extreme: rgb(0xe2, 0xe4, 0xea),
-            err_bg: rgb(0xfd, 0xec, 0xec),
-            err_border: rgb(0xe6, 0xb3, 0xad),
-            err_text: rgb(0xc0, 0x39, 0x2e),
+            bg: rgb(0xe6, 0xef, 0xe9),
+            bar: rgb(0xe6, 0xef, 0xe9),
+            canvas: rgb(0xdc, 0xe7, 0xdf),
+            text: rgb(0x3f, 0x52, 0x48),
+            text_bright: rgb(0x2c, 0x3b, 0x32),
+            dim: rgb(0x6d, 0x7f, 0x74),
+            faint: rgb(0x9a, 0xaa, 0xa0),
+            border: rgb(0xc3, 0xd1, 0xc7),
+            accent: rgb(0x5d, 0x8f, 0x74),
+            overlay: Color32::from_rgba_unmultiplied(0xea, 0xf2, 0xec, 246),
+            overlay_border: Color32::from_white_alpha(130),
+            icon: rgb(0x5a, 0x6f, 0x62),
+            btn_hover: Color32::from_white_alpha(70),
+            btn_on_bg: Color32::from_rgba_unmultiplied(0x5d, 0x8f, 0x74, 26),
+            w_bg: rgb(0xdf, 0xe8, 0xe1),
+            w_hover: rgb(0xd5, 0xe1, 0xd8),
+            w_border: rgb(0xc3, 0xd1, 0xc7),
+            extreme: rgb(0xd8, 0xe2, 0xda),
+            err_bg: rgb(0xf6, 0xe3, 0xe0),
+            err_border: rgb(0xe0, 0xb5, 0xae),
+            err_text: rgb(0xa1, 0x4e, 0x46),
             shadow: egui::epaint::Shadow {
-                offset: egui::vec2(0.0, 5.0),
-                blur: 16.0,
+                offset: egui::vec2(0.0, 10.0),
+                blur: 26.0,
                 spread: 0.0,
-                color: Color32::from_black_alpha(45),
+                color: Color32::from_rgba_unmultiplied(0x74, 0x8a, 0x7c, 60),
             },
+            neu_dark: Color32::from_rgba_unmultiplied(0x9f, 0xb5, 0xa8, 130),
+            neu_light: Color32::from_white_alpha(200),
         },
     }
 }
@@ -178,15 +188,15 @@ pub fn apply(ctx: &egui::Context) {
     v.widgets.inactive.weak_bg_fill = pal.w_bg;
     v.widgets.inactive.fg_stroke = Stroke::new(1.0f32, pal.text);
     v.widgets.inactive.bg_stroke = Stroke::new(1.0f32, pal.w_border);
-    v.widgets.inactive.rounding = Rounding::same(6.0);
+    v.widgets.inactive.rounding = Rounding::same(10.0);
     v.widgets.hovered.weak_bg_fill = pal.w_hover;
     v.widgets.hovered.fg_stroke = Stroke::new(1.0f32, pal.text_bright);
-    v.widgets.hovered.rounding = Rounding::same(6.0);
+    v.widgets.hovered.rounding = Rounding::same(10.0);
     v.widgets.active.bg_fill = pal.accent;
     v.widgets.active.fg_stroke = Stroke::new(1.0f32, Color32::WHITE);
-    v.widgets.active.rounding = Rounding::same(6.0);
+    v.widgets.active.rounding = Rounding::same(10.0);
     v.widgets.open.weak_bg_fill = pal.w_bg;
-    v.widgets.open.rounding = Rounding::same(6.0);
+    v.widgets.open.rounding = Rounding::same(10.0);
     // 关闭悬停/按下时的尺寸膨胀：现代 UI 保持稳定尺寸
     v.widgets.inactive.expansion = 0.0;
     v.widgets.hovered.expansion = 0.0;
@@ -194,8 +204,8 @@ pub fn apply(ctx: &egui::Context) {
     v.widgets.open.expansion = 0.0;
     v.widgets.noninteractive.fg_stroke = Stroke::new(1.0f32, pal.dim);
     v.widgets.noninteractive.bg_stroke = Stroke::new(1.0f32, pal.border);
-    v.window_rounding = Rounding::same(10.0);
-    v.menu_rounding = Rounding::same(8.0);
+    v.window_rounding = Rounding::same(16.0);
+    v.menu_rounding = Rounding::same(14.0);
     // 浮层投影：小偏移 + 大羽化
     let (pa, wa) = if pal.is_dark { (96, 110) } else { (35, 55) };
     v.popup_shadow = egui::epaint::Shadow {
@@ -227,13 +237,13 @@ pub fn apply(ctx: &egui::Context) {
 
 /* ============================== 悬浮胶囊 ============================== */
 
-/// 悬浮工具条容器：半透明底 + 细描边 + 胶囊圆角 + 投影。
+/// 悬浮工具条容器：近不透明底 + 高光细边 + 大圆角 + 柔和投影。
 pub fn capsule(pal: &Palette) -> egui::Frame {
     egui::Frame::default()
         .fill(pal.overlay)
         .stroke(Stroke::new(1.0f32, pal.overlay_border))
-        .rounding(Rounding::same(18.0))
-        .inner_margin(egui::Margin::symmetric(8.0, 5.0))
+        .rounding(Rounding::same(22.0))
+        .inner_margin(egui::Margin::symmetric(9.0, 6.0))
         .shadow(pal.shadow)
 }
 
@@ -250,8 +260,8 @@ pub fn menu_frame(pal: &Palette) -> egui::Frame {
     egui::Frame::default()
         .fill(pal.bar)
         .stroke(Stroke::new(1.0f32, pal.overlay_border))
-        .rounding(Rounding::same(10.0))
-        .inner_margin(egui::Margin::symmetric(4.0, 4.0))
+        .rounding(Rounding::same(16.0))
+        .inner_margin(egui::Margin::symmetric(5.0, 5.0))
         .shadow(pal.shadow)
 }
 
@@ -408,21 +418,58 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
 
 /* ============================== 图标按钮 ============================== */
 
-/// 图标按钮：28×26，透明底，悬停淡底色，激活态（开关）为强调色。
+/// 新拟态软凸起：右下暗阴影 + 左上亮高光（用 Shadow::tessellate 叠两层 mesh）。
+fn paint_neu_raise(p: &egui::Painter, rect: Rect, rounding: Rounding, pal: &Palette) {
+    let dark = egui::epaint::Shadow {
+        offset: egui::vec2(3.0, 4.0),
+        blur: 9.0,
+        spread: 0.0,
+        color: pal.neu_dark,
+    };
+    let light = egui::epaint::Shadow {
+        offset: egui::vec2(-3.0, -3.0),
+        blur: 9.0,
+        spread: 0.0,
+        color: pal.neu_light,
+    };
+    p.add(egui::Shape::mesh(dark.tessellate(rect, rounding)));
+    p.add(egui::Shape::mesh(light.tessellate(rect, rounding)));
+}
+
+/// 新拟态凹陷：稍暗的底 + 顶内暗线 / 底内亮线（egui 无内阴影，用边线模拟）。
+fn paint_neu_inset(p: &egui::Painter, rect: Rect, rounding: Rounding, pal: &Palette) {
+    let fill = if pal.is_dark {
+        Color32::from_black_alpha(36)
+    } else {
+        Color32::from_rgba_unmultiplied(0x9f, 0xb5, 0xa8, 44)
+    };
+    p.rect_filled(rect, rounding, fill);
+    // 顶/左边偏暗（光从左上来，凹陷处上沿背光）
+    let top = Rect::from_min_size(rect.min, egui::vec2(rect.width(), 1.6));
+    p.rect_filled(top, Rounding::ZERO, pal.neu_dark);
+    // 底/左边偏亮
+    let bot = Rect::from_min_max(
+        egui::pos2(rect.left(), rect.bottom() - 1.6),
+        rect.max,
+    );
+    p.rect_filled(bot, Rounding::ZERO, pal.neu_light);
+}
+
+/// 图标按钮：28×26，常态透明，悬停软凸起，开关激活态凹陷 + 强调色图标。
 pub fn icon_btn(ui: &mut egui::Ui, icon: Icon, active: bool, pal: &Palette) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(28.0, 26.0), Sense::click());
     if ui.is_rect_visible(rect) {
         let enabled = ui.is_enabled();
-        let hovering = resp.hovered() || resp.is_pointer_button_down_on();
-        let bg = if !enabled {
-            Color32::TRANSPARENT
-        } else if active {
-            pal.btn_on_bg
-        } else if hovering {
-            pal.btn_hover
-        } else {
-            Color32::TRANSPARENT
-        };
+        let hovering = enabled && (resp.hovered() || resp.is_pointer_button_down_on());
+        let p = ui.painter();
+        let r = Rounding::same(9.0);
+        let inner = rect.shrink(1.5);
+        if enabled && active {
+            paint_neu_inset(p, inner, r, pal);
+        } else if enabled && hovering {
+            paint_neu_raise(p, inner, r, pal);
+            p.rect_filled(inner, r, pal.btn_hover);
+        }
         let fg = if !enabled {
             pal.faint
         } else if active {
@@ -432,11 +479,8 @@ pub fn icon_btn(ui: &mut egui::Ui, icon: Icon, active: bool, pal: &Palette) -> e
         } else {
             pal.icon
         };
-        if bg != Color32::TRANSPARENT {
-            ui.painter().rect_filled(rect.shrink(1.5), Rounding::same(7.0), bg);
-        }
         paint_icon(
-            ui.painter(),
+            p,
             icon,
             Rect::from_center_size(rect.center(), Vec2::splat(16.0)),
             fg,
