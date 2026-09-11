@@ -10,12 +10,18 @@ authors.workspace = true
 name = "imageview"
 path = "src/main.rs"
 
+[build-dependencies]
+winres = "0.1"
+
 [dependencies]
 iv-core = { path = "../iv-core" }
 eframe = { version = "0.27", default-features = false, features = [
     "wgpu",
     "default_fonts",
+    "persistence",
 ] }
 crossbeam-channel = "0.5"
 rfd = "0.13"
 bytemuck = { version = "1", features = ["derive"] }
+# 仅用于启动时解码窗口图标 PNG
+image = { version = "0.25", default-features = false, features = ["png"] }
