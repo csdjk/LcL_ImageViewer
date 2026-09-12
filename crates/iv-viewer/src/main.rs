@@ -5,6 +5,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
+mod backdrop;
 mod loader;
 mod render;
 mod ui;
@@ -17,7 +18,13 @@ fn main() -> eframe::Result<()> {
         .map(std::path::PathBuf::from)
         .find(|p| p.is_file());
 
+    // 注：窗口保持不透明。wgpu flip-model swapchain 窗口上 DWM 磨砂材质
+    // （Acrylic/Mica）均不生效，窗口磨砂背景由 backdrop.rs 自实现
+    // （截取窗口背后画面 → 模糊 → 作画布背景）。
+    // 无边框：去掉系统标题栏/边框，整个窗口由自绘 UI（悬浮胶囊工具栏 +
+    // 全窗磨砂背景）接管；拖动/缩放/最小最大/关闭均在 app.rs 内自绘实现。
     let mut viewport = eframe::egui::ViewportBuilder::default()
+        .with_decorations(false)
         .with_inner_size([1280.0, 860.0])
         .with_min_inner_size([880.0, 560.0]);
     if let Some(icon) = load_window_icon() {

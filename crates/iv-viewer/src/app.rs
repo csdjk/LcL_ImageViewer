@@ -7,13 +7,14 @@ use std::time::{Duration, Instant};
 
 use eframe::egui;
 use eframe::egui::{
-    Color32, ComboBox, Frame, Key, Pos2, RichText, Slider, Stroke, Vec2, ViewportCommand,
+    Color32, ComboBox, CursorIcon, Frame, Key, PointerButton, Pos2, ResizeDirection, RichText,
+    Sense, Slider, Stroke, Vec2, ViewportCommand,
 };
 use iv_core::decode::{DecodedImage, MipLevel, PixelData};
 use iv_core::format::has_supported_ext;
 
 use crate::loader::{Loader, Msg};
-use crate::render::{ChannelMode, Renderer, Uniforms};
+use crate::render::{ChannelMode, Renderer, Uniforms, MAX_GLASS};
 use crate::ui::{self, Icon, Palette, ThemeMode};
 use crate::winassoc;
 
@@ -145,6 +146,33 @@ pub struct App {
     over_overlay: bool,
     /// 自绘右键菜单的打开位置（None = 关闭）
     ctx_menu_pos: Option<Pos2>,
+    /// 本帧玻璃区域（逻辑坐标矩形 + 模糊混合系数 + 圆角半径），绘制悬浮层时收集，
+    /// 供图像 shader 在这些区域内做背景模糊（磨砂玻璃）
+    glass_regions: Vec<(egui::Rect, f32, f32)>,
+    /// 窗口磨砂背景开关（持久化）；关闭时画布回退为不透明渐变
+    backdrop: bool,
+    /// 磨砂不透明度 0..1（主题 tint 强度；越小越透亮）
+    backdrop_opacity: f32,
+    /// 磨砂模糊强度 0..1（捕获时降采样深度 + 盒式模糊遍数）
+    backdrop_blur: f32,
+    /// 磨砂背景亮度 0.5..1.5（捕获画面明暗微调）
+    backdrop_brightness: f32,
+    /// 本进程主窗口句柄（首次 update 时枚举获取）
+    hwnd: Option<isize>,
+    /// 伪磨砂背景：窗口背后画面的低分辨率模糊快照纹理
+    backdrop_tex: Option<egui::TextureHandle>,
+    /// 截图排除标志（WDA_EXCLUDEFROMCAPTURE）当前是否已施加到窗口
+    capture_excluded: bool,
+    /// 截图排除施加时刻（DWM 生效需等待约 80ms 才能 BitBlt）
+    exclude_since: Option<Instant>,
+    /// 最近一次背景快照时刻（捕获节流 + 空闲周期刷新依据）
+    last_capture: Instant,
+    /// 停止移动/调整后释放截图排除的时刻
+    exclude_release_at: Option<Instant>,
+    /// 截图排除不被系统支持（老系统）→ 永久回退渐变画布
+    exclude_unsupported: bool,
+    /// 上次视口外框（检测窗口移动/调整大小以触发重捕）
+    last_outer_rect: Option<egui::Rect>,
 }
 
 impl App {
@@ -183,6 +211,24 @@ impl App {
                 .and_then(|s| s.get_string("iv-checkerboard"))
                 .as_deref()
                 != Some("off"),
+            // 窗口磨砂背景默认开启；老系统不支持截图排除时自动回退渐变画布
+            backdrop: cc
+                .storage
+                .and_then(|s| s.get_string("iv-backdrop"))
+                .as_deref()
+                != Some("off"),
+            backdrop_opacity: load_f32(cc.storage, "iv-bd-opacity", 0.42),
+            backdrop_blur: load_f32(cc.storage, "iv-bd-blur", 0.5),
+            backdrop_brightness: load_f32(cc.storage, "iv-bd-bright", 1.0),
+            hwnd: None,
+            backdrop_tex: None,
+            capture_excluded: false,
+            exclude_since: None,
+            // 拨回过去：首帧立即可触发第一次背景捕获
+            last_capture: Instant::now() - Duration::from_secs(10),
+            exclude_release_at: None,
+            exclude_unsupported: false,
+            last_outer_rect: None,
             assoc_registered: false,
             last_canvas_size: Vec2::ZERO,
             zoom_flash: None,
@@ -198,6 +244,7 @@ impl App {
             last_move: Instant::now(),
             over_overlay: false,
             ctx_menu_pos: None,
+            glass_regions: Vec::new(),
         };
         if let Some(p) = initial_path {
             app.open(p);
@@ -664,12 +711,16 @@ impl App {
             return false;
         }
         let alpha = self.top_alpha;
+        let maximized = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
         let area = egui::Area::new(egui::Id::new("iv-top"))
             .order(egui::Order::Foreground)
             .anchor(egui::Align2::CENTER_TOP, Vec2::new(0.0, 10.0))
+            // 无边框：胶囊本体兼作标题栏——空白处可拖拽移动窗口、双击切换最大化。
+            //（内部按钮在更上层优先响应，不会误触发拖动/双击）
+            .sense(Sense::click_and_drag())
             .show(ctx, |ui| {
                 ui.set_opacity(alpha);
-                ui::capsule(pal).show(ui, |ui| {
+                let frame_resp = ui::capsule(pal).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
 
@@ -916,10 +967,45 @@ impl App {
                             self.show_settings = true;
                             self.assoc_registered = winassoc::is_registered();
                         }
+
+                        // —— 窗口控制（无边框自绘）：最小化 / 最大化·还原 / 关闭 ——
+                        ui::sep(ui, pal);
+                        if ui::icon_btn(ui, Icon::Min, false, pal)
+                            .on_hover_text("最小化")
+                            .clicked()
+                        {
+                            ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+                        }
+                        let (micon, mtip) = if maximized {
+                            (Icon::Restore, "还原")
+                        } else {
+                            (Icon::Max, "最大化")
+                        };
+                        if ui::icon_btn(ui, micon, false, pal).on_hover_text(mtip).clicked() {
+                            ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized));
+                        }
+                        if ui::icon_btn(ui, Icon::Close, false, pal)
+                            .on_hover_text("关闭")
+                            .clicked()
+                        {
+                            ctx.send_viewport_cmd(ViewportCommand::Close);
+                        }
                     });
                 });
+                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
-        Self::rect_hovered(ctx, area.response.rect)
+        // 顶栏胶囊（无边框标题栏）：空白处拖拽移动窗口，双击切换最大化/还原。
+        // 按钮在更上层优先捕获指针，故仅空白处会落到胶囊本体的 drag/click。
+        let resp = area.response;
+        if resp.drag_started_by(PointerButton::Primary) && !maximized {
+            ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+        }
+        if resp.double_clicked() {
+            ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized));
+        }
+        let rect = resp.rect;
+        self.glass_regions.push((rect, alpha, 22.0));
+        Self::rect_hovered(ctx, rect)
     }
 
     /// 错误胶囊（顶栏下方，出错时常显）。返回指针是否悬停。
@@ -937,7 +1023,7 @@ impl App {
             .order(egui::Order::Foreground)
             .anchor(egui::Align2::CENTER_TOP, Vec2::new(0.0, 56.0))
             .show(ctx, |ui| {
-                frame.show(ui, |ui| {
+                let frame_resp = frame.show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(
                             RichText::new(format!("无法打开：{err}"))
@@ -952,8 +1038,11 @@ impl App {
                         }
                     });
                 });
+                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
-        Self::rect_hovered(ctx, area.response.rect)
+        let rect = area.response.rect;
+        self.glass_regions.push((rect, 1.0, 18.0));
+        Self::rect_hovered(ctx, rect)
     }
 
     /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。返回指针是否悬停。
@@ -967,7 +1056,7 @@ impl App {
             .anchor(egui::Align2::CENTER_BOTTOM, Vec2::new(0.0, -10.0))
             .show(ctx, |ui| {
                 ui.set_opacity(alpha);
-                ui::capsule(pal).show(ui, |ui| {
+                let frame_resp = ui::capsule(pal).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 6.0;
 
@@ -1110,8 +1199,11 @@ impl App {
                         slot_resp.on_hover_text("缩放比例（滚轮 · F 适配 · 0 实际大小）");
                     });
                 });
+                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
-        Self::rect_hovered(ctx, area.response.rect)
+        let rect = area.response.rect;
+        self.glass_regions.push((rect, alpha, 22.0));
+        Self::rect_hovered(ctx, rect)
     }
 
     /// 自绘右键菜单壳：定位于右键点击处，点击菜单外 / Esc 关闭。
@@ -1125,12 +1217,16 @@ impl App {
             .fixed_pos(pos)
             .constrain(true)
             .show(ctx, |ui| {
-                ui::menu_frame(pal).show(ui, |ui| {
+                // 限制最大宽度：否则按钮/分隔线会把菜单撑满可用宽度
+                ui.set_max_width(232.0);
+                let frame_resp = ui::menu_frame(pal).show(ui, |ui| {
                     self.draw_context_menu(ui, canvas);
                 });
+                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
         // 左键点击菜单外关闭（右键点别处由画布重新定位菜单）
         let rect = area.response.rect;
+        self.glass_regions.push((rect, 1.0, 16.0));
         let outside_click = ctx.input(|i| {
             i.pointer.primary_pressed()
                 && i.pointer
@@ -1350,6 +1446,7 @@ impl App {
             return;
         }
         let mut open = self.show_props;
+        let mut win_rect = None;
         if let Some(cur) = &self.current {
             let img = &cur.img;
             let name = cur
@@ -1362,7 +1459,7 @@ impl App {
             let file_size = std::fs::metadata(&cur.path)
                 .map(|m| fmt_size(m.len()))
                 .unwrap_or_default();
-            egui::Window::new("图像属性")
+            win_rect = egui::Window::new("图像属性")
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
@@ -1402,11 +1499,15 @@ impl App {
                             }
                             row("文件大小", file_size.clone(), ui);
                         });
-                });
+                })
+                .map(|r| r.response.rect);
         } else {
             open = false;
         }
         self.show_props = open;
+        if let Some(r) = win_rect {
+            self.glass_regions.push((r, 1.0, 16.0));
+        }
     }
 
     /// 设置窗口（顶栏齿轮 / 右键菜单打开）：外观 + Windows 集成 + 关于。
@@ -1415,20 +1516,17 @@ impl App {
             return;
         }
         let mut open = self.show_settings;
-        egui::Window::new("设置")
+        let win_rect = egui::Window::new("设置")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(330.0)
+            .default_width(348.0)
             .show(ctx, |ui| {
+                ui.spacing_mut().item_spacing.y = 10.0;
+
                 // —— 外观 ——
-                ui.label(RichText::new("外观").color(pal.text).strong());
-                ui.add_space(2.0);
-                egui::Grid::new("iv-settings-look")
-                    .num_columns(2)
-                    .spacing([16.0, 9.0])
-                    .show(ui, |ui| {
-                        ui.label(RichText::new("主题").color(pal.dim));
+                ui::settings_card(ui, pal, "外观", |ui| {
+                    ui::setting_row(ui, pal, "主题", "", |ui| {
                         ui.horizontal(|ui| {
                             let mut mode = self.theme;
                             let changed = ui
@@ -1441,82 +1539,112 @@ impl App {
                                 self.theme = mode;
                             }
                         });
-                        ui.end_row();
-
-                        ui.label(RichText::new("透明背景").color(pal.dim))
-                            .on_hover_text("含 Alpha 通道图片的背景");
+                    });
+                    ui.add_space(2.0);
+                    ui::setting_row(ui, pal, "透明背景", "含 Alpha 通道图片的衬底", |ui| {
                         ui.horizontal(|ui| {
                             ui.selectable_value(&mut self.checkerboard, true, "棋盘格");
                             ui.selectable_value(&mut self.checkerboard, false, "纯色");
                         });
-                        ui.end_row();
                     });
+                });
 
-                ui.add_space(4.0);
-                ui.separator();
-                ui.add_space(4.0);
+                // —— 窗口磨砂 ——
+                ui::settings_card(ui, pal, "窗口磨砂", |ui| {
+                    ui::setting_row(ui, pal, "启用磨砂", "画布显示背后内容的模糊（伪磨砂）", |ui| {
+                        let mut on = self.backdrop;
+                        if ui::toggle(ui, &mut on, pal).changed() && on != self.backdrop {
+                            self.backdrop = on;
+                            // update 内的捕获状态机会在下一帧自动开始/停止捕获
+                            if on {
+                                // 拨回周期计时，下一帧立即重捕
+                                self.last_capture = Instant::now() - Duration::from_secs(10);
+                            } else {
+                                self.backdrop_tex = None;
+                            }
+                        }
+                    });
+                    if self.backdrop {
+                        ui.add_space(6.0);
+                        // 不透明度：绘制时实时生效
+                        let mut op = self.backdrop_opacity;
+                        if ui::slider_row(ui, pal, "不透明度", &mut op, 0.05..=0.95, true) {
+                            self.backdrop_opacity = op;
+                        }
+                        ui.add_space(2.0);
+                        // 模糊强度：烘焙在捕获里，改后触发重捕
+                        let mut bl = self.backdrop_blur;
+                        if ui::slider_row(ui, pal, "模糊强度", &mut bl, 0.0..=1.0, true) {
+                            self.backdrop_blur = bl;
+                            self.last_capture = Instant::now() - Duration::from_secs(10);
+                        }
+                        ui.add_space(2.0);
+                        // 背景亮度：绘制时实时生效
+                        let mut br = self.backdrop_brightness;
+                        if ui::slider_row(ui, pal, "背景亮度", &mut br, 0.6..=1.4, true) {
+                            self.backdrop_brightness = br;
+                        }
+                    }
+                });
 
                 // —— Windows 集成 ——
-                ui.label(RichText::new("Windows 集成").color(pal.text).strong());
-                ui.add_space(2.0);
-                let (status, tip) = if self.assoc_registered {
-                    ("已注册到「打开方式」", "列表中将显示图标与名称，可选「始终」")
-                } else {
-                    ("未注册", "注册后才能出现在打开方式列表并支持「始终」")
-                };
-                ui.horizontal(|ui| {
+                ui::settings_card(ui, pal, "Windows 集成", |ui| {
+                    let (status, tip) = if self.assoc_registered {
+                        ("已注册到「打开方式」", "列表中将显示图标与名称，可选「始终」")
+                    } else {
+                        ("未注册", "注册后才能出现在打开方式列表并支持「始终」")
+                    };
                     let status_color = if self.assoc_registered { pal.accent } else { pal.faint };
-                    ui.label(RichText::new(status).color(status_color));
+                    ui.label(RichText::new(status).color(status_color).size(13.0));
                     ui.label(RichText::new(tip).small().color(pal.faint));
-                });
-                ui.horizontal(|ui| {
-                    if self.assoc_registered {
-                        if ui
-                            .button("解除注册")
-                            .on_hover_text("从打开方式列表与默认应用候选中移除")
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if self.assoc_registered {
+                            if ui
+                                .button("解除注册")
+                                .on_hover_text("从打开方式列表与默认应用候选中移除")
+                                .clicked()
+                            {
+                                if let Err(e) = winassoc::unregister() {
+                                    self.error_msg = Some(e);
+                                }
+                                self.assoc_registered = winassoc::is_registered();
+                            }
+                        } else if ui
+                            .button("注册到「打开方式」")
+                            .on_hover_text("写入 HKCU，无需管理员权限")
                             .clicked()
                         {
-                            if let Err(e) = winassoc::unregister() {
-                                self.error_msg = Some(e);
-                            }
-                            self.assoc_registered = winassoc::is_registered();
-                        }
-                    } else if ui
-                        .button("注册到「打开方式」")
-                        .on_hover_text("写入 HKCU，无需管理员权限")
-                        .clicked()
-                    {
-                        if let Err(e) = winassoc::register() {
-                            self.error_msg = Some(e);
-                        }
-                        self.assoc_registered = winassoc::is_registered();
-                    }
-                    if ui
-                        .button("设为默认看图软件…")
-                        .on_hover_text("打开系统「默认应用」设置页")
-                        .clicked()
-                    {
-                        // 未注册时先补注册，否则系统默认应用页里找不到本应用
-                        if !self.assoc_registered {
                             if let Err(e) = winassoc::register() {
                                 self.error_msg = Some(e);
                             }
                             self.assoc_registered = winassoc::is_registered();
                         }
-                        winassoc::open_default_apps_settings();
-                    }
+                        if ui
+                            .button("设为默认看图软件…")
+                            .on_hover_text("打开系统「默认应用」设置页")
+                            .clicked()
+                        {
+                            // 未注册时先补注册，否则系统默认应用页里找不到本应用
+                            if !self.assoc_registered {
+                                if let Err(e) = winassoc::register() {
+                                    self.error_msg = Some(e);
+                                }
+                                self.assoc_registered = winassoc::is_registered();
+                            }
+                            winassoc::open_default_apps_settings();
+                        }
+                    });
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new("Win10/11 的默认关联需在系统设置页确认，程序无法代为设置")
+                            .small()
+                            .color(pal.faint),
+                    );
                 });
-                ui.label(
-                    RichText::new("Win10/11 的默认关联需在系统设置页确认，程序无法代为设置")
-                        .small()
-                        .color(pal.faint),
-                );
 
-                ui.add_space(4.0);
-                ui.separator();
-                ui.add_space(4.0);
-
-                // —— 关于 ——
+                // —— 关于（页脚小字） ——
+                ui.add_space(2.0);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(winassoc::APP_NAME).color(pal.text).strong());
                     ui.label(
@@ -1530,8 +1658,12 @@ impl App {
                         .small()
                         .color(pal.faint),
                 );
-            });
+            })
+            .map(|r| r.response.rect);
         self.show_settings = open;
+        if let Some(r) = win_rect {
+            self.glass_regions.push((r, 1.0, 16.0));
+        }
     }
 }
 
@@ -1549,6 +1681,13 @@ impl eframe::App for App {
             "iv-checkerboard",
             if self.checkerboard { "on" } else { "off" }.into(),
         );
+        storage.set_string(
+            "iv-backdrop",
+            if self.backdrop { "on" } else { "off" }.into(),
+        );
+        storage.set_string("iv-bd-opacity", self.backdrop_opacity.to_string());
+        storage.set_string("iv-bd-blur", self.backdrop_blur.to_string());
+        storage.set_string("iv-bd-bright", self.backdrop_brightness.to_string());
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -1556,11 +1695,155 @@ impl eframe::App for App {
         self.update_window_title(ctx);
         let pal = ui::palette(ctx);
 
-        // 全窗口画布（图像铺满，UI 以悬浮层叠加其上）
+        // 首帧：获取本进程窗口句柄（伪磨砂的截图排除/抓图都基于它）
+        if self.hwnd.is_none() {
+            self.hwnd = crate::backdrop::find_own_window();
+            if let Some(hwnd) = self.hwnd {
+                // 无边框窗口启用 Win11 圆角，与内部玻璃圆角语言一致
+                crate::backdrop::set_rounded_corners(hwnd);
+                // 无边框无系统标题栏：上次退出时若窗口被拖出屏幕，启动时夹回工作区
+                crate::backdrop::clamp_window_onscreen(hwnd);
+            }
+        }
+
+        // ---- 伪磨砂背景：捕获窗口背后画面 → 低分辨率模糊快照作画布背景 ----
+        // wgpu flip-model swapchain 窗口上 DWM 磨砂材质（Acrylic/Mica）不生效，
+        // 故自实现：捕获时临时把窗口设为"截图排除"（不影响屏幕显示），
+        // BitBlt 抓到的即是窗口背后的画面。
+        if self.backdrop && !self.exclude_unsupported {
+            if let Some(hwnd) = self.hwnd {
+                let now = Instant::now();
+                let outer = ctx.input(|i| i.viewport().outer_rect);
+                let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
+                let moved = outer.is_some() && outer != self.last_outer_rect;
+                if outer.is_some() {
+                    self.last_outer_rect = outer;
+                }
+                let due_periodic =
+                    now.duration_since(self.last_capture) > Duration::from_millis(1500);
+                let want_capture = !minimized && (moved || due_periodic);
+
+                if want_capture && !self.capture_excluded {
+                    let ok = crate::backdrop::set_exclude_from_capture(hwnd, true);
+                    if ok {
+                        self.capture_excluded = true;
+                        self.exclude_since = Some(now);
+                    } else {
+                        self.exclude_unsupported = true; // 老系统：回退渐变画布
+                    }
+                }
+                if self.capture_excluded {
+                    let mut captured = false;
+                    // 排除生效要等 DWM 合成几帧；拖动中按 150ms 节流连续捕获
+                    let settled = self
+                        .exclude_since
+                        .is_some_and(|t| now.duration_since(t) >= Duration::from_millis(80));
+                    let throttled =
+                        now.duration_since(self.last_capture) >= Duration::from_millis(150);
+                    if want_capture && settled && throttled {
+                        let cap = crate::backdrop::capture_behind(hwnd, self.backdrop_blur);
+                        if let Some(cap) = cap {
+                            let img = egui::ColorImage::from_rgba_unmultiplied(
+                                [cap.width as usize, cap.height as usize],
+                                &cap.rgba,
+                            );
+                            self.backdrop_tex = Some(ctx.load_texture(
+                                "iv-backdrop",
+                                img,
+                                egui::TextureOptions::LINEAR,
+                            ));
+                            self.last_capture = now;
+                            captured = true;
+                        }
+                    }
+                    if moved {
+                        // 拖动/调整中持续持有排除标志，停止 250ms 后释放
+                        self.exclude_release_at = Some(now + Duration::from_millis(250));
+                    } else if captured {
+                        // 空闲周期快照完成：立即释放，尽量缩短对系统截图的影响
+                        self.exclude_release_at = Some(now);
+                    } else if self
+                        .exclude_since
+                        .is_some_and(|t| now.duration_since(t) > Duration::from_secs(2))
+                    {
+                        // 兜底：捕获持续失败（如中途最小化）也必须释放
+                        self.exclude_release_at = Some(now);
+                    }
+                    if let Some(at) = self.exclude_release_at {
+                        if now >= at {
+                            crate::backdrop::set_exclude_from_capture(hwnd, false);
+                            self.capture_excluded = false;
+                            self.exclude_since = None;
+                            self.exclude_release_at = None;
+                        }
+                    }
+                    if self.capture_excluded {
+                        ctx.request_repaint_after(Duration::from_millis(40));
+                    }
+                } else if !minimized {
+                    // 空闲心跳：驱动周期刷新
+                    ctx.request_repaint_after(Duration::from_millis(1600));
+                }
+            }
+        } else if self.capture_excluded {
+            // 设置被关闭：释放截图排除并丢弃快照
+            if let Some(hwnd) = self.hwnd {
+                crate::backdrop::set_exclude_from_capture(hwnd, false);
+            }
+            self.capture_excluded = false;
+            self.exclude_since = None;
+            self.exclude_release_at = None;
+            self.backdrop_tex = None;
+        }
+
+        // 全窗口画布（图像铺满，UI 以悬浮层叠加其上）。
+        // 磨砂开启且有背景快照：画模糊快照 + 主题 tint；
+        // 否则（关闭/老系统/首张快照未到）回退不透明对角渐变。
+        let backdrop_tex_id = if self.backdrop {
+            self.backdrop_tex.as_ref().map(|t| t.id())
+        } else {
+            None
+        };
         let (canvas_rect, canvas_hover) = egui::CentralPanel::default()
             .frame(Frame::default().fill(pal.canvas))
             .show(ctx, |ui| {
                 let rect = ui.available_rect_before_wrap();
+                if let Some(tex_id) = backdrop_tex_id {
+                    // 伪磨砂：窗口背后画面的模糊快照铺满画布
+                    // 背景亮度：顶点色乘法调暗（≤1.0），>1.0 的部分再用白色叠加提亮
+                    let bright = self.backdrop_brightness.clamp(0.5, 1.5);
+                    let img_tint = if bright <= 1.0 {
+                        let v = (255.0 * bright) as u8;
+                        Color32::from_rgb(v, v, v)
+                    } else {
+                        Color32::WHITE
+                    };
+                    ui.painter().image(
+                        tex_id,
+                        rect,
+                        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                        img_tint,
+                    );
+                    if bright > 1.0 {
+                        let add = ((bright - 1.0) / 0.5).clamp(0.0, 1.0);
+                        ui.painter().rect_filled(
+                            rect,
+                            0.0,
+                            Color32::from_white_alpha((add * 110.0) as u8),
+                        );
+                    }
+                    // 主题 tint（磨砂不透明度）：压暗/提亮以保证悬浮层可读性
+                    let a = (self.backdrop_opacity.clamp(0.0, 1.0) * 220.0) as u8;
+                    let tint = if pal.is_dark {
+                        Color32::from_black_alpha(a)
+                    } else {
+                        Color32::from_white_alpha(a)
+                    };
+                    ui.painter().rect_filled(rect, 0.0, tint);
+                } else {
+                    // 玻璃拟态底衬：画布对角渐变（回退路径）
+                    ui::paint_canvas_bg(ui.painter(), rect, &pal);
+                }
                 // 画布交互：拖拽平移 + 滚轮缩放
                 let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
                 // 右键菜单（自绘悬浮菜单，支持 Esc 关闭）
@@ -1568,8 +1851,15 @@ impl eframe::App for App {
                     self.ctx_menu_pos = resp.interact_pointer_pos();
                 }
                 if resp.dragged() {
-                    self.view.offset += resp.drag_delta();
-                    self.auto_fit = false;
+                    // 从窗口边缘（6px 热区）发起的拖拽交给系统缩放（BeginResize），不平移图像
+                    let on_edge = ctx
+                        .input(|i| i.pointer.press_origin())
+                        .map(|p| edge_resize_dir(ctx.screen_rect(), p, 6.0).is_some())
+                        .unwrap_or(false);
+                    if !on_edge {
+                        self.view.offset += resp.drag_delta();
+                        self.auto_fit = false;
+                    }
                 }
                 let hover_pos = resp.hover_pos();
                 if let Some(p) = hover_pos {
@@ -1643,6 +1933,8 @@ impl eframe::App for App {
         }
 
         // 悬浮层自动显隐 + 绘制（Foreground 层，叠加在画布之上）
+        // 玻璃区域每帧重建：各悬浮层绘制时收集其矩形与淡入系数
+        self.glass_regions.clear();
         self.update_overlay_visibility(ctx);
         let over_top = self.draw_top_overlay(ctx, &pal);
         let over_err = self.draw_error_overlay(ctx, &pal);
@@ -1651,6 +1943,8 @@ impl eframe::App for App {
         self.draw_ctx_menu_overlay(ctx, &pal, canvas_rect);
         self.draw_props_window(ctx, &pal);
         self.draw_settings_window(ctx, &pal);
+        // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
+        borderless_chrome(ctx);
 
         // 像素检查器（光标 → 图像坐标 → 像素值）
         // 右键菜单弹出 / 拖拽时 hover 消失 → 冻结上一帧值；指针离开窗口才清空
@@ -1720,6 +2014,20 @@ impl eframe::App for App {
                     if is_hdr {
                         flags |= 4;
                     }
+                    // 玻璃区域（逻辑坐标 → 画布内物理像素）
+                    let mut glass_rects = [[0.0f32; 4]; MAX_GLASS];
+                    let mut glass_alpha = [[0.0f32; 4]; 2];
+                    let mut glass_corner = [[0.0f32; 4]; 2];
+                    let glass_count = self.glass_regions.len().min(MAX_GLASS);
+                    for (i, (rect, a, corner)) in
+                        self.glass_regions.iter().take(MAX_GLASS).enumerate()
+                    {
+                        let r = rect.translate(-canvas_rect.min.to_vec2());
+                        glass_rects[i] =
+                            [r.min.x * ppp, r.min.y * ppp, r.max.x * ppp, r.max.y * ppp];
+                        glass_alpha[i / 4][i % 4] = *a;
+                        glass_corner[i / 4][i % 4] = corner * ppp;
+                    }
                     let uniforms = Uniforms {
                         canvas_size: [csize.x, csize.y],
                         image_size: [mip.width as f32, mip.height as f32],
@@ -1728,18 +2036,22 @@ impl eframe::App for App {
                         channel_mode: self.channel as u32,
                         exposure: self.exposure,
                         flags,
-                        _pad: [0.0; 2],
+                        glass_count: glass_count as u32,
+                        _pad: 0.0,
+                        glass_rects,
+                        glass_alpha,
+                        glass_corner,
                     };
                     r.write_uniforms(&uniforms);
-                    egui::Painter::new(
+                    let canvas_painter = egui::Painter::new(
                         ctx.clone(),
                         egui::LayerId::new(
                             egui::Order::Background,
                             egui::Id::new("iv-canvas"),
                         ),
                         canvas_rect,
-                    )
-                    .add(crate::render::new_paint_callback(canvas_rect));
+                    );
+                    canvas_painter.add(crate::render::new_paint_callback(canvas_rect));
                 }
             }
         }
@@ -1785,6 +2097,14 @@ impl eframe::App for App {
     }
 }
 
+/// 从 eframe storage 读取 f32 设置项，缺失/解析失败时用默认值。
+fn load_f32(storage: Option<&dyn eframe::Storage>, key: &str, default: f32) -> f32 {
+    storage
+        .and_then(|s| s.get_string(key))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
 fn fmt_size(b: u64) -> String {
     if b < 1024 {
         format!("{b} B")
@@ -1792,5 +2112,64 @@ fn fmt_size(b: u64) -> String {
         format!("{:.1} KB", b as f64 / 1024.0)
     } else {
         format!("{:.1} MB", b as f64 / (1024.0 * 1024.0))
+    }
+}
+
+/// 无边框窗口的边缘八向缩放：指针贴近窗口边缘（6px 热区）显示对应缩放光标，
+/// 按下即交给系统缩放（BeginResize）。最大化时禁用（窗口不可再缩放）。
+/// 拖动移动窗口 / 双击最大化由顶栏胶囊（Area + Sense::click_and_drag）处理，
+/// 见 draw_top_overlay。
+fn borderless_chrome(ctx: &egui::Context) {
+    let maximized = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
+    if maximized {
+        return;
+    }
+    let Some(pos) = ctx.input(|i| i.pointer.latest_pos()) else {
+        return;
+    };
+    let Some(dir) = edge_resize_dir(ctx.screen_rect(), pos, 6.0) else {
+        return;
+    };
+    // 本函数在每帧末尾调用，set_cursor_icon 后于各控件执行，边缘缩放光标优先
+    ctx.set_cursor_icon(edge_cursor(dir));
+    if ctx.input(|i| i.pointer.primary_pressed()) {
+        ctx.send_viewport_cmd(ViewportCommand::BeginResize(dir));
+    }
+}
+
+/// 指针是否落在窗口边缘缩放热区（border 宽，逻辑像素），命中则返回八向之一。
+/// 四个角优先于单条边；非热区（含多条边同时为 true 的极小窗回退）返回 None。
+fn edge_resize_dir(win: egui::Rect, pos: Pos2, border: f32) -> Option<ResizeDirection> {
+    if !win.contains(pos) {
+        return None;
+    }
+    let l = pos.x - win.left() < border;
+    let r = win.right() - pos.x < border;
+    let t = pos.y - win.top() < border;
+    let b = win.bottom() - pos.y < border;
+    Some(match (t, b, l, r) {
+        (true, false, true, false) => ResizeDirection::NorthWest,
+        (true, false, false, true) => ResizeDirection::NorthEast,
+        (false, true, true, false) => ResizeDirection::SouthWest,
+        (false, true, false, true) => ResizeDirection::SouthEast,
+        (true, false, false, false) => ResizeDirection::North,
+        (false, true, false, false) => ResizeDirection::South,
+        (false, false, true, false) => ResizeDirection::West,
+        (false, false, false, true) => ResizeDirection::East,
+        _ => return None,
+    })
+}
+
+/// 缩放方向 → 对应的系统鼠标光标。
+fn edge_cursor(d: ResizeDirection) -> CursorIcon {
+    match d {
+        ResizeDirection::North => CursorIcon::ResizeNorth,
+        ResizeDirection::South => CursorIcon::ResizeSouth,
+        ResizeDirection::East => CursorIcon::ResizeEast,
+        ResizeDirection::West => CursorIcon::ResizeWest,
+        ResizeDirection::NorthEast => CursorIcon::ResizeNorthEast,
+        ResizeDirection::NorthWest => CursorIcon::ResizeNorthWest,
+        ResizeDirection::SouthEast => CursorIcon::ResizeSouthEast,
+        ResizeDirection::SouthWest => CursorIcon::ResizeSouthWest,
     }
 }

@@ -43,7 +43,10 @@ impl ChannelMode {
     }
 }
 
-/// uniform 布局（与 image.wgsl 的 Uniforms 一致，48 字节，含 padding）。
+/// 玻璃区域数量上限（顶/底/错误胶囊 + 右键菜单 + 属性/设置窗口）
+pub const MAX_GLASS: usize = 6;
+
+/// uniform 布局（与 image.wgsl 的 Uniforms 一致，176 字节，含 padding）。
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Uniforms {
@@ -59,9 +62,20 @@ pub struct Uniforms {
     pub exposure: f32,
     /// bit0: nearest 采样；bit1: 显示棋盘格；bit2: HDR（曝光+tonemap+gamma）
     pub flags: u32,
+    /// 玻璃区域数量（0..=MAX_GLASS）
+    pub glass_count: u32,
     /// 对齐填充（uniform 结构需 16 字节对齐）
-    pub _pad: [f32; 2],
+    pub _pad: f32,
+    /// 玻璃区域矩形：min.xy / max.xy（画布物理像素）
+    pub glass_rects: [[f32; 4]; MAX_GLASS],
+    /// 各区域模糊混合系数（随悬浮层淡入淡出），打包为 2×vec4
+    pub glass_alpha: [[f32; 4]; 2],
+    /// 各区域圆角半径（画布物理像素，圆角 SDF 用），打包为 2×vec4
+    pub glass_corner: [[f32; 4]; 2],
 }
+
+// 与 image.wgsl 的 Uniforms 布局一致性编译期校验（16 字节对齐 × 13 个 vec4 槽位）
+const _: () = assert!(std::mem::size_of::<Uniforms>() == 208);
 
 /// 一次性创建的 GPU 静态资源。
 pub struct SharedGpu {
