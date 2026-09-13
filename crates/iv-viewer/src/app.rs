@@ -171,6 +171,10 @@ pub struct App {
     hwnd: Option<isize>,
     /// 伪磨砂背景：窗口背后画面的低分辨率模糊快照纹理
     backdrop_tex: Option<egui::TextureHandle>,
+    /// 桌面捕获不可用时的可诊断原因；成功捕获后清空。
+    backdrop_capture_error: Option<String>,
+    /// 截图排除恢复失败是独立故障，不能被后续成功捕获覆盖。
+    backdrop_restore_error: Option<String>,
     /// 截图排除标志（WDA_EXCLUDEFROMCAPTURE）当前是否已施加到窗口
     capture_excluded: bool,
     /// 截图排除施加时刻（DWM 生效需等待约 80ms 才能 BitBlt）
@@ -183,6 +187,8 @@ pub struct App {
     exclude_unsupported: bool,
     /// 上次视口外框（检测窗口移动/调整大小以触发重捕）
     last_outer_rect: Option<egui::Rect>,
+    /// 防止玻璃区域超限时每帧重复输出同一诊断。
+    glass_overflow_reported: bool,
 }
 
 impl App {
@@ -237,6 +243,8 @@ impl App {
             backdrop_brightness: load_f32(cc.storage, "iv-bd-bright", 1.0),
             hwnd: None,
             backdrop_tex: None,
+            backdrop_capture_error: None,
+            backdrop_restore_error: None,
             capture_excluded: false,
             exclude_since: None,
             // 拨回过去：首帧立即可触发第一次背景捕获
@@ -244,6 +252,7 @@ impl App {
             exclude_release_at: None,
             exclude_unsupported: false,
             last_outer_rect: None,
+            glass_overflow_reported: false,
             assoc_registered: false,
             last_canvas_size: Vec2::ZERO,
             zoom_flash: None,
@@ -1892,7 +1901,29 @@ impl App {
                                     }
                                 },
                             );
+                            if let Some(error) = &self.backdrop_restore_error {
+                                ui.label(
+                                    RichText::new(format!("截图状态异常：{error}"))
+                                        .small()
+                                        .color(pal.err_text),
+                                );
+                            }
                             if self.backdrop {
+                                if self.backdrop_restore_error.is_none() {
+                                    if let Some(error) = &self.backdrop_capture_error {
+                                        ui.label(
+                                            RichText::new(format!("桌面磨砂不可用：{error}"))
+                                                .small()
+                                                .color(pal.err_text),
+                                        );
+                                    } else if self.backdrop_tex.is_some() {
+                                        ui.label(
+                                            RichText::new("桌面磨砂已就绪")
+                                                .small()
+                                                .color(pal.accent),
+                                        );
+                                    }
+                                }
                                 ui.add_space(6.0);
                                 // 不透明度：绘制时实时生效
                                 let mut op = self.backdrop_opacity;
@@ -2091,6 +2122,8 @@ impl eframe::App for App {
                         self.exclude_since = Some(now);
                     } else {
                         self.exclude_unsupported = true; // 老系统：回退渐变画布
+                        self.backdrop_capture_error =
+                            Some("Windows 未接受截图排除，已回退为主题渐变".into());
                     }
                 }
                 if self.capture_excluded {
@@ -2102,22 +2135,25 @@ impl eframe::App for App {
                     let throttled =
                         now.duration_since(self.last_capture) >= Duration::from_millis(150);
                     if want_capture && settled && throttled {
-                        let cap = crate::backdrop::capture_behind(hwnd, self.backdrop_blur);
-                        if let Some(cap) = cap {
-                            if let Some(renderer) = &mut self.renderer {
-                                renderer.upload_backdrop(cap.width, cap.height, &cap.rgba);
+                        match crate::backdrop::capture_behind(hwnd, self.backdrop_blur) {
+                            Ok(cap) => {
+                                if let Some(renderer) = &mut self.renderer {
+                                    renderer.upload_backdrop(cap.width, cap.height, &cap.rgba);
+                                }
+                                let img = egui::ColorImage::from_rgba_unmultiplied(
+                                    [cap.width as usize, cap.height as usize],
+                                    &cap.rgba,
+                                );
+                                self.backdrop_tex = Some(ctx.load_texture(
+                                    "iv-backdrop",
+                                    img,
+                                    egui::TextureOptions::LINEAR,
+                                ));
+                                self.backdrop_capture_error = None;
+                                self.last_capture = now;
+                                captured = true;
                             }
-                            let img = egui::ColorImage::from_rgba_unmultiplied(
-                                [cap.width as usize, cap.height as usize],
-                                &cap.rgba,
-                            );
-                            self.backdrop_tex = Some(ctx.load_texture(
-                                "iv-backdrop",
-                                img,
-                                egui::TextureOptions::LINEAR,
-                            ));
-                            self.last_capture = now;
-                            captured = true;
+                            Err(error) => self.backdrop_capture_error = Some(error),
                         }
                     }
                     if moved {
@@ -2135,7 +2171,12 @@ impl eframe::App for App {
                     }
                     if let Some(at) = self.exclude_release_at {
                         if now >= at {
-                            crate::backdrop::set_exclude_from_capture(hwnd, false);
+                            if crate::backdrop::set_exclude_from_capture(hwnd, false) {
+                                self.backdrop_restore_error = None;
+                            } else {
+                                self.backdrop_restore_error =
+                                    Some("截图排除状态恢复失败，请重启应用".into());
+                            }
                             self.capture_excluded = false;
                             self.exclude_since = None;
                             self.exclude_release_at = None;
@@ -2152,7 +2193,11 @@ impl eframe::App for App {
         } else if self.capture_excluded {
             // 设置被关闭：释放截图排除并丢弃快照
             if let Some(hwnd) = self.hwnd {
-                crate::backdrop::set_exclude_from_capture(hwnd, false);
+                if crate::backdrop::set_exclude_from_capture(hwnd, false) {
+                    self.backdrop_restore_error = None;
+                } else {
+                    self.backdrop_restore_error = Some("截图排除状态恢复失败，请重启应用".into());
+                }
             }
             self.capture_excluded = false;
             self.exclude_since = None;
@@ -2360,6 +2405,17 @@ impl eframe::App for App {
         }
 
         // 图像绘制（wgpu paint callback 覆盖画布）
+        if self.glass_regions.len() > MAX_GLASS {
+            if !self.glass_overflow_reported {
+                eprintln!(
+                    "glass region overflow: {} regions, capacity {MAX_GLASS}",
+                    self.glass_regions.len()
+                );
+                self.glass_overflow_reported = true;
+            }
+        } else {
+            self.glass_overflow_reported = false;
+        }
         if let Some(r) = &self.renderer {
             if r.has_image() {
                 if let Some(mip) = self.current_mip() {

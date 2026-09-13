@@ -30,7 +30,8 @@ extern "system" {
     fn ReleaseDC(hwnd: isize, dc: isize) -> i32;
     fn SetWindowDisplayAffinity(hwnd: isize, affinity: u32) -> i32;
     fn GetWindowRect(hwnd: isize, rect: *mut WRect) -> i32;
-    fn SetWindowPos(hwnd: isize, after: isize, x: i32, y: i32, cx: i32, cy: i32, flags: u32) -> i32;
+    fn SetWindowPos(hwnd: isize, after: isize, x: i32, y: i32, cx: i32, cy: i32, flags: u32)
+        -> i32;
     fn MonitorFromWindow(hwnd: isize, flags: u32) -> isize;
     fn GetMonitorInfoW(mon: isize, info: *mut MonitorInfo) -> i32;
     fn IsZoomed(hwnd: isize) -> i32;
@@ -195,7 +196,11 @@ pub fn find_own_window() -> Option<isize> {
 /// 截图排除开关：开启后所有捕获 API 都取不到本窗口内容
 /// （屏幕上用户看到的显示完全不变）。返回系统是否接受（老系统可能不支持）。
 pub fn set_exclude_from_capture(hwnd: isize, exclude: bool) -> bool {
-    let affinity = if exclude { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE };
+    let affinity = if exclude {
+        WDA_EXCLUDEFROMCAPTURE
+    } else {
+        WDA_NONE
+    };
     unsafe { SetWindowDisplayAffinity(hwnd, affinity) != 0 }
 }
 
@@ -215,15 +220,30 @@ pub fn clamp_window_onscreen(hwnd: isize) {
         if IsIconic(hwnd) != 0 || IsZoomed(hwnd) != 0 {
             return; // 最小化/最大化时不调整
         }
-        let mut r = WRect { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut r = WRect {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
         if GetWindowRect(hwnd, &mut r) == 0 {
             return;
         }
         let mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
         let mut mi = MonitorInfo {
             size: std::mem::size_of::<MonitorInfo>() as u32,
-            monitor: WRect { left: 0, top: 0, right: 0, bottom: 0 },
-            work: WRect { left: 0, top: 0, right: 0, bottom: 0 },
+            monitor: WRect {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            work: WRect {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
             flags: 0,
         };
         if GetMonitorInfoW(mon, &mut mi) == 0 {
@@ -232,10 +252,26 @@ pub fn clamp_window_onscreen(hwnd: isize) {
         let wa = mi.work;
         let (w, h) = (r.right - r.left, r.bottom - r.top);
         // 某轴向比工作区还宽/高时贴起点；否则整窗夹进工作区
-        let nx = if w <= wa.right - wa.left { r.left.clamp(wa.left, wa.right - w) } else { wa.left };
-        let ny = if h <= wa.bottom - wa.top { r.top.clamp(wa.top, wa.bottom - h) } else { wa.top };
+        let nx = if w <= wa.right - wa.left {
+            r.left.clamp(wa.left, wa.right - w)
+        } else {
+            wa.left
+        };
+        let ny = if h <= wa.bottom - wa.top {
+            r.top.clamp(wa.top, wa.bottom - h)
+        } else {
+            wa.top
+        };
         if (nx, ny) != (r.left, r.top) {
-            SetWindowPos(hwnd, 0, nx, ny, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            SetWindowPos(
+                hwnd,
+                0,
+                nx,
+                ny,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
         }
     }
 }
@@ -250,10 +286,10 @@ pub struct Capture {
 /// 抓取本窗口背后的屏幕区域，直接降采样到约 1/8 尺寸并柔化。
 /// 调用前须先 set_exclude_from_capture(hwnd, true) 并等待约 80ms
 /// （让 DWM 合成器应用排除标志），否则会把本窗口内容一起抓进去。
-pub fn capture_behind(hwnd: isize, blur: f32) -> Option<Capture> {
+pub fn capture_behind(hwnd: isize, blur: f32) -> Result<Capture, String> {
     unsafe {
         if IsIconic(hwnd) != 0 {
-            return None; // 最小化时窗口矩形无效（-32000）
+            return Err("窗口已最小化".into());
         }
         // 抓客户区（而非含标题栏的外框）：快照与画布 1:1 对齐，
         // 窗口边缘处的模糊背景才能与窗外实景无缝衔接
@@ -264,15 +300,21 @@ pub fn capture_behind(hwnd: isize, blur: f32) -> Option<Capture> {
             bottom: 0,
         };
         if GetClientRect(hwnd, &mut r) == 0 {
-            return None;
+            return Err(format!(
+                "GetClientRect 失败：{}",
+                std::io::Error::last_os_error()
+            ));
         }
         let (w, h) = (r.right - r.left, r.bottom - r.top);
         if w <= 0 || h <= 0 {
-            return None;
+            return Err(format!("客户区尺寸无效：{w}×{h}"));
         }
         let mut pt = WPoint { x: 0, y: 0 };
         if ClientToScreen(hwnd, &mut pt) == 0 {
-            return None;
+            return Err(format!(
+                "ClientToScreen 失败：{}",
+                std::io::Error::last_os_error()
+            ));
         }
         // 模糊强度 0..1 → 降采样因子 5..14（采样越少越糊）；采样边长限制 48..480
         let blur = blur.clamp(0.0, 1.0);
@@ -282,11 +324,35 @@ pub fn capture_behind(hwnd: isize, blur: f32) -> Option<Capture> {
 
         let screen = GetDC(0); // 整个虚拟屏幕（多显示器/负坐标均有效）
         if screen == 0 {
-            return None;
+            return Err(format!("GetDC 失败：{}", std::io::Error::last_os_error()));
         }
         let mem = CreateCompatibleDC(screen);
+        if mem == 0 {
+            ReleaseDC(0, screen);
+            return Err(format!(
+                "CreateCompatibleDC 失败：{}",
+                std::io::Error::last_os_error()
+            ));
+        }
         let hbm = CreateCompatibleBitmap(screen, tw, th);
+        if hbm == 0 {
+            DeleteDC(mem);
+            ReleaseDC(0, screen);
+            return Err(format!(
+                "CreateCompatibleBitmap 失败：{}",
+                std::io::Error::last_os_error()
+            ));
+        }
         let old = SelectObject(mem, hbm);
+        if old == 0 {
+            DeleteObject(hbm);
+            DeleteDC(mem);
+            ReleaseDC(0, screen);
+            return Err(format!(
+                "SelectObject 失败：{}",
+                std::io::Error::last_os_error()
+            ));
+        }
         SetStretchBltMode(mem, HALFTONE);
         SetBrushOrgEx(mem, 0, 0, 0); // HALFTONE 模式要求设置画刷原点
         let ok = StretchBlt(mem, 0, 0, tw, th, screen, pt.x, pt.y, w, h, SRCCOPY);
@@ -314,7 +380,10 @@ pub fn capture_behind(hwnd: isize, blur: f32) -> Option<Capture> {
         DeleteDC(mem);
         ReleaseDC(0, screen);
         if ok == 0 || lines == 0 {
-            return None;
+            return Err(format!(
+                "StretchBlt/GetDIBits 失败：{}",
+                std::io::Error::last_os_error()
+            ));
         }
         // GDI 输出 BGRA → RGBA
         for px in buf.as_chunks_mut::<4>().0 {
@@ -327,7 +396,7 @@ pub fn capture_behind(hwnd: isize, blur: f32) -> Option<Capture> {
         };
         // 高斯模糊让降采样结果更细腻，半径随模糊强度
         soften(&mut cap, blur);
-        Some(cap)
+        Ok(cap)
     }
 }
 

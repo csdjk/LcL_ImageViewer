@@ -46,7 +46,7 @@ impl ChannelMode {
 /// 玻璃区域数量上限（顶/底/错误胶囊 + 右键菜单 + 属性/设置窗口 + 缩放提示）。
 pub const MAX_GLASS: usize = 8;
 
-/// uniform 布局（与 image.wgsl 的 Uniforms 一致，176 字节，含 padding）。
+/// uniform 布局（与 image.wgsl 的 Uniforms 一致，288 字节，含 padding）。
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Uniforms {
