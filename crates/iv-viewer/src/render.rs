@@ -1,4 +1,4 @@
-//! wgpu 渲染封装：图像纹理 + 通道查看/棋盘格/HDR tonemap shader。
+//! wgpu 渲染封装：统一画布 + 图像纹理 + 通道查看/棋盘格/HDR tonemap shader。
 //!
 //! 架构（egui_wgpu 0.27 paint callback 模式）：
 //! - `SharedGpu`（管线/顶点/ uniform buffer）创建一次，放入 callback_resources
@@ -43,8 +43,8 @@ impl ChannelMode {
     }
 }
 
-/// 玻璃区域数量上限（顶/底/错误胶囊 + 右键菜单 + 属性/设置窗口）
-pub const MAX_GLASS: usize = 6;
+/// 玻璃区域数量上限（顶/底/错误胶囊 + 右键菜单 + 属性/设置窗口 + 缩放提示）。
+pub const MAX_GLASS: usize = 8;
 
 /// uniform 布局（与 image.wgsl 的 Uniforms 一致，176 字节，含 padding）。
 #[repr(C)]
@@ -60,12 +60,17 @@ pub struct Uniforms {
     pub scale: f32,
     pub channel_mode: u32,
     pub exposure: f32,
-    /// bit0: nearest 采样；bit1: 显示棋盘格；bit2: HDR（曝光+tonemap+gamma）
+    /// bit0: nearest；bit1: 棋盘格；bit2: HDR；bit3: 有桌面背景纹理
     pub flags: u32,
     /// 玻璃区域数量（0..=MAX_GLASS）
     pub glass_count: u32,
     /// 对齐填充（uniform 结构需 16 字节对齐）
     pub _pad: f32,
+    /// 回退画布顶部/底部颜色（线性 RGBA）。
+    pub canvas_top: [f32; 4],
+    pub canvas_bottom: [f32; 4],
+    /// 桌面背景：亮度、主题 tint 强度、深色主题标记、面板模糊物理半径。
+    pub backdrop_params: [f32; 4],
     /// 玻璃区域矩形：min.xy / max.xy（画布物理像素）
     pub glass_rects: [[f32; 4]; MAX_GLASS],
     /// 各区域模糊混合系数（随悬浮层淡入淡出），打包为 2×vec4
@@ -75,7 +80,7 @@ pub struct Uniforms {
 }
 
 // 与 image.wgsl 的 Uniforms 布局一致性编译期校验（16 字节对齐 × 13 个 vec4 槽位）
-const _: () = assert!(std::mem::size_of::<Uniforms>() == 208);
+const _: () = assert!(std::mem::size_of::<Uniforms>() == 288);
 
 /// 一次性创建的 GPU 静态资源。
 pub struct SharedGpu {
@@ -129,6 +134,9 @@ pub struct Renderer {
     has_image: bool,
     /// 复用中的图像纹理（动画帧/同尺寸换图时避免重建纹理与 bind group）
     tex: Option<TexReuse>,
+    /// 桌面背景快照；没有时 bind group 使用 1×1 占位纹理。
+    backdrop_tex: Option<TexReuse>,
+    dummy_backdrop: wgpu::Texture,
 }
 
 /// 可复用的纹理槽位（bind group 由 callback_resources 持有并引用纹理，
@@ -183,6 +191,16 @@ impl Renderer {
                     binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
                     count: None,
                 },
             ],
@@ -256,6 +274,20 @@ impl Renderer {
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
+        let dummy_backdrop = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("iv-backdrop-dummy"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
 
         let shared = Arc::new(SharedGpu {
             pipeline,
@@ -280,6 +312,8 @@ impl Renderer {
             sampler_nearest,
             has_image: false,
             tex: None,
+            backdrop_tex: None,
+            dummy_backdrop,
         }
     }
 
@@ -355,7 +389,96 @@ impl Renderer {
             tex_size,
         );
 
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.tex = Some(TexReuse {
+            texture,
+            width,
+            height,
+            format,
+        });
+        self.rebuild_bind_group();
+        self.has_image = true;
+    }
+
+    /// 上传窗口背后的已模糊快照。使用 sRGB 纹理，采样时自动转为线性颜色。
+    pub fn upload_backdrop(&mut self, width: u32, height: u32, rgba: &[u8]) {
+        let size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+        if let Some(tex) = &self.backdrop_tex {
+            if tex.width == width && tex.height == height {
+                self.rs.queue.write_texture(
+                    wgpu::ImageCopyTexture {
+                        texture: &tex.texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    rgba,
+                    wgpu::ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * width),
+                        rows_per_image: Some(height),
+                    },
+                    size,
+                );
+                return;
+            }
+        }
+        let texture = self.rs.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("iv-backdrop-tex"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        self.rs.queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            rgba,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
+            },
+            size,
+        );
+        self.backdrop_tex = Some(TexReuse {
+            texture,
+            width,
+            height,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        });
+        self.rebuild_bind_group();
+    }
+
+    pub fn clear_backdrop(&mut self) {
+        if self.backdrop_tex.take().is_some() {
+            self.rebuild_bind_group();
+        }
+    }
+
+    fn rebuild_bind_group(&self) {
+        let Some(tex) = &self.tex else {
+            return;
+        };
+        let view = tex
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let backdrop = self
+            .backdrop_tex
+            .as_ref()
+            .map_or(&self.dummy_backdrop, |t| &t.texture);
+        let backdrop_view = backdrop.create_view(&wgpu::TextureViewDescriptor::default());
+        let device = self.rs.device.clone();
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("iv-image-bg"),
             layout: &self.layout,
@@ -376,6 +499,10 @@ impl Renderer {
                     binding: 3,
                     resource: wgpu::BindingResource::Sampler(&self.sampler_nearest),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(&backdrop_view),
+                },
             ],
         });
         self.rs
@@ -383,15 +510,6 @@ impl Renderer {
             .write()
             .callback_resources
             .insert(CurrentBindGroup(Some(bind_group)));
-        // 注意：bind group 的所有权已移交 callback_resources，
-        // 其内部的 texture view 会保活纹理；这里仅保留 texture 句柄供复用写入。
-        self.tex = Some(TexReuse {
-            texture,
-            width,
-            height,
-            format,
-        });
-        self.has_image = true;
     }
 
     /// 写入本帧 uniform。

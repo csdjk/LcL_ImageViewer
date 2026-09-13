@@ -1,6 +1,5 @@
-//! 图像 shader：通道查看、HDR tonemap、棋盘格、线性/最近邻采样切换，
-//! 以及玻璃拟态背景模糊（像素落在玻璃区域内时对图像做泊松盘模糊，
-//! egui 再叠上半透明面板即成磨砂玻璃）。所有显示逻辑在 GPU 侧，切换零开销。
+//! 统一场景 shader：先合成画布、透明衬底和图像，再仅在玻璃遮罩内模糊。
+//! 这样面板跨过图片边缘时仍采样同一张完整画布，不会出现材质断层。
 
 struct Uniforms {
     canvas_size: vec2f,     // 画布物理像素尺寸（= viewport，NDC [-1,1] 覆盖它）
@@ -12,7 +11,10 @@ struct Uniforms {
     flags: u32,             // bit0 nearest, bit1 棋盘格, bit2 HDR
     glass_count: u32,       // 玻璃区域数量（0..=6）
     _pad: f32,
-    glass_rects: array<vec4f, 6>,   // min.xy, max.xy（画布物理像素）
+    canvas_top: vec4f,      // 回退画布顶部颜色（线性 RGBA）
+    canvas_bottom: vec4f,   // 回退画布底部颜色（线性 RGBA）
+    backdrop_params: vec4f, // 亮度、tint、深色标记、面板模糊物理半径
+    glass_rects: array<vec4f, 8>,   // min.xy, max.xy（画布物理像素）
     glass_alpha: array<vec4f, 2>,   // 每区域模糊混合系数（打包 2×vec4）
     glass_corner: array<vec4f, 2>,  // 每区域圆角半径（画布物理像素，打包 2×vec4）
 };
@@ -21,6 +23,7 @@ struct Uniforms {
 @group(0) @binding(1) var t_image: texture_2d<f32>;
 @group(0) @binding(2) var s_linear: sampler;
 @group(0) @binding(3) var s_nearest: sampler;
+@group(0) @binding(4) var t_backdrop: texture_2d<f32>;
 
 struct VsOut {
     @builtin(position) position: vec4f,
@@ -60,53 +63,41 @@ fn glass_alpha_at(px: vec2f) -> f32 {
     return a;
 }
 
-@fragment
-fn fs_main(in: VsOut) -> @location(0) vec4f {
-    // 图像范围外：discard，透出 egui 背景
-    if (in.img_px.x < 0.0 || in.img_px.y < 0.0
-        || in.img_px.x >= u.image_size.x || in.img_px.y >= u.image_size.y) {
-        discard;
-    }
-    let uv = in.img_px / u.image_size;
-    let ga = glass_alpha_at(in.screen_px);
-
-    // 全部用 textureSampleLevel（显式 LOD）：玻璃判断使控制流按像素分叉，
-    // 隐式导数的 textureSample 在非均匀控制流中是未定义行为
-    var c: vec4f;
-    if (ga > 0.001) {
-        // 磨砂玻璃：Vogel 螺线（黄金角）高斯加权 24 采样 + 中心采样。
-        // 均匀均值的碟式模糊会在亮点周围留下硬边光斑/环状伪影；
-        // 高斯权重（中心密、边缘疏）让磨砂如真实高斯般干净细腻。
-        // 注：naga 的模块级常量数组只允许常量索引，故采样盘改为程序化生成
-        let radius = max(18.0 / u.scale, 1.5); // 屏幕 18px 模糊半径 → 图像像素
-        let sigma = radius * 0.5;
-        let inv_2s2 = 1.0 / (2.0 * sigma * sigma);
-        var sum = textureSampleLevel(t_image, s_linear, uv, 0.0);
-        var wsum = 1.0;
-        for (var k = 0u; k < 24u; k = k + 1u) {
-            let fi = f32(k) + 0.5;
-            let rr = sqrt(fi / 24.0) * radius;
-            let th = fi * 2.39996; // 黄金角
-            let w = exp(-(rr * rr) * inv_2s2);
-            let tap = (in.img_px + vec2f(cos(th), sin(th)) * rr) / u.image_size;
-            sum += textureSampleLevel(t_image, s_linear, tap, 0.0) * w;
-            wsum += w;
-        }
-        let blurred = sum / wsum;
-        var sharp: vec4f;
-        if ((u.flags & 1u) != 0u) {
-            sharp = textureSampleLevel(t_image, s_nearest, uv, 0.0);
+/// 画布背景：桌面快照（已由 CPU 降采样模糊）或主题渐变。
+fn canvas_at(screen_px: vec2f) -> vec3f {
+    if ((u.flags & 8u) != 0u) {
+        let uv = clamp(screen_px / u.canvas_size, vec2f(0.0), vec2f(1.0));
+        var c = textureSampleLevel(t_backdrop, s_linear, uv, 0.0).rgb;
+        let brightness = clamp(u.backdrop_params.x, 0.5, 1.5);
+        if (brightness <= 1.0) {
+            c *= brightness;
         } else {
-            sharp = textureSampleLevel(t_image, s_linear, uv, 0.0);
+            let lift = clamp((brightness - 1.0) / 0.5, 0.0, 1.0) * (110.0 / 255.0);
+            c = mix(c, vec3f(1.0), lift);
         }
-        c = mix(sharp, blurred, ga);
-    } else if ((u.flags & 1u) != 0u) {
+        let tint = clamp(u.backdrop_params.y, 0.0, 1.0) * (220.0 / 255.0);
+        let tint_color = select(vec3f(1.0), vec3f(0.0), u.backdrop_params.z > 0.5);
+        return mix(c, tint_color, tint);
+    }
+    let t = clamp(screen_px.y / max(u.canvas_size.y, 1.0), 0.0, 1.0);
+    return mix(u.canvas_top.rgb, u.canvas_bottom.rgb, t);
+}
+
+/// 在一个屏幕位置取得已经完成通道、HDR 与 Alpha 合成的最终场景颜色。
+fn scene_at(screen_px: vec2f, nearest: bool) -> vec3f {
+    let bg = canvas_at(screen_px);
+    let img_px = (screen_px - u.screen_offset) / u.scale;
+    if (img_px.x < 0.0 || img_px.y < 0.0
+        || img_px.x >= u.image_size.x || img_px.y >= u.image_size.y) {
+        return bg;
+    }
+    let uv = img_px / u.image_size;
+    var c = textureSampleLevel(t_image, s_linear, uv, 0.0);
+    if (nearest) {
         c = textureSampleLevel(t_image, s_nearest, uv, 0.0);
-    } else {
-        c = textureSampleLevel(t_image, s_linear, uv, 0.0);
     }
 
-    // HDR：曝光 → Reinhard tonemap → gamma（WGSL 不支持 swizzle 赋值，用局部变量）
+    // HDR：曝光 → Reinhard tonemap → gamma（保持现有显示顺序）
     if ((u.flags & 4u) != 0u) {
         let e = max(u.exposure, 0.0001);
         var hdr = c.rgb * e;
@@ -125,15 +116,41 @@ fn fs_main(in: VsOut) -> @location(0) vec4f {
         default: {}
     }
 
-    // RGB 模式下含 alpha：棋盘格背景混合
+    // RGB 模式下含 alpha：先与棋盘格或画布合成，模糊采样因此不会产生透明暗边。
     if ((u.flags & 2u) != 0u && u.channel_mode == 0u && c.a < 1.0) {
         let cell = 8.0; // 物理像素
-        let cx = floor(in.screen_px.x / cell);
-        let cy = floor(in.screen_px.y / cell);
+        let cx = floor(screen_px.x / cell);
+        let cy = floor(screen_px.y / cell);
         let light = ((cx + cy) % 2.0) == 0.0;
-        let bg = select(vec3f(0.78), vec3f(0.92), light);
-        return vec4f(mix(bg, c.rgb, c.a), 1.0);
+        let checker = select(vec3f(0.78), vec3f(0.92), light);
+        return mix(checker, c.rgb, c.a);
+    }
+    return mix(bg, c.rgb, c.a);
+}
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4f {
+    let nearest = (u.flags & 1u) != 0u;
+    let sharp = scene_at(in.screen_px, nearest);
+    let ga = glass_alpha_at(in.screen_px);
+    if (ga <= 0.001) {
+        return vec4f(sharp, 1.0);
     }
 
-    return c;
+    // Vogel 螺线高斯采样完整场景。半径来自逻辑 16pt × pixels_per_point，
+    // 不再随图像缩放变化，因此图内、图外和透明区的磨砂尺度一致。
+    let radius = max(u.backdrop_params.w, 1.5);
+    let sigma = radius * 0.5;
+    let inv_2s2 = 1.0 / (2.0 * sigma * sigma);
+    var sum = scene_at(in.screen_px, false);
+    var wsum = 1.0;
+    for (var k = 0u; k < 24u; k = k + 1u) {
+        let fi = f32(k) + 0.5;
+        let rr = sqrt(fi / 24.0) * radius;
+        let th = fi * 2.39996;
+        let weight = exp(-(rr * rr) * inv_2s2);
+        sum += scene_at(in.screen_px + vec2f(cos(th), sin(th)) * rr, false) * weight;
+        wsum += weight;
+    }
+    return vec4f(mix(sharp, sum / wsum, ga), 1.0);
 }

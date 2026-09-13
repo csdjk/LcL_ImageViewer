@@ -317,7 +317,7 @@ pub fn capture_behind(hwnd: isize, blur: f32) -> Option<Capture> {
             return None;
         }
         // GDI 输出 BGRA → RGBA
-        for px in buf.chunks_exact_mut(4) {
+        for px in buf.as_chunks_mut::<4>().0 {
             px.swap(0, 2);
         }
         let mut cap = Capture {

@@ -85,7 +85,9 @@ impl ImageCache {
         // 超预算时从最旧开始清（保留当前显示）
         while self.bytes > CACHE_BUDGET_BYTES && self.order.len() > 1 {
             let victim = self.order.iter().position(|p| p != keep).unwrap_or(0);
-            let Some(p) = self.order.get(victim).cloned() else { break };
+            let Some(p) = self.order.get(victim).cloned() else {
+                break;
+            };
             if let Some(img) = self.map.remove(&p) {
                 self.bytes -= Self::image_bytes(&img);
             }
@@ -111,10 +113,14 @@ pub struct App {
     error_msg: Option<String>,
     /// 底部状态栏文本（像素检查器，每帧更新）
     probe_text: String,
+    /// 像素检查器的完整 RGBA / 浮点读数。
+    probe_detail: String,
     /// 光标下的像素颜色（状态栏色块 / 右键菜单）
     probe_color: Option<[u8; 4]>,
     /// 图像属性窗口是否打开
     show_props: bool,
+    /// 可固定的完整像素检查器窗口是否打开。
+    show_probe: bool,
     /// 设置窗口是否打开
     show_settings: bool,
     /// 半透明图像背景：true=棋盘格，false=纯画布背景色
@@ -144,6 +150,10 @@ pub struct App {
     last_move: Instant,
     /// 上一帧指针是否悬停在任一悬浮层上
     over_overlay: bool,
+    /// 固定工具栏，关闭自动隐藏。
+    toolbar_pinned: bool,
+    /// 减少界面淡入淡出动效。
+    reduce_motion: bool,
     /// 自绘右键菜单的打开位置（None = 关闭）
     ctx_menu_pos: Option<Pos2>,
     /// 本帧玻璃区域（逻辑坐标矩形 + 模糊混合系数 + 圆角半径），绘制悬浮层时收集，
@@ -184,7 +194,10 @@ impl App {
             _ => ThemeMode::Dark,
         };
         ThemeMode::apply_to(&cc.egui_ctx, theme);
-        let renderer = cc.wgpu_render_state.as_ref().map(crate::render::Renderer::new);
+        let renderer = cc
+            .wgpu_render_state
+            .as_ref()
+            .map(crate::render::Renderer::new);
         let mut app = Self {
             loader: Loader::spawn(),
             cache: ImageCache::new(),
@@ -203,8 +216,10 @@ impl App {
             renderer,
             error_msg: None,
             probe_text: String::new(),
+            probe_detail: String::new(),
             probe_color: None,
             show_props: false,
+            show_probe: false,
             show_settings: false,
             checkerboard: cc
                 .storage
@@ -243,6 +258,16 @@ impl App {
             bot_alpha: 1.0,
             last_move: Instant::now(),
             over_overlay: false,
+            toolbar_pinned: cc
+                .storage
+                .and_then(|s| s.get_string("iv-toolbar-pinned"))
+                .as_deref()
+                == Some("on"),
+            reduce_motion: cc
+                .storage
+                .and_then(|s| s.get_string("iv-reduce-motion"))
+                .as_deref()
+                == Some("on"),
             ctx_menu_pos: None,
             glass_regions: Vec::new(),
         };
@@ -383,7 +408,12 @@ impl App {
             Some(d) => (d.files.clone(), d.index),
             None => return,
         };
-        for di in [index as isize - 2, index as isize - 1, index as isize + 1, index as isize + 2] {
+        for di in [
+            index as isize - 2,
+            index as isize - 1,
+            index as isize + 1,
+            index as isize + 2,
+        ] {
             if di >= 0 && (di as usize) < files.len() {
                 let p = &files[di as usize];
                 if !self.cache.contains(p) {
@@ -604,11 +634,7 @@ impl App {
             self.step_frame(1);
         }
         // ↑↓ 切换 DDS mip
-        let mip_count = self
-            .current
-            .as_ref()
-            .map(|c| c.img.mips.len())
-            .unwrap_or(1);
+        let mip_count = self.current.as_ref().map(|c| c.img.mips.len()).unwrap_or(1);
         if key(Key::ArrowUp) && self.mip_index + 1 < mip_count {
             self.mip_index += 1;
             self.upload_current_mip();
@@ -627,8 +653,8 @@ impl App {
             .add_filter(
                 "所有支持的图像",
                 &[
-                    "png", "jpg", "jpeg", "bmp", "gif", "webp", "ico", "tif", "tiff", "hdr",
-                    "dds", "psd", "qoi", "tga", "ppm", "pgm", "pbm",
+                    "png", "jpg", "jpeg", "bmp", "gif", "webp", "ico", "tif", "tiff", "hdr", "dds",
+                    "psd", "qoi", "tga", "ppm", "pgm", "pbm",
                 ],
             )
             .pick_file()
@@ -668,38 +694,43 @@ impl App {
     }
 
     /// 悬浮层自动显隐：指针移动 / 悬停悬浮层 / 弹窗打开 / 出错时显示，
-    /// 指针静止约 1.6s 后淡出；无图像时顶栏常显（保留“打开”入口）。
+    /// 指针静止约 2.4s 后淡出；无图像或固定工具栏时常显。
     fn update_overlay_visibility(&mut self, ctx: &egui::Context) {
         if ctx.input(|i| i.pointer.delta().length_sq() > 0.0) {
             self.last_move = Instant::now();
         }
         let has_image = self.current.is_some();
-        let recent = self.last_move.elapsed() < Duration::from_millis(1600);
+        let recent = self.last_move.elapsed() < Duration::from_millis(2400);
         let busy = self.over_overlay
             || ctx.input(|i| i.pointer.any_down())
+            || ctx.memory(|m| m.focused().is_some())
             || ctx.memory(|m| m.any_popup_open())
             || self.ctx_menu_pos.is_some()
             || self.show_props
+            || self.show_probe
             || self.show_settings
             || self.error_msg.is_some();
-        let top_show = !has_image || recent || busy;
-        let bot_show = has_image && (recent || busy);
+        let top_show = self.toolbar_pinned || !has_image || recent || busy;
+        let bot_show = has_image && (self.toolbar_pinned || recent || busy);
         let dt = ctx.input(|i| i.unstable_dt).min(0.1);
-        fn fade(a: &mut f32, show: bool, dt: f32) -> bool {
+        fn fade(a: &mut f32, show: bool, dt: f32, reduce_motion: bool) -> bool {
             let t = if show { 1.0 } else { 0.0 };
-            *a += (t - *a) * (dt * 9.0).min(1.0);
-            if (*a - t).abs() < 0.02 {
+            if reduce_motion {
                 *a = t;
+            } else if show {
+                *a = (*a + dt / 0.12).min(1.0);
+            } else {
+                *a = (*a - dt / 0.18).max(0.0);
             }
-            *a != t // true = 仍在动画中
+            *a != t
         }
-        let animating =
-            fade(&mut self.top_alpha, top_show, dt) | fade(&mut self.bot_alpha, bot_show, dt);
+        let animating = fade(&mut self.top_alpha, top_show, dt, self.reduce_motion)
+            | fade(&mut self.bot_alpha, bot_show, dt, self.reduce_motion);
         if animating {
             ctx.request_repaint();
         } else if recent && !busy {
             // 静止计时到点后再评估一次，触发淡出
-            let remain = Duration::from_millis(1600).saturating_sub(self.last_move.elapsed());
+            let remain = Duration::from_millis(2400).saturating_sub(self.last_move.elapsed());
             ctx.request_repaint_after(remain.max(Duration::from_millis(16)));
         }
     }
@@ -707,7 +738,7 @@ impl App {
     /// 顶部悬浮工具栏：打开 / 目录导航 / 文件信息 / 通道 / mip / 视图控制 / 动画 / 曝光 / 主题。
     /// 返回指针是否悬停在胶囊上。
     fn draw_top_overlay(&mut self, ctx: &egui::Context, pal: &Palette) -> bool {
-        if self.top_alpha <= 0.01 {
+        if self.show_settings || self.top_alpha <= 0.01 {
             return false;
         }
         let alpha = self.top_alpha;
@@ -762,31 +793,26 @@ impl App {
                         if let Some(cur) = &self.current {
                             ui::sep(ui, pal);
                             let img = &cur.img;
-                            let raw =
-                                cur.path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-                            // 超长文件名截断，避免把胶囊撑得过宽
-                            let name = if raw.chars().count() > 28 {
-                                format!("{}…", raw.chars().take(27).collect::<String>())
-                            } else {
-                                raw.to_string()
-                            };
+                            let raw = cur.path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
                             let file_size = std::fs::metadata(&cur.path)
                                 .map(|m| fmt_size(m.len()))
                                 .unwrap_or_default();
-                            ui::bar_label(ui, name, 13.0, pal.text_bright);
+                            let window_width = ctx.screen_rect().width();
+                            let name_width = if window_width < 1000.0 {
+                                132.0
+                            } else if window_width < 1200.0 {
+                                180.0
+                            } else {
+                                240.0
+                            };
+                            ui::filename_label(ui, raw, name_width, pal.text_bright)
+                                .on_hover_text(raw);
                             ui::badge(ui, img.kind.label(), pal)
                                 .on_hover_text(format!("文件大小 {file_size}"));
-                            if let Some(c) = &img.compression {
-                                ui::badge(ui, c, pal);
-                            }
-                            ui::bar_label_mono(
-                                ui,
-                                format!("{}×{}", img.width, img.height),
-                                11.5,
-                                pal.dim,
-                            );
-                            if let Some(e) = &img.extra_meta {
-                                ui::bar_label(ui, e, 11.0, pal.faint);
+                            if window_width >= 1200.0 {
+                                if let Some(c) = &img.compression {
+                                    ui::badge(ui, c, pal);
+                                }
                             }
                         } else if self.pending.is_some() {
                             ui::sep(ui, pal);
@@ -796,35 +822,55 @@ impl App {
                         if self.current.is_some() {
                             // —— 通道 ——
                             ui::sep(ui, pal);
-                            ui::bar_label(ui, "通道", 11.0, pal.faint);
-                            for (target, label, tip) in [
-                                (ChannelMode::Rgb, "RGB", "完整 RGBA（5 或 C），O 键忽略 Alpha"),
+                            let compact = ctx.screen_rect().width() < 1000.0;
+                            let channels = [
+                                (
+                                    ChannelMode::Rgb,
+                                    "RGB",
+                                    "完整 RGBA（5 或 C），O 键忽略 Alpha",
+                                ),
                                 (ChannelMode::R, "R", "红通道 (1)"),
                                 (ChannelMode::G, "G", "绿通道 (2)"),
                                 (ChannelMode::B, "B", "蓝通道 (3)"),
                                 (ChannelMode::A, "A", "Alpha 通道 (4)"),
-                            ] {
-                                ui.selectable_value(
-                                    &mut self.channel,
-                                    target,
-                                    RichText::new(label).size(12.0),
-                                )
-                                .on_hover_text(tip);
+                            ];
+                            if compact {
+                                ui.scope(|ui| {
+                                    ui.spacing_mut().interact_size.y = 32.0;
+                                    ComboBox::from_id_source("iv-channel-compact")
+                                        .selected_text(self.channel.label())
+                                        .width(52.0)
+                                        .show_ui(ui, |ui| {
+                                            for (target, label, tip) in channels {
+                                                ui.selectable_value(
+                                                    &mut self.channel,
+                                                    target,
+                                                    label,
+                                                )
+                                                .on_hover_text(tip);
+                                            }
+                                        });
+                                });
+                            } else {
+                                ui::bar_label(ui, "通道", 12.0, pal.dim);
+                                for (target, label, tip) in channels {
+                                    let selected = self.channel == target;
+                                    if ui::segment_button(ui, label, selected, pal)
+                                        .on_hover_text(tip)
+                                        .clicked()
+                                    {
+                                        self.channel = target;
+                                    }
+                                }
                             }
 
                             // —— mip 选择（多 mip 时显示）——
                             let mip_sizes: Vec<(u32, u32)> = self
                                 .current
                                 .as_ref()
-                                .map(|c| {
-                                    c.img
-                                        .mips
-                                        .iter()
-                                        .map(|m| (m.width, m.height))
-                                        .collect()
-                                })
+                                .map(|c| c.img.mips.iter().map(|m| (m.width, m.height)).collect())
                                 .unwrap_or_default();
-                            if mip_sizes.len() > 1 {
+                            if mip_sizes.len() > 1 && ctx.screen_rect().width() >= 1200.0 {
                                 let before = self.mip_index;
                                 ComboBox::from_id_source("iv-mip")
                                     .selected_text(
@@ -878,10 +924,13 @@ impl App {
                                 .as_ref()
                                 .map(|c| c.img.frames.len())
                                 .unwrap_or(0);
-                            if anim_frames > 1 {
+                            if anim_frames > 1 && ctx.screen_rect().width() >= 1200.0 {
                                 ui::sep(ui, pal);
-                                let play_icon =
-                                    if self.playing { Icon::Pause } else { Icon::Play };
+                                let play_icon = if self.playing {
+                                    Icon::Pause
+                                } else {
+                                    Icon::Play
+                                };
                                 if ui::icon_btn(ui, play_icon, false, pal)
                                     .on_hover_text("播放/暂停 (Space) · 逗号/句号逐帧")
                                     .clicked()
@@ -934,12 +983,9 @@ impl App {
                             }
 
                             // —— HDR 曝光 ——
-                            let is_hdr = self
-                                .current
-                                .as_ref()
-                                .map(|c| c.img.is_hdr)
-                                .unwrap_or(false);
-                            if is_hdr {
+                            let is_hdr =
+                                self.current.as_ref().map(|c| c.img.is_hdr).unwrap_or(false);
+                            if is_hdr && ctx.screen_rect().width() >= 1200.0 {
                                 ui::sep(ui, pal);
                                 ui.add_sized(
                                     [100.0, 18.0],
@@ -953,12 +999,17 @@ impl App {
 
                         // —— 主题切换 + 设置 ——
                         ui::sep(ui, pal);
-                        let (icon, tip) = match self.theme {
-                            ThemeMode::Dark => (Icon::Sun, "切换到浅色主题 (T)"),
-                            ThemeMode::Light => (Icon::Moon, "切换到深色主题 (T)"),
-                        };
-                        if ui::icon_btn(ui, icon, false, pal).on_hover_text(tip).clicked() {
-                            self.toggle_theme(ctx);
+                        if ctx.screen_rect().width() >= 1000.0 {
+                            let (icon, tip) = match self.theme {
+                                ThemeMode::Dark => (Icon::Sun, "切换到浅色主题 (T)"),
+                                ThemeMode::Light => (Icon::Moon, "切换到深色主题 (T)"),
+                            };
+                            if ui::icon_btn(ui, icon, false, pal)
+                                .on_hover_text(tip)
+                                .clicked()
+                            {
+                                self.toggle_theme(ctx);
+                            }
                         }
                         if ui::icon_btn(ui, Icon::Settings, false, pal)
                             .on_hover_text("设置")
@@ -981,10 +1032,13 @@ impl App {
                         } else {
                             (Icon::Max, "最大化")
                         };
-                        if ui::icon_btn(ui, micon, false, pal).on_hover_text(mtip).clicked() {
+                        if ui::icon_btn(ui, micon, false, pal)
+                            .on_hover_text(mtip)
+                            .clicked()
+                        {
                             ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized));
                         }
-                        if ui::icon_btn(ui, Icon::Close, false, pal)
+                        if ui::icon_btn_danger(ui, Icon::Close, pal)
                             .on_hover_text("关闭")
                             .clicked()
                         {
@@ -1004,7 +1058,114 @@ impl App {
             ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized));
         }
         let rect = resp.rect;
-        self.glass_regions.push((rect, alpha, 22.0));
+        self.glass_regions.push((rect, alpha, 24.0));
+        Self::rect_hovered(ctx, rect)
+    }
+
+    fn has_context_tools(&self) -> bool {
+        self.current
+            .as_ref()
+            .is_some_and(|cur| cur.img.mips.len() > 1 || cur.img.frames.len() > 1 || cur.img.is_hdr)
+    }
+
+    /// 窄于 1200pt 时将格式专属工具放到第二行，避免挤压主标题栏。
+    fn draw_context_tools_overlay(&mut self, ctx: &egui::Context, pal: &Palette) -> bool {
+        if self.top_alpha <= 0.01
+            || ctx.screen_rect().width() >= 1200.0
+            || !self.has_context_tools()
+        {
+            return false;
+        }
+        let alpha = self.top_alpha;
+        let mip_sizes: Vec<(u32, u32)> = self
+            .current
+            .as_ref()
+            .map(|c| c.img.mips.iter().map(|m| (m.width, m.height)).collect())
+            .unwrap_or_default();
+        let anim_frames = self
+            .current
+            .as_ref()
+            .map(|c| c.img.frames.len())
+            .unwrap_or_default();
+        let is_hdr = self.current.as_ref().is_some_and(|c| c.img.is_hdr);
+        let area = egui::Area::new(egui::Id::new("iv-context-tools"))
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::CENTER_TOP, Vec2::new(0.0, 70.0))
+            .show(ctx, |ui| {
+                ui.set_opacity(alpha);
+                let frame_resp = ui::capsule(pal).show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 6.0;
+                        let mut has_group = false;
+                        if mip_sizes.len() > 1 {
+                            let before = self.mip_index;
+                            ui.scope(|ui| {
+                                ui.spacing_mut().interact_size.y = 32.0;
+                                ComboBox::from_id_source("iv-mip-context")
+                                    .selected_text(format!(
+                                        "Mip {}/{}",
+                                        self.mip_index,
+                                        mip_sizes.len() - 1
+                                    ))
+                                    .width(94.0)
+                                    .show_ui(ui, |ui| {
+                                        for (index, (width, height)) in mip_sizes.iter().enumerate()
+                                        {
+                                            ui.selectable_value(
+                                                &mut self.mip_index,
+                                                index,
+                                                format!("Mip {index} · {width}×{height}"),
+                                            );
+                                        }
+                                    });
+                            });
+                            if self.mip_index != before {
+                                self.upload_current_mip();
+                                self.auto_fit = true;
+                            }
+                            has_group = true;
+                        }
+                        if anim_frames > 1 {
+                            if has_group {
+                                ui::sep(ui, pal);
+                            }
+                            let icon = if self.playing {
+                                Icon::Pause
+                            } else {
+                                Icon::Play
+                            };
+                            if ui::icon_btn(ui, icon, false, pal)
+                                .on_hover_text("播放/暂停 (Space) · 逗号/句号逐帧")
+                                .clicked()
+                            {
+                                self.toggle_play();
+                            }
+                            ui::bar_label_mono(
+                                ui,
+                                format!("{}/{}", self.frame_index + 1, anim_frames),
+                                12.0,
+                                pal.dim,
+                            );
+                            has_group = true;
+                        }
+                        if is_hdr {
+                            if has_group {
+                                ui::sep(ui, pal);
+                            }
+                            ui::bar_label(ui, "曝光", 12.0, pal.dim);
+                            ui.add_sized(
+                                [120.0, 22.0],
+                                Slider::new(&mut self.exposure, 0.01..=64.0)
+                                    .logarithmic(true)
+                                    .show_value(true),
+                            );
+                        }
+                    });
+                });
+                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
+            });
+        let rect = area.response.rect;
+        self.glass_regions.push((rect, alpha, 24.0));
         Self::rect_hovered(ctx, rect)
     }
 
@@ -1021,7 +1182,17 @@ impl App {
             .shadow(pal.shadow);
         let area = egui::Area::new(egui::Id::new("iv-error"))
             .order(egui::Order::Foreground)
-            .anchor(egui::Align2::CENTER_TOP, Vec2::new(0.0, 56.0))
+            .anchor(
+                egui::Align2::CENTER_TOP,
+                Vec2::new(
+                    0.0,
+                    if self.has_context_tools() && ctx.screen_rect().width() < 1200.0 {
+                        130.0
+                    } else {
+                        70.0
+                    },
+                ),
+            )
             .show(ctx, |ui| {
                 let frame_resp = frame.show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -1030,7 +1201,7 @@ impl App {
                                 .size(12.5)
                                 .color(pal.err_text),
                         );
-                        if ui::icon_btn(ui, Icon::Close, false, pal)
+                        if ui::icon_btn_danger(ui, Icon::Close, pal)
                             .on_hover_text("关闭")
                             .clicked()
                         {
@@ -1047,7 +1218,7 @@ impl App {
 
     /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。返回指针是否悬停。
     fn draw_bottom_overlay(&mut self, ctx: &egui::Context, pal: &Palette) -> bool {
-        if self.bot_alpha <= 0.01 {
+        if self.show_settings || self.bot_alpha <= 0.01 {
             return false;
         }
         let alpha = self.bot_alpha;
@@ -1063,8 +1234,8 @@ impl App {
                         // —— 像素检查器：色块固定位 + 定宽槽位文本 ——
                         // 色块始终占位（无像素时不填色），避免布局伸缩
                         let mono = egui::FontId::new(11.5, egui::FontFamily::Monospace);
-                        let (rc, _) = ui
-                            .allocate_exact_size(egui::vec2(13.0, 13.0), egui::Sense::hover());
+                        let (rc, _) =
+                            ui.allocate_exact_size(egui::vec2(13.0, 13.0), egui::Sense::hover());
                         {
                             let p = ui.painter();
                             p.rect_filled(
@@ -1085,21 +1256,19 @@ impl App {
                                 Stroke::new(1.0f32, pal.border),
                             );
                         }
-                        // 槽位宽按本图最大可能文本测量；probe_text 已做位数填充，内容长度恒定
+                        // 默认只保留坐标与 HEX；完整 RGBA/浮点值点击后在检查器中查看。
                         let (iw, ih) = self
                             .current
                             .as_ref()
                             .map(|c| (c.img.width, c.img.height))
                             .unwrap_or((9999, 9999));
-                        let sample = format!(
-                            "{iw}, {ih}  #RRGGBBAA  (255, 255, 255, 255)  [ 64.000  64.000  64.000  64.000]"
-                        );
+                        let sample = format!("{iw}, {ih}   #RRGGBBAA");
                         let slot_w = ui
                             .fonts(|f| f.layout_no_wrap(sample, mono.clone(), pal.dim))
                             .size()
                             .x;
-                        let (slot, slot_resp) = ui
-                            .allocate_exact_size(Vec2::new(slot_w, 18.0), egui::Sense::hover());
+                        let (slot, slot_resp) =
+                            ui.allocate_exact_size(Vec2::new(slot_w, 20.0), egui::Sense::click());
                         let probe = self.probe_text.clone();
                         let (txt, color) = if probe.is_empty() {
                             ("光标移到图像上查看像素".to_string(), pal.faint)
@@ -1107,11 +1276,13 @@ impl App {
                             (probe, pal.dim)
                         };
                         let galley = ui.fonts(|f| f.layout_no_wrap(txt, mono.clone(), color));
-                        let gp =
-                            Pos2::new(slot.left(), slot.center().y - galley.size().y / 2.0);
+                        let gp = Pos2::new(slot.left(), slot.center().y - galley.size().y / 2.0);
                         ui.painter().galley(gp, galley, color);
-                        slot_resp
-                            .on_hover_text("光标处像素：坐标 · HEX · RGBA · 线性浮点值");
+                        let slot_resp = slot_resp
+                            .on_hover_text("坐标与 HEX；点击打开可固定、可复制的完整像素检查器");
+                        if slot_resp.clicked() {
+                            self.show_probe = true;
+                        }
 
                         ui::sep(ui, pal);
 
@@ -1121,14 +1292,13 @@ impl App {
                         }
                         if self.channel != ChannelMode::Rgb {
                             ui.label(
-                                RichText::new(self.channel.label()).size(11.0).color(pal.accent),
+                                RichText::new(self.channel.label())
+                                    .size(11.0)
+                                    .color(pal.accent),
                             );
                         }
-                        let mip_count = self
-                            .current
-                            .as_ref()
-                            .map(|c| c.img.mips.len())
-                            .unwrap_or(1);
+                        let mip_count =
+                            self.current.as_ref().map(|c| c.img.mips.len()).unwrap_or(1);
                         if mip_count > 1 {
                             ui.label(
                                 RichText::new(format!("Mip {}/{}", self.mip_index, mip_count - 1))
@@ -1156,10 +1326,8 @@ impl App {
                                 })
                                 .size()
                                 .x;
-                            let (slot, slot_resp) = ui.allocate_exact_size(
-                                Vec2::new(slot_w, 18.0),
-                                egui::Sense::hover(),
-                            );
+                            let (slot, slot_resp) = ui
+                                .allocate_exact_size(Vec2::new(slot_w, 18.0), egui::Sense::hover());
                             let fd = anim_frames.to_string().len();
                             let txt = format!(
                                 "帧 {:>fd$}/{}{}",
@@ -1202,7 +1370,7 @@ impl App {
                 ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, alpha, 22.0));
+        self.glass_regions.push((rect, alpha, 24.0));
         Self::rect_hovered(ctx, rect)
     }
 
@@ -1212,15 +1380,21 @@ impl App {
         let Some(pos) = self.ctx_menu_pos else {
             return;
         };
+        let safe_rect = ctx.screen_rect().shrink(8.0);
+        let menu_height = (safe_rect.height() - 16.0).max(240.0);
         let area = egui::Area::new(egui::Id::new("iv-ctxmenu"))
             .order(egui::Order::Foreground)
             .fixed_pos(pos)
-            .constrain(true)
+            .constrain_to(safe_rect)
             .show(ctx, |ui| {
                 // 限制最大宽度：否则按钮/分隔线会把菜单撑满可用宽度
                 ui.set_max_width(232.0);
                 let frame_resp = ui::menu_frame(pal).show(ui, |ui| {
-                    self.draw_context_menu(ui, canvas);
+                    egui::ScrollArea::vertical()
+                        .id_source("iv-context-scroll")
+                        .max_height(menu_height)
+                        .auto_shrink([false, true])
+                        .show(ui, |ui| self.draw_context_menu(ui, canvas));
                 });
                 ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
@@ -1241,7 +1415,7 @@ impl App {
 
     /// 画布右键菜单：像素 / 文件 / 导航 / 视图 / 属性 / 主题。
     fn draw_context_menu(&mut self, ui: &mut egui::Ui, canvas: egui::Rect) {
-        ui.set_min_width(210.0);
+        ui.set_min_width(232.0);
         let has_image = self.current.is_some();
         let ctx = ui.ctx().clone();
         let pal = ui::palette(&ctx);
@@ -1249,9 +1423,20 @@ impl App {
         // 光标下的像素（菜单弹出前的 hover 值已冻结）
         if let Some([r, g, b, a]) = self.probe_color {
             let hex = format!("#{r:02X}{g:02X}{b:02X}{a:02X}");
-            ui.horizontal(|ui| {
-                let (rc, _) =
-                    ui.allocate_exact_size(egui::vec2(15.0, 15.0), egui::Sense::hover());
+            let (header, resp) =
+                ui.allocate_exact_size(Vec2::new(ui.available_width(), 36.0), Sense::click());
+            if resp.hovered() {
+                ui.painter().rect_filled(
+                    header.shrink2(Vec2::new(2.0, 1.0)),
+                    egui::Rounding::same(8.0),
+                    pal.btn_hover,
+                );
+            }
+            let rc = egui::Rect::from_center_size(
+                Pos2::new(header.left() + 17.0, header.center().y),
+                Vec2::splat(16.0),
+            );
+            {
                 let p = ui.painter();
                 p.rect_filled(
                     rc,
@@ -1263,40 +1448,48 @@ impl App {
                     egui::Rounding::same(3.0),
                     Color32::from_rgba_unmultiplied(r, g, b, a),
                 );
-                p.rect_stroke(rc, egui::Rounding::same(3.0), Stroke::new(1.0f32, pal.border));
-                if ui
-                    .button(RichText::new(format!("复制像素值  {hex}")).monospace())
-                    .clicked()
-                {
-                    ui.ctx().output_mut(|o| o.copied_text = hex.clone());
-                    self.ctx_menu_pos = None;
-                }
-            });
-            ui.separator();
+                p.rect_stroke(
+                    rc,
+                    egui::Rounding::same(3.0),
+                    Stroke::new(1.0f32, pal.border),
+                );
+                p.text(
+                    Pos2::new(header.left() + 32.0, header.center().y),
+                    egui::Align2::LEFT_CENTER,
+                    format!("复制像素值  {hex}"),
+                    egui::FontId::new(12.5, egui::FontFamily::Monospace),
+                    pal.text,
+                );
+            }
+            if resp.clicked() {
+                ui.ctx().output_mut(|o| o.copied_text = hex.clone());
+                self.ctx_menu_pos = None;
+            }
+            ui::menu_sep(ui, &pal);
         }
 
         // 文件操作
         if let Some(cur) = &self.current {
             let path = cur.path.clone();
-            if ui.button("复制文件路径").clicked() {
+            if ui::menu_item(ui, "复制文件路径", "", false, &pal).clicked() {
                 ui.ctx()
                     .output_mut(|o| o.copied_text = path.display().to_string());
                 self.ctx_menu_pos = None;
             }
-            if ui.button("在资源管理器中显示").clicked() {
+            if ui::menu_item(ui, "在资源管理器中显示", "", false, &pal).clicked() {
                 let _ = std::process::Command::new("explorer")
                     .arg(format!("/select,{}", path.display()))
                     .spawn();
                 self.ctx_menu_pos = None;
             }
-            ui.separator();
+            ui::menu_sep(ui, &pal);
         }
 
-        if ui.button("打开文件…").on_hover_text("Ctrl+O").clicked() {
+        if ui::menu_item(ui, "打开文件…", "Ctrl+O", false, &pal).clicked() {
             self.open_dialog();
             self.ctx_menu_pos = None;
         }
-        if ui.button("设置…").clicked() {
+        if ui::menu_item(ui, "设置…", "", false, &pal).clicked() {
             self.show_settings = true;
             self.assoc_registered = winassoc::is_registered();
             self.ctx_menu_pos = None;
@@ -1309,17 +1502,15 @@ impl App {
             .map(|d| d.files.len() > 1)
             .unwrap_or(false)
         {
-            ui.separator();
-            ui.horizontal(|ui| {
-                if ui.button("上一张").on_hover_text("←").clicked() {
-                    self.step(-1);
-                    self.ctx_menu_pos = None;
-                }
-                if ui.button("下一张").on_hover_text("→").clicked() {
-                    self.step(1);
-                    self.ctx_menu_pos = None;
-                }
-            });
+            ui::menu_sep(ui, &pal);
+            if ui::menu_item(ui, "上一张", "←", false, &pal).clicked() {
+                self.step(-1);
+                self.ctx_menu_pos = None;
+            }
+            if ui::menu_item(ui, "下一张", "→", false, &pal).clicked() {
+                self.step(1);
+                self.ctx_menu_pos = None;
+            }
         }
 
         if !has_image {
@@ -1333,70 +1524,80 @@ impl App {
             .map(|c| c.img.frames.len())
             .unwrap_or(0);
         if anim > 1 {
-            ui.separator();
-            if ui
-                .button(if self.playing { "暂停动画" } else { "播放动画" })
-                .on_hover_text("Space")
-                .clicked()
-            {
+            ui::menu_sep(ui, &pal);
+            ui::menu_section(ui, "动画", &pal);
+            let playback = if self.playing {
+                "暂停动画"
+            } else {
+                "播放动画"
+            };
+            if ui::menu_item(ui, playback, "Space", self.playing, &pal).clicked() {
                 self.toggle_play();
                 self.ctx_menu_pos = None;
             }
-            ui.horizontal(|ui| {
-                if ui.button("上一帧").on_hover_text(",").clicked() {
-                    self.step_frame(-1);
-                    self.ctx_menu_pos = None;
-                }
-                if ui.button("下一帧").on_hover_text(".").clicked() {
-                    self.step_frame(1);
-                    self.ctx_menu_pos = None;
-                }
-            });
+            if ui::menu_item(ui, "上一帧", ",", false, &pal).clicked() {
+                self.step_frame(-1);
+                self.ctx_menu_pos = None;
+            }
+            if ui::menu_item(ui, "下一帧", ".", false, &pal).clicked() {
+                self.step_frame(1);
+                self.ctx_menu_pos = None;
+            }
         }
 
         // 视图操作
-        ui.separator();
-        if ui.button("适配窗口").on_hover_text("F").clicked() {
+        ui::menu_sep(ui, &pal);
+        ui::menu_section(ui, "视图", &pal);
+        if ui::menu_item(ui, "适配窗口", "F", false, &pal).clicked() {
             self.fit(canvas.size());
             self.ctx_menu_pos = None;
         }
-        if ui.button("实际大小 100%").on_hover_text("0").clicked() {
+        if ui::menu_item(ui, "实际大小 100%", "0", false, &pal).clicked() {
             self.actual_size(canvas.size());
             self.ctx_menu_pos = None;
         }
-        if ui.button("放大").on_hover_text("滚轮 ↑").clicked() {
+        if ui::menu_item(ui, "放大", "滚轮 ↑", false, &pal).clicked() {
             self.zoom_at(canvas.center(), 1.25);
             self.ctx_menu_pos = None;
         }
-        if ui.button("缩小").on_hover_text("滚轮 ↓").clicked() {
+        if ui::menu_item(ui, "缩小", "滚轮 ↓", false, &pal).clicked() {
             self.zoom_at(canvas.center(), 0.8);
             self.ctx_menu_pos = None;
         }
-        if ui
-            .selectable_label(self.nearest, "最近邻采样")
-            .on_hover_text("N —— 放大看像素")
-            .clicked()
-        {
+        if ui::menu_item(ui, "最近邻采样", "N", self.nearest, &pal).clicked() {
             self.nearest = !self.nearest;
             self.ctx_menu_pos = None;
         }
+        let is_hdr = self.current.as_ref().is_some_and(|c| c.img.is_hdr);
+        if is_hdr {
+            ui::menu_section(ui, "HDR 曝光", &pal);
+            ui.add(
+                Slider::new(&mut self.exposure, 0.01..=64.0)
+                    .logarithmic(true)
+                    .show_value(true),
+            );
+        }
 
         // 通道（内联按钮行，替代 egui 子菜单）
-        ui.separator();
-        ui.label(RichText::new("通道").small().color(pal.faint));
+        ui::menu_sep(ui, &pal);
+        ui::menu_section(ui, "通道", &pal);
         ui.horizontal(|ui| {
             for (target, label, tip) in [
-                (ChannelMode::Rgb, "RGB", "完整 RGBA（5 或 C），O 键忽略 Alpha"),
+                (
+                    ChannelMode::Rgb,
+                    "RGB",
+                    "完整 RGBA（5 或 C），O 键忽略 Alpha",
+                ),
                 (ChannelMode::R, "R", "红通道 (1)"),
                 (ChannelMode::G, "G", "绿通道 (2)"),
                 (ChannelMode::B, "B", "蓝通道 (3)"),
                 (ChannelMode::A, "A", "Alpha 通道 (4)"),
             ] {
-                if ui
-                    .selectable_value(&mut self.channel, target, RichText::new(label).size(12.0))
+                if ui::segment_button(ui, label, self.channel == target, &pal)
                     .on_hover_text(tip)
                     .clicked()
                 {
+                    self.channel = target;
                     self.ctx_menu_pos = None;
                 }
             }
@@ -1408,14 +1609,13 @@ impl App {
             .map(|c| c.img.mips.iter().map(|m| (m.width, m.height)).collect())
             .unwrap_or_default();
         if mip_sizes.len() > 1 {
-            ui.separator();
-            ui.label(RichText::new("Mip 级别").small().color(pal.faint));
+            ui::menu_sep(ui, &pal);
+            ui::menu_section(ui, "Mip 级别", &pal);
             let before = self.mip_index;
             for (i, (w, h)) in mip_sizes.iter().enumerate() {
-                if ui
-                    .selectable_value(&mut self.mip_index, i, format!("Mip {i} · {w}×{h}"))
-                    .clicked()
-                {
+                let label = format!("Mip {i} · {w}×{h}");
+                if ui::menu_item(ui, &label, "", self.mip_index == i, &pal).clicked() {
+                    self.mip_index = i;
                     self.ctx_menu_pos = None;
                 }
             }
@@ -1425,16 +1625,20 @@ impl App {
             }
         }
 
-        ui.separator();
-        if ui.button("图像属性…").clicked() {
+        ui::menu_sep(ui, &pal);
+        if ui::menu_item(ui, "图像属性…", "", false, &pal).clicked() {
             self.show_props = true;
+            self.ctx_menu_pos = None;
+        }
+        if ui::menu_item(ui, "像素检查器…", "", false, &pal).clicked() {
+            self.show_probe = true;
             self.ctx_menu_pos = None;
         }
         let theme_label = match self.theme {
             ThemeMode::Dark => "切换到浅色主题",
             ThemeMode::Light => "切换到深色主题",
         };
-        if ui.button(theme_label).on_hover_text("T").clicked() {
+        if ui::menu_item(ui, theme_label, "T", false, &pal).clicked() {
             self.toggle_theme(&ctx);
             self.ctx_menu_pos = None;
         }
@@ -1488,11 +1692,7 @@ impl App {
                             if img.frames.len() > 1 {
                                 row("动画", format!("{} 帧", img.frames.len()), ui);
                             }
-                            row(
-                                "Alpha",
-                                if img.has_alpha { "有" } else { "无" }.into(),
-                                ui,
-                            );
+                            row("Alpha", if img.has_alpha { "有" } else { "无" }.into(), ui);
                             row("HDR", if img.is_hdr { "是" } else { "否" }.into(), ui);
                             if let Some(e) = &img.extra_meta {
                                 row("备注", e.clone(), ui);
@@ -1510,154 +1710,307 @@ impl App {
         }
     }
 
+    /// 完整像素检查器：底栏保持简洁，专业读数在这里可固定和复制。
+    fn draw_probe_window(&mut self, ctx: &egui::Context, pal: &Palette) {
+        if !self.show_probe {
+            return;
+        }
+        let mut open = self.show_probe;
+        let win_rect = egui::Window::new("像素检查器")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .default_width(400.0)
+            .show(ctx, |ui| {
+                ui.spacing_mut().item_spacing.y = 10.0;
+                if let Some([r, g, b, a]) = self.probe_color {
+                    ui.horizontal(|ui| {
+                        let (rect, _) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::hover());
+                        ui.painter().rect_filled(
+                            rect,
+                            egui::Rounding::same(7.0),
+                            Color32::from_rgba_unmultiplied(r, g, b, a),
+                        );
+                        ui.painter().rect_stroke(
+                            rect,
+                            egui::Rounding::same(7.0),
+                            Stroke::new(1.0_f32, pal.border),
+                        );
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new(&self.probe_text).monospace().color(pal.text));
+                            ui.label(
+                                RichText::new(&self.probe_detail)
+                                    .monospace()
+                                    .size(12.0)
+                                    .color(pal.dim),
+                            );
+                        });
+                    });
+                    if ui.button("复制完整读数").clicked() {
+                        ui.output_mut(|o| {
+                            o.copied_text = format!("{}  {}", self.probe_text, self.probe_detail)
+                        });
+                    }
+                } else {
+                    ui.label(RichText::new("将光标移到图像上以读取原始像素值").color(pal.dim));
+                }
+            })
+            .map(|r| r.response.rect);
+        self.show_probe = open;
+        if let Some(rect) = win_rect {
+            self.glass_regions.push((rect, 1.0, 16.0));
+        }
+    }
+
     /// 设置窗口（顶栏齿轮 / 右键菜单打开）：外观 + Windows 集成 + 关于。
     fn draw_settings_window(&mut self, ctx: &egui::Context, pal: &Palette) {
         if !self.show_settings {
             return;
         }
         let mut open = self.show_settings;
+        let content_height = (ctx.screen_rect().height() - 160.0).clamp(320.0, 720.0);
         let win_rect = egui::Window::new("设置")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(348.0)
+            .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+            .default_width(400.0)
+            .min_height(content_height)
+            .max_width((ctx.screen_rect().width() - 32.0).max(320.0))
+            .max_height((ctx.screen_rect().height() - 96.0).max(352.0))
             .show(ctx, |ui| {
-                ui.spacing_mut().item_spacing.y = 10.0;
+                egui::ScrollArea::vertical()
+                    .id_source("iv-settings-scroll")
+                    .max_height(content_height)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        ui.spacing_mut().interact_size.y = 32.0;
+                        ui.spacing_mut().item_spacing.y = 10.0;
 
-                // —— 外观 ——
-                ui::settings_card(ui, pal, "外观", |ui| {
-                    ui::setting_row(ui, pal, "主题", "", |ui| {
-                        ui.horizontal(|ui| {
-                            let mut mode = self.theme;
-                            let changed = ui
-                                .selectable_value(&mut mode, ThemeMode::Dark, "深色")
-                                .changed()
-                                | ui.selectable_value(&mut mode, ThemeMode::Light, "浅色")
-                                    .changed();
-                            if changed && mode != self.theme {
-                                ThemeMode::apply_to(ctx, mode);
-                                self.theme = mode;
+                        // —— 外观 ——
+                        ui::settings_card(ui, pal, "外观", |ui| {
+                            ui::setting_row(ui, pal, "主题", "", |ui| {
+                                ui.horizontal(|ui| {
+                                    if ui::segment_button(
+                                        ui,
+                                        "深色",
+                                        self.theme == ThemeMode::Dark,
+                                        pal,
+                                    )
+                                    .clicked()
+                                    {
+                                        ThemeMode::apply_to(ctx, ThemeMode::Dark);
+                                        self.theme = ThemeMode::Dark;
+                                    }
+                                    if ui::segment_button(
+                                        ui,
+                                        "浅色",
+                                        self.theme == ThemeMode::Light,
+                                        pal,
+                                    )
+                                    .clicked()
+                                    {
+                                        ThemeMode::apply_to(ctx, ThemeMode::Light);
+                                        self.theme = ThemeMode::Light;
+                                    }
+                                });
+                            });
+                            ui.add_space(2.0);
+                            ui::setting_row(
+                                ui,
+                                pal,
+                                "Alpha 衬底",
+                                "透明图片区域使用棋盘格或画布色",
+                                |ui| {
+                                    ui.horizontal(|ui| {
+                                        if ui::segment_button(ui, "纯色", !self.checkerboard, pal)
+                                            .clicked()
+                                        {
+                                            self.checkerboard = false;
+                                        }
+                                        if ui::segment_button(ui, "棋盘格", self.checkerboard, pal)
+                                            .clicked()
+                                        {
+                                            self.checkerboard = true;
+                                        }
+                                    });
+                                },
+                            );
+                            ui.add_space(2.0);
+                            ui::setting_row(
+                                ui,
+                                pal,
+                                "固定工具栏",
+                                "始终显示顶部工具栏和底部读数",
+                                |ui| {
+                                    ui::toggle(ui, &mut self.toolbar_pinned, pal);
+                                },
+                            );
+                            ui.add_space(2.0);
+                            ui::setting_row(
+                                ui,
+                                pal,
+                                "减少动效",
+                                "关闭工具栏淡入淡出动画",
+                                |ui| {
+                                    ui::toggle(ui, &mut self.reduce_motion, pal);
+                                },
+                            );
+                        });
+
+                        ui::settings_card(ui, pal, "面板磨砂", |ui| {
+                            ui.label(
+                                RichText::new("工具栏、菜单、属性和设置共享统一的画布柔化材质")
+                                    .small()
+                                    .color(pal.dim),
+                            );
+                        });
+
+                        // —— 画布背景 ——
+                        ui::settings_card(ui, pal, "画布背景", |ui| {
+                            ui::setting_row(
+                                ui,
+                                pal,
+                                "桌面磨砂",
+                                "柔化窗口后方内容；不可用时回退为主题渐变",
+                                |ui| {
+                                    let mut on = self.backdrop;
+                                    if ui::toggle(ui, &mut on, pal).changed() && on != self.backdrop
+                                    {
+                                        self.backdrop = on;
+                                        // update 内的捕获状态机会在下一帧自动开始/停止捕获
+                                        if on {
+                                            // 拨回周期计时，下一帧立即重捕
+                                            self.last_capture =
+                                                Instant::now() - Duration::from_secs(10);
+                                        } else {
+                                            self.backdrop_tex = None;
+                                            if let Some(renderer) = &mut self.renderer {
+                                                renderer.clear_backdrop();
+                                            }
+                                        }
+                                    }
+                                },
+                            );
+                            if self.backdrop {
+                                ui.add_space(6.0);
+                                // 不透明度：绘制时实时生效
+                                let mut op = self.backdrop_opacity;
+                                if ui::slider_row(ui, pal, "不透明度", &mut op, 0.05..=0.95, true)
+                                {
+                                    self.backdrop_opacity = op;
+                                }
+                                ui.add_space(2.0);
+                                // 模糊强度：烘焙在捕获里，改后触发重捕
+                                let mut bl = self.backdrop_blur;
+                                if ui::slider_row(ui, pal, "模糊强度", &mut bl, 0.0..=1.0, true)
+                                {
+                                    self.backdrop_blur = bl;
+                                    self.last_capture = Instant::now() - Duration::from_secs(10);
+                                }
+                                ui.add_space(2.0);
+                                // 背景亮度：绘制时实时生效
+                                let mut br = self.backdrop_brightness;
+                                if ui::slider_row(ui, pal, "背景亮度", &mut br, 0.6..=1.4, true)
+                                {
+                                    self.backdrop_brightness = br;
+                                }
                             }
                         });
-                    });
-                    ui.add_space(2.0);
-                    ui::setting_row(ui, pal, "透明背景", "含 Alpha 通道图片的衬底", |ui| {
-                        ui.horizontal(|ui| {
-                            ui.selectable_value(&mut self.checkerboard, true, "棋盘格");
-                            ui.selectable_value(&mut self.checkerboard, false, "纯色");
-                        });
-                    });
-                });
 
-                // —— 窗口磨砂 ——
-                ui::settings_card(ui, pal, "窗口磨砂", |ui| {
-                    ui::setting_row(ui, pal, "启用磨砂", "画布显示背后内容的模糊（伪磨砂）", |ui| {
-                        let mut on = self.backdrop;
-                        if ui::toggle(ui, &mut on, pal).changed() && on != self.backdrop {
-                            self.backdrop = on;
-                            // update 内的捕获状态机会在下一帧自动开始/停止捕获
-                            if on {
-                                // 拨回周期计时，下一帧立即重捕
-                                self.last_capture = Instant::now() - Duration::from_secs(10);
+                        // —— Windows 集成 ——
+                        ui::settings_card(ui, pal, "Windows 集成", |ui| {
+                            let (status, tip) = if self.assoc_registered {
+                                (
+                                    "已注册到「打开方式」",
+                                    "列表中将显示图标与名称，可选「始终」",
+                                )
                             } else {
-                                self.backdrop_tex = None;
-                            }
-                        }
-                    });
-                    if self.backdrop {
-                        ui.add_space(6.0);
-                        // 不透明度：绘制时实时生效
-                        let mut op = self.backdrop_opacity;
-                        if ui::slider_row(ui, pal, "不透明度", &mut op, 0.05..=0.95, true) {
-                            self.backdrop_opacity = op;
-                        }
-                        ui.add_space(2.0);
-                        // 模糊强度：烘焙在捕获里，改后触发重捕
-                        let mut bl = self.backdrop_blur;
-                        if ui::slider_row(ui, pal, "模糊强度", &mut bl, 0.0..=1.0, true) {
-                            self.backdrop_blur = bl;
-                            self.last_capture = Instant::now() - Duration::from_secs(10);
-                        }
-                        ui.add_space(2.0);
-                        // 背景亮度：绘制时实时生效
-                        let mut br = self.backdrop_brightness;
-                        if ui::slider_row(ui, pal, "背景亮度", &mut br, 0.6..=1.4, true) {
-                            self.backdrop_brightness = br;
-                        }
-                    }
-                });
+                                ("未注册", "注册后才能出现在打开方式列表并支持「始终」")
+                            };
+                            let status_color = if self.assoc_registered {
+                                pal.accent
+                            } else {
+                                pal.faint
+                            };
+                            ui.label(RichText::new(status).color(status_color).size(13.0));
+                            ui.label(RichText::new(tip).small().color(pal.faint));
+                            ui.add_space(8.0);
+                            ui.horizontal(|ui| {
+                                let button_width = ((ui.available_width() - 8.0) / 2.0).max(132.0);
+                                if self.assoc_registered {
+                                    if ui
+                                        .add_sized(
+                                            [button_width, 32.0],
+                                            egui::Button::new("解除注册"),
+                                        )
+                                        .on_hover_text("从打开方式列表与默认应用候选中移除")
+                                        .clicked()
+                                    {
+                                        if let Err(e) = winassoc::unregister() {
+                                            self.error_msg = Some(e);
+                                        }
+                                        self.assoc_registered = winassoc::is_registered();
+                                    }
+                                } else if ui
+                                    .add_sized(
+                                        [button_width, 32.0],
+                                        egui::Button::new("注册到「打开方式」"),
+                                    )
+                                    .on_hover_text("写入 HKCU，无需管理员权限")
+                                    .clicked()
+                                {
+                                    if let Err(e) = winassoc::register() {
+                                        self.error_msg = Some(e);
+                                    }
+                                    self.assoc_registered = winassoc::is_registered();
+                                }
+                                if ui
+                                    .add_sized(
+                                        [button_width, 32.0],
+                                        egui::Button::new("设为默认看图软件…"),
+                                    )
+                                    .on_hover_text("打开系统「默认应用」设置页")
+                                    .clicked()
+                                {
+                                    // 未注册时先补注册，否则系统默认应用页里找不到本应用
+                                    if !self.assoc_registered {
+                                        if let Err(e) = winassoc::register() {
+                                            self.error_msg = Some(e);
+                                        }
+                                        self.assoc_registered = winassoc::is_registered();
+                                    }
+                                    winassoc::open_default_apps_settings();
+                                }
+                            });
+                            ui.add_space(4.0);
+                            ui.label(
+                                RichText::new(
+                                    "Win10/11 的默认关联需在系统设置页确认，程序无法代为设置",
+                                )
+                                .small()
+                                .color(pal.faint),
+                            );
+                        });
 
-                // —— Windows 集成 ——
-                ui::settings_card(ui, pal, "Windows 集成", |ui| {
-                    let (status, tip) = if self.assoc_registered {
-                        ("已注册到「打开方式」", "列表中将显示图标与名称，可选「始终」")
-                    } else {
-                        ("未注册", "注册后才能出现在打开方式列表并支持「始终」")
-                    };
-                    let status_color = if self.assoc_registered { pal.accent } else { pal.faint };
-                    ui.label(RichText::new(status).color(status_color).size(13.0));
-                    ui.label(RichText::new(tip).small().color(pal.faint));
-                    ui.add_space(8.0);
-                    ui.horizontal(|ui| {
-                        if self.assoc_registered {
-                            if ui
-                                .button("解除注册")
-                                .on_hover_text("从打开方式列表与默认应用候选中移除")
-                                .clicked()
-                            {
-                                if let Err(e) = winassoc::unregister() {
-                                    self.error_msg = Some(e);
-                                }
-                                self.assoc_registered = winassoc::is_registered();
-                            }
-                        } else if ui
-                            .button("注册到「打开方式」")
-                            .on_hover_text("写入 HKCU，无需管理员权限")
-                            .clicked()
-                        {
-                            if let Err(e) = winassoc::register() {
-                                self.error_msg = Some(e);
-                            }
-                            self.assoc_registered = winassoc::is_registered();
-                        }
-                        if ui
-                            .button("设为默认看图软件…")
-                            .on_hover_text("打开系统「默认应用」设置页")
-                            .clicked()
-                        {
-                            // 未注册时先补注册，否则系统默认应用页里找不到本应用
-                            if !self.assoc_registered {
-                                if let Err(e) = winassoc::register() {
-                                    self.error_msg = Some(e);
-                                }
-                                self.assoc_registered = winassoc::is_registered();
-                            }
-                            winassoc::open_default_apps_settings();
-                        }
-                    });
-                    ui.add_space(4.0);
-                    ui.label(
-                        RichText::new("Win10/11 的默认关联需在系统设置页确认，程序无法代为设置")
+                        // —— 关于（页脚小字） ——
+                        ui.add_space(2.0);
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(winassoc::APP_NAME).color(pal.text).strong());
+                            ui.label(
+                                RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                                    .small()
+                                    .color(pal.faint),
+                            );
+                        });
+                        ui.label(
+                            RichText::new(
+                                "轻量级游戏美术看图工具 · DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG",
+                            )
                             .small()
                             .color(pal.faint),
-                    );
-                });
-
-                // —— 关于（页脚小字） ——
-                ui.add_space(2.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(winassoc::APP_NAME).color(pal.text).strong());
-                    ui.label(
-                        RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
-                            .small()
-                            .color(pal.faint),
-                    );
-                });
-                ui.label(
-                    RichText::new("轻量级游戏美术看图工具 · DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG")
-                        .small()
-                        .color(pal.faint),
-                );
+                        );
+                    });
             })
             .map(|r| r.response.rect);
         self.show_settings = open;
@@ -1688,6 +2041,14 @@ impl eframe::App for App {
         storage.set_string("iv-bd-opacity", self.backdrop_opacity.to_string());
         storage.set_string("iv-bd-blur", self.backdrop_blur.to_string());
         storage.set_string("iv-bd-bright", self.backdrop_brightness.to_string());
+        storage.set_string(
+            "iv-toolbar-pinned",
+            if self.toolbar_pinned { "on" } else { "off" }.into(),
+        );
+        storage.set_string(
+            "iv-reduce-motion",
+            if self.reduce_motion { "on" } else { "off" }.into(),
+        );
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -1743,6 +2104,9 @@ impl eframe::App for App {
                     if want_capture && settled && throttled {
                         let cap = crate::backdrop::capture_behind(hwnd, self.backdrop_blur);
                         if let Some(cap) = cap {
+                            if let Some(renderer) = &mut self.renderer {
+                                renderer.upload_backdrop(cap.width, cap.height, &cap.rgba);
+                            }
                             let img = egui::ColorImage::from_rgba_unmultiplied(
                                 [cap.width as usize, cap.height as usize],
                                 &cap.rgba,
@@ -1794,6 +2158,9 @@ impl eframe::App for App {
             self.exclude_since = None;
             self.exclude_release_at = None;
             self.backdrop_tex = None;
+            if let Some(renderer) = &mut self.renderer {
+                renderer.clear_backdrop();
+            }
         }
 
         // 全窗口画布（图像铺满，UI 以悬浮层叠加其上）。
@@ -1937,11 +2304,13 @@ impl eframe::App for App {
         self.glass_regions.clear();
         self.update_overlay_visibility(ctx);
         let over_top = self.draw_top_overlay(ctx, &pal);
+        let over_context = self.draw_context_tools_overlay(ctx, &pal);
         let over_err = self.draw_error_overlay(ctx, &pal);
         let over_bot = self.draw_bottom_overlay(ctx, &pal);
-        self.over_overlay = over_top || over_err || over_bot;
+        self.over_overlay = over_top || over_context || over_err || over_bot;
         self.draw_ctx_menu_overlay(ctx, &pal, canvas_rect);
         self.draw_props_window(ctx, &pal);
+        self.draw_probe_window(ctx, &pal);
         self.draw_settings_window(ctx, &pal);
         // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
         borderless_chrome(ctx);
@@ -1950,9 +2319,11 @@ impl eframe::App for App {
         // 右键菜单弹出 / 拖拽时 hover 消失 → 冻结上一帧值；指针离开窗口才清空
         if ctx.input(|i| i.pointer.latest_pos()).is_none() {
             self.probe_text.clear();
+            self.probe_detail.clear();
             self.probe_color = None;
         } else if let Some(p) = canvas_hover {
             self.probe_text.clear();
+            self.probe_detail.clear();
             self.probe_color = None;
             if let Some((x, y)) = self.pos_to_image(p) {
                 // 动画图取当前帧，静态图取当前 mip（均先在局部取完再写回）
@@ -1976,10 +2347,13 @@ impl eframe::App for App {
                         .map(|c| (c.img.width, c.img.height))
                         .unwrap_or((9999, 9999));
                     self.probe_text = format!(
-                        "{x:>xw$}, {y:>yw$}  #{r:02X}{g:02X}{b:02X}{a:02X}  ({r:>3}, {g:>3}, {b:>3}, {a:>3})  [{:>7.3} {:>7.3} {:>7.3} {:>7.3}]",
-                        f[0], f[1], f[2], f[3],
+                        "{x:>xw$}, {y:>yw$}   #{r:02X}{g:02X}{b:02X}{a:02X}",
                         xw = iw.to_string().len(),
                         yw = ih.to_string().len(),
+                    );
+                    self.probe_detail = format!(
+                        "RGBA ({r:>3}, {g:>3}, {b:>3}, {a:>3})   Float [{:>7.3} {:>7.3} {:>7.3} {:>7.3}]",
+                        f[0], f[1], f[2], f[3],
                     );
                 }
             }
@@ -2006,13 +2380,12 @@ impl eframe::App for App {
                     if has_alpha && self.checkerboard {
                         flags |= 2;
                     }
-                    let is_hdr = self
-                        .current
-                        .as_ref()
-                        .map(|c| c.img.is_hdr)
-                        .unwrap_or(false);
+                    let is_hdr = self.current.as_ref().map(|c| c.img.is_hdr).unwrap_or(false);
                     if is_hdr {
                         flags |= 4;
+                    }
+                    if self.backdrop && self.backdrop_tex.is_some() {
+                        flags |= 8;
                     }
                     // 玻璃区域（逻辑坐标 → 画布内物理像素）
                     let mut glass_rects = [[0.0f32; 4]; MAX_GLASS];
@@ -2028,6 +2401,9 @@ impl eframe::App for App {
                         glass_alpha[i / 4][i % 4] = *a;
                         glass_corner[i / 4][i % 4] = corner * ppp;
                     }
+                    let (canvas_top, canvas_bottom) = ui::canvas_gradient(&pal);
+                    let canvas_top = egui::Rgba::from(canvas_top).to_array();
+                    let canvas_bottom = egui::Rgba::from(canvas_bottom).to_array();
                     let uniforms = Uniforms {
                         canvas_size: [csize.x, csize.y],
                         image_size: [mip.width as f32, mip.height as f32],
@@ -2038,6 +2414,14 @@ impl eframe::App for App {
                         flags,
                         glass_count: glass_count as u32,
                         _pad: 0.0,
+                        canvas_top,
+                        canvas_bottom,
+                        backdrop_params: [
+                            self.backdrop_brightness,
+                            self.backdrop_opacity,
+                            if pal.is_dark { 1.0 } else { 0.0 },
+                            16.0 * ppp,
+                        ],
                         glass_rects,
                         glass_alpha,
                         glass_corner,
@@ -2045,10 +2429,7 @@ impl eframe::App for App {
                     r.write_uniforms(&uniforms);
                     let canvas_painter = egui::Painter::new(
                         ctx.clone(),
-                        egui::LayerId::new(
-                            egui::Order::Background,
-                            egui::Id::new("iv-canvas"),
-                        ),
+                        egui::LayerId::new(egui::Order::Background, egui::Id::new("iv-canvas")),
                         canvas_rect,
                     );
                     canvas_painter.add(crate::render::new_paint_callback(canvas_rect));
