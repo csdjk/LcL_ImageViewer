@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | REVIEW | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
+| IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | DONE | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
 | IV-P1-N05 | 直接打开当前图片所在文件夹 | DONE | ChatGPT-AgentDock | 用户明确修复需求 / N04 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/ui-qa/打开所在目录验收.md` | 打开当前父目录，不使用/select；中文/空格路径、相对路径测试；实机菜单打开Explorer定位核对；tests/check/构建/main复验 |
 | IV-P1-N04 | 左键平移图像、右键拖动窗口 | DONE | ChatGPT-AgentDock | 用户2026-09-14明确授权 / N03 DONE | `crates/iv-viewer/src/{app.rs,backdrop.rs}`, `tools/ui-qa/**`, `docs/ui-qa/鼠标拖拽验收.md`, `README.md` | 左键移图不移窗；右键移窗不移图且拖后不弹菜单；单击菜单/边缘缩放/导航保留；tests/check/release及实机双主题双尺寸验证 |
 | IV-P1-N03 | 窗口两侧半透明磨砂切图按钮 | DONE | ChatGPT-AgentDock | 用户追加需求；串行复用 N02 的1秒计时 | `crates/iv-viewer/src/{app.rs,ui.rs,main.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md` | 左右边缘垂直居中；顶栏移除重复箭头；半透明真实场景模糊；边界禁用；1秒隐藏恢复；tests/check/release及双主题双尺寸实机验收 |
@@ -36,7 +36,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-N06 REVIEW
+NOW: IV-P1-01 READY
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -113,3 +113,7 @@ N04分支复验：24tests/check/Debug及Release构建通过，48张双主题双�
 用户要求精简菜单及A/D切图；上一条Delete删除修复尚未执行，本轮一并完成。READY后领取，Owner ChatGPT-AgentDock，分支 `codex/iv-p1-n06-menu-keys`，工作树 `Temp/worktrees/menu-keys`，Base `dda28fddd2cbc60c9c86860170b248a4b6f29ee3`。保留文件操作、属性、像素检查、设置；移除重复的切图/视图/通道/主题/动画/Mip控制入口，功能仍由顶栏/快捷键提供。删除只在显式确认后通过IFileOperation移入回收站，拒绝非回收模式，不提供永久删除；阻止输入框、弹层和Ctrl/Alt/Shift组合误触。只回收本轮生成的测试文件，不操作用户原图。保留既有提交与用户窗口，主线验收后DONE，不push/发布。
 
 N06 Review：工作树b45b3a5，源码5130492，35tests/check/双构建通过，100张最终实机截图四组PASS；已核对每组3张测试图的回收站字节hash。范围9文件核对通过；主线复验后DONE。
+
+## N06 完成记录
+
+功能集成 `85bb27e077d62356f2e6957f6fd2e0b0834d0e6f`；main35tests/check/双构建PASS；分支100张及主线Release50张实机回归，A/D、精简菜单、确认/取消/回收站原始hash、后继/空态校验PASS。常规Debug/Release均更新，用户旧folder-fix副本未关闭或覆盖；使用隔离配置、只回收新建测试图，无push/发布。详见菜单快捷键验收.md。NEXT恢复IV-P1-01。

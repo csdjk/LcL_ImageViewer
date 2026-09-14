@@ -94,3 +94,7 @@ IV-P1-N04 DONE：左键移图/右键移窗，main24tests/check/双构建及隔�
 ## 打开所在目录修复
 
 IV-P1-N05 DONE：菜单直接打开当前图片父目录；29tests/check/构建和真实Explorer目录核验通过。现有鼠标手势与视觉保留，具体部署路径见status.md；P1仍ACTIVE，NEXT为IV-P1-01。
+
+## 菜单与图片快捷键
+
+IV-P1-N06 DONE：精简右键菜单、A/D导航及确认后回收站删除。main `85bb27e077d62356f2e6957f6fd2e0b0834d0e6f` 35tests/check/双构建、双主题实机复验通过；P1仍ACTIVE，NEXT为IV-P1-01。
