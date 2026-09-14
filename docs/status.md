@@ -3,63 +3,45 @@
 > 更新时间：2026-09-14。本文是当前阶段和唯一 NEXT 的权威来源。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-N01 -->
+<!-- project-next: IV-P1-01 -->
 
 ## 当前阶段
 
 ```text
 P0 Viewer Foundation      VALIDATED
-P1 Glass UI Stabilization ACTIVE
+P1 UI Stabilization       ACTIVE（用户授权改为新拟态）
 P2 Release Hardening      GATED BY P1 VALIDATED
 ```
 
-## 本轮用户授权
+## 当前实现
 
-2026-09-14 用户明确要求：浅色粉彩、单色系明暗变化、12–16px 圆角、多层柔和阴影、无硬边框、可交互元素具有凸起/凹陷效果。本轮新拟态规范优先于旧玻璃视觉方案；保留图像功能、已有显式偏好和历史本地提交。
+用户于2026-09-14明确将视觉方向改为浅色粉彩、单色系明暗、12–16点圆角、多层柔影、凸起/凹陷操作反馈。`IV-P1-N01` 已在独立工作树完成、经审查合入main并复验，状态 **DONE**。主线功能集成提交 `635b7dcc195c5c220882cb9589b3762ebc124eff`；最终状态文档提交的HEAD通过Git读取，不在本文自引用。
 
-## 新拟态工作分支验收（待 main 复验）
+当前规范是 `docs/新拟态UI规范.md`，验收记录是 `docs/ui-qa/新拟态验收.md`。旧玻璃方案保留作历史参考，桌面磨砂仍是可选画布功能。新用户默认浅色并关闭桌面磨砂；已有显式主题/背景偏好继续保留。
 
-`7343033` 已通过范围审查；源码 `62b5163` 的15项测试、check和release构建通过；50张实机截图及ROI比较记录位于 `docs/ui-qa/新拟态验收.md`。当前进入main集成复验，不据此将P1标记VALIDATED。以下原始基线保留作历史参照，完成后同步最新状态。
+## 已完成验证
 
-## 当前真实状态
+- main 集成提交上 `cargo test --workspace --offline`：**15 passed / 0 failed**。
+- `cargo check --workspace --offline` 与 `cargo build --release -p iv-viewer --offline`：**PASS**。
+- 工作分支最终源码50张实际Windows原始截图：双主题、1280×860/880×560、通道、悬停、按下、Tab焦点、菜单、设置/滚动、自动隐藏/恢复、空态、DDS与长中文文件名。
+- main重建的Release程序又完成22张截图：浅色1280×860的13状态、深色880×560的8状态、浅色空态；全部DPI96/100%，元数据及配置恢复核对通过。
+- 相同测试PNG内部ROI与旧版RGB差异为0；四个主题/尺寸组合工具栏恢复区域差异为0。该比较不扩展为全格式或设计稿相似度承诺。
+- 主程序：`target/release/imageview.exe`，SHA-256 `ec37f483172dad922561aee51b097b6c5a432d200541ad908f95b8cb55483256`。没有发布、push、安装器分发或注册表写操作。
 
-- 玻璃 UI 实现与测试基线为 `162ee27fb712479a3474ba04ad561bc24ea6a899`；接入工作流时 `main` 工作区干净。当前 HEAD 应始终通过 Git 读取，不在本文自引用工作流配置提交的 hash。
-- `main` 包含 4 个尚未 push 的本地功能提交：`cbffda3`、`f3b90b2`、`561734a`、`162ee27`。它们实现了玻璃界面、诊断、高斯模糊、窗口拖拽与工具栏自动隐藏调整；本次另增 1 个工作流配置提交。
-- 2026-09-14 在当前 HEAD 执行 `cargo test --workspace`：PASS，共 10 个测试通过、0 失败。
-- `cargo fmt --all -- --check`：FAIL，发现 `iv-core`、`iv-shell` 和 `winassoc.rs` 等既有格式差异；本次没有自动格式化或修改 Rust 源码。
-- `ui-verify-shots/` 中存在当前本机截图，但缺少统一的 commit、DPI、逻辑/物理客户区、输入、状态和比较元数据，不能据此认定 P1 已完成视觉验收。
-- `docs/玻璃磨砂UI优化方案.md` 是基于 `b99efcc` 的原始方案与验收规范；方案之后已有实现提交，当前完成度以本文和 Git 为准。
+完整证据位于忽略目录 `ui-verify-shots/neumorphic-*`。原始PNG逐张配有commit、二进制/输入hash、动作、主题、尺寸、DPI和裁剪JSON。较早迭代截图不能替代最终证据。
 
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-N01 REVIEW — 按用户授权实现浅色单色系新拟态
-AFTER STYLE TASK: IV-P1-01 — 完整验收工具链
+NOW: IV-P1-01 READY — 在现有可重复截图工具上完善通用验收入口
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
+COMPLETED: IV-P1-N01 DONE — 新拟态 UI 已集成且 main 复验
 ```
 
-具体范围见 `docs/task-board.md` 和 `docs/development-plan.md`。
+## 保留的历史与风险
 
-## Git / Test 基线
+原main上的功能与工作流提交（截至 `10686275ff3ec026086e9a244a72d8df143de833`）完整保留，已验证它仍是当前main的祖先。所有新增提交仅在本地；远端没有被修改。
 
-```text
-current main HEAD: 每轮通过 git rev-parse main 读取
-implementation/test baseline: 162ee27fb712479a3474ba04ad561bc24ea6a899
-origin/main: b99efcc（4 个本地功能提交未 push）
-cargo test --workspace: PASS，10 passed，2026-09-14，tested at 162ee27
-cargo fmt --all -- --check: FAIL，历史格式差异；不是本次文档改动造成
-release build: 本次未执行
-UI runtime acceptance: 本次未执行
-```
+全仓rustfmt原有差异尚未清理；本轮只格式化UI实现文件，未将大规模历史格式化混入功能修改。未验证其他DPI、HDR/动画/全格式、全键盘/辅助功能/全部禁用态、桌面捕获恢复、窗口状态矩阵和性能预算；不声明GPU≤2ms，也不将P1标为VALIDATED。
 
-## 当前风险
-
-- 4 个玻璃 UI 提交仅存在本地 `main`；未 push 不等于丢失，但远端尚不能恢复这些提交。
-- 当前 UI 截图流程散落在忽略目录且部分脚本依赖固定 HWND，无法作为稳定回归入口。
-- P1 的对比度、DPI、桌面捕获恢复和性能预算尚无完整、可重复证据。
-- 全仓 rustfmt 基线不干净；后续任务必须避免把大规模格式化混入功能 diff。
-
-## 非阻塞说明
-
-- 当前没有 OPEN 的产品或架构决策。
-- push、Release 和安装包分发不阻塞本地 P1 验收，但执行前需要用户明确要求。
+当前没有新增阻塞产品/架构决策。push、Release与安装包分发需要另外明确授权。

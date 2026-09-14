@@ -78,3 +78,7 @@ IV-P1-01 UI 验收工具链
 - 自动发布到 GitHub Releases。
 
 这些事项需要新的需求、范围和验收，不从 P1 的 UI 稳定化任务中顺带扩展。
+
+## 2026-09-14 新拟态任务实施记录
+
+`IV-P1-N01` DONE，已合入main（`635b7dcc195c5c220882cb9589b3762ebc124eff`）并通过main tests15/check/release及Release双主题实机复验。用户新视觉规范优先于旧玻璃装饰参数。完整多DPI、捕获恢复、性能及其他矩阵未全部覆盖，P1仍为ACTIVE，P2仍受门禁约束。NEXT为IV-P1-01；复用本轮tools/ui-qa而非重写截图入口。
