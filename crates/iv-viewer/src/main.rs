@@ -27,6 +27,11 @@ fn main() -> eframe::Result<()> {
         .with_decorations(false)
         .with_inner_size([1280.0, 860.0])
         .with_min_inner_size([880.0, 560.0]);
+    // 仅显式QA会话使用独立持久化命名空间；常规启动的用户设置路径不变。
+    if let Some(id) = std::env::var("LCL_IV_QA_PROFILE").ok().and_then(|v| qa_app_id(&v)) {
+        eprintln!("QA isolated profile: {id}");
+        viewport = viewport.with_app_id(id);
+    }
     if let Some(icon) = load_window_icon() {
         viewport = viewport.with_icon(icon);
     }
@@ -55,4 +60,26 @@ fn load_window_icon() -> Option<std::sync::Arc<eframe::egui::IconData>> {
         width,
         height,
     }))
+}
+
+/// 只接受会话标识，不接受文件路径，避免测试入口覆盖正常用户配置。
+fn qa_app_id(profile: &str) -> Option<String> {
+    if !profile.is_empty() && profile.len() <= 64
+        && profile.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        Some(format!("LcL ImageViewer QA-{profile}"))
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod qa_tests {
+    #[test]
+    fn qa_profiles_cannot_select_the_normal_app_or_a_path() {
+        assert_eq!(super::qa_app_id("abc-123").as_deref(), Some("LcL ImageViewer QA-abc-123"));
+        for invalid in ["", "..", "../LcL ImageViewer", "C:\\Users", "a/b", "a\\b"] {
+            assert!(super::qa_app_id(invalid).is_none());
+        }
+        assert!(super::qa_app_id(&"a".repeat(65)).is_none());
+    }
 }

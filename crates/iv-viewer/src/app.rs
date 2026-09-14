@@ -765,27 +765,10 @@ impl App {
                             ui::bar_label(ui, "打开或拖入图片", 12.5, pal.dim);
                         }
 
-                        // —— 目录导航 ——
-                        let nav = self
-                            .directory
-                            .as_ref()
-                            .filter(|d| d.files.len() > 1)
-                            .map(|d| (d.index, d.files.len()));
-                        if let Some((i, n)) = nav {
+                        // 导航箭头移到窗口两侧；顶栏只保留目录位置。
+                        if let Some(d) = self.directory.as_ref().filter(|d| d.files.len() > 1) {
                             ui::sep(ui, pal);
-                            if ui::icon_btn(ui, Icon::Prev, false, pal)
-                                .on_hover_text("上一张 (←)")
-                                .clicked()
-                            {
-                                self.step(-1);
-                            }
-                            ui::bar_label_mono(ui, format!("{}/{}", i + 1, n), 11.5, pal.dim);
-                            if ui::icon_btn(ui, Icon::Next, false, pal)
-                                .on_hover_text("下一张 (→)")
-                                .clicked()
-                            {
-                                self.step(1);
-                            }
+                            ui::bar_label_mono(ui, format!("{}/{}", d.index + 1, d.files.len()), 11.5, pal.dim);
                         }
 
                         // —— 文件信息 ——
@@ -1056,7 +1039,50 @@ impl App {
             ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized));
         }
         let rect = resp.rect;
-        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        }
+    }
+
+    /// 窗口两侧的目录导航。与顶栏共用1秒显隐，但不参与标题栏的拖拽。
+    fn draw_side_navigation(&mut self, ctx: &egui::Context, pal: &Palette) {
+        if self.top_alpha <= 0.01 || self.show_settings || self.ctx_menu_pos.is_some()
+            || self.current.is_none()
+        {
+            return;
+        }
+        let Some((index, count)) = self.directory.as_ref()
+            .filter(|d| d.files.len() > 1).map(|d| (d.index, d.files.len())) else {
+            return;
+        };
+        let enabled = navigation_enabled(index, count);
+        let rects = ui::side_navigation_rects(ctx.screen_rect());
+        for (side, (icon, step, label)) in [
+            (Icon::Prev, -1, "上一张 (←)"),
+            (Icon::Next, 1, "下一张 (→)"),
+        ].into_iter().enumerate() {
+            let response = egui::Area::new(egui::Id::new(("iv-side-navigation", side)))
+                .order(egui::Order::Foreground)
+                .fixed_pos(rects[side].min)
+                .movable(false)
+                .sense(Sense::hover())
+                .show(ctx, |ui| {
+                    ui.set_opacity(self.top_alpha);
+                    ui::glass_navigation_button(ui, icon, enabled[side], pal)
+                        .on_hover_text(if enabled[side] {
+                            label
+                        } else if side == 0 {
+                            "已经是第一张"
+                        } else {
+                            "已经是最后一张"
+                        })
+                }).inner;
+            // 模糊遮罩和按钮使用同一个实际矩形、圆角及显隐系数。
+            self.glass_regions.push((response.rect, self.top_alpha, ui::SIDE_NAV_RADIUS));
+            if enabled[side] && response.clicked() {
+                self.step(step);
+            }
+        }
     }
 
     fn has_context_tools(&self) -> bool {
@@ -1161,7 +1187,9 @@ impl App {
                 });
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        }
     }
 
     /// 错误胶囊（顶栏下方，出错时常显）。
@@ -1206,7 +1234,9 @@ impl App {
                 });
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, 1.0, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, 1.0, ui::PANEL_RADIUS));
+        }
     }
 
     /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。
@@ -1362,7 +1392,9 @@ impl App {
                 });
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        }
     }
 
     /// 自绘右键菜单壳：定位于右键点击处，点击菜单外 / Esc 关闭。
@@ -1390,7 +1422,9 @@ impl App {
             });
         // 左键点击菜单外关闭（右键点别处由画布重新定位菜单）
         let rect = area.response.rect;
-        self.glass_regions.push((rect, 1.0, 16.0));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, 1.0, 16.0));
+        }
         let outside_click = ctx.input(|i| {
             i.pointer.primary_pressed()
                 && i.pointer
@@ -1696,7 +1730,9 @@ impl App {
         }
         self.show_props = open;
         if let Some(r) = win_rect {
-            self.glass_regions.push((r, 1.0, 16.0));
+            if pal.overlay.a() < 255 {
+                self.glass_regions.push((r, 1.0, 16.0));
+            }
         }
     }
 
@@ -1748,7 +1784,9 @@ impl App {
             .map(|r| r.response.rect);
         self.show_probe = open;
         if let Some(rect) = win_rect {
-            self.glass_regions.push((rect, 1.0, 16.0));
+            if pal.overlay.a() < 255 {
+                self.glass_regions.push((rect, 1.0, 16.0));
+            }
         }
     }
 
@@ -2005,7 +2043,9 @@ impl App {
             .map(|r| r.response.rect);
         self.show_settings = open;
         if let Some(r) = win_rect {
-            self.glass_regions.push((r, 1.0, 16.0));
+            if pal.overlay.a() < 255 {
+                self.glass_regions.push((r, 1.0, 16.0));
+            }
         }
     }
 }
@@ -2356,6 +2396,7 @@ impl eframe::App for App {
         // 玻璃区域每帧重建：各悬浮层绘制时收集其矩形与淡入系数
         self.glass_regions.clear();
         self.update_overlay_visibility(ctx);
+        self.draw_side_navigation(ctx, &pal);
         self.draw_top_overlay(ctx, &pal);
         self.draw_context_tools_overlay(ctx, &pal);
         self.draw_error_overlay(ctx, &pal);
@@ -2454,12 +2495,8 @@ impl eframe::App for App {
                     let mut glass_rects = [[0.0f32; 4]; MAX_GLASS];
                     let mut glass_alpha = [[0.0f32; 4]; 2];
                     let mut glass_corner = [[0.0f32; 4]; 2];
-                    // 不透明新拟态表面不需要玻璃采样；淡出时也保留清晰原图。
-                    let glass_count = if pal.overlay.a() < 255 {
-                        self.glass_regions.len().min(MAX_GLASS)
-                    } else {
-                        0
-                    };
+                    // 仅注册半透明表面：两侧导航有真实磨砂，其余新拟态面板保持原样。
+                    let glass_count = self.glass_regions.len().min(MAX_GLASS);
                     for (i, (rect, a, corner)) in
                         self.glass_regions.iter().take(glass_count).enumerate()
                     {
@@ -2585,6 +2622,11 @@ fn borderless_chrome(ctx: &egui::Context) {
     }
 }
 
+/// 不循环目录，不在第一张/最后一张提供无效切换；单图目录隐藏两侧导航。
+fn navigation_enabled(index: usize, count: usize) -> [bool; 2] {
+    [count > 1 && index > 0 && index < count, count > 1 && index < count - 1]
+}
+
 /// 顶栏始终跟随活动状态；底栏仅在已经打开图像时显示。
 fn overlay_targets(
     has_image: bool,
@@ -2634,8 +2676,18 @@ fn edge_cursor(d: ResizeDirection) -> CursorIcon {
 
 #[cfg(test)]
 mod tests {
-    use super::{overlay_targets, OVERLAY_HIDE_DELAY};
+    use super::{navigation_enabled, overlay_targets, OVERLAY_HIDE_DELAY};
     use std::time::Duration;
+
+    #[test]
+    fn navigation_respects_directory_boundaries() {
+        assert_eq!(navigation_enabled(0, 0), [false, false]);
+        assert_eq!(navigation_enabled(0, 1), [false, false]);
+        assert_eq!(navigation_enabled(0, 3), [false, true]);
+        assert_eq!(navigation_enabled(1, 3), [true, true]);
+        assert_eq!(navigation_enabled(2, 3), [true, false]);
+        assert_eq!(navigation_enabled(3, 3), [false, false]);
+    }
 
     #[test]
     fn overlays_hide_at_the_one_second_boundary() {
