@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。以磁盘、Git和可重复实机结果为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-N07 -->
+<!-- project-next: IV-P1-N08 -->
 
 ## 当前实现
 
@@ -27,7 +27,7 @@ N01新拟态、N02的1秒隐藏、N03两侧玻璃导航、N04左键移图/右键
 
 ## NEXT
 
-NOW: IV-P1-N07 IN_PROGRESS — 去掉右键菜单分类和分组空白，之后恢复IV-P1-01。
+NOW: IV-P1-N08 IN_PROGRESS — 设置页精简和标题拖窗；N07已经集成，随本轮串行复验收尾。
 
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 / IV-P1-N04 / IV-P1-N05 / IV-P1-N06 DONE。
 

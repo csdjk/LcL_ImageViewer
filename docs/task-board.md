@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-P1-N08 | 设置页紧凑列表与标题拖窗 | IN_PROGRESS | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
 | IV-P1-N07 | 右键菜单去掉分类与分组空白 | REVIEW | ChatGPT-AgentDock | 用户最新需求 / N06 DONE | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/无分类菜单验收.md` | 连续单列无分类；功能/快捷键保留；tests/check/构建及双主题双尺寸实机验证 |
 | IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | DONE | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
 | IV-P1-N05 | 直接打开当前图片所在文件夹 | DONE | ChatGPT-AgentDock | 用户明确修复需求 / N04 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/ui-qa/打开所在目录验收.md` | 打开当前父目录，不使用/select；中文/空格路径、相对路径测试；实机菜单打开Explorer定位核对；tests/check/构建/main复验 |
@@ -37,7 +38,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-N07 REVIEW
+NOW: IV-P1-N08 IN_PROGRESS
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -124,3 +125,7 @@ N06 Review：工作树b45b3a5，源码5130492，35tests/check/双构建通过，
 READY后由ChatGPT-AgentDock串行领取；Base `2ba8e09700b4da9a917c324d48ca68612ff0c4b3`，分支`codex/iv-p1-n07-flat-menu`，工作树`Temp/worktrees/flat-menu`。只移除菜单分类/分组留白并统一行高，不改操作回调及快捷键。旧N06工作树已集成且冻结。验收仅对测试图打开/取消弹层，不回收或删除文件；保持用户窗口，不改关联，不push。
 
 N07 Review：Worker `515dc89b1266d952a0b3e57c4dcdd7314f85931c`，35tests/check/Debug通过；4组40张实际截图、含/不含像素行菜单和原快捷键检查通过，输入文件保持不变。范围核对后串行合入main复验。
+
+## N08 执行合同
+
+READY后串行领取。Base `2452ffacd7d6d81f5d0fe018c1b2c8ced164dbdd`；branch `codex/iv-p1-n08-compact-settings`，worktree `Temp/worktrees/compact-settings`。移除设置分类卡片/装饰说明，保留实际设置、错误诊断和持久化键；固定设置面板随原生窗口移动，标题和顶部空白为独立拖动区，关闭/开关/滑条区域不启动拖窗。N07已在main且原工作树冻结，本轮一并补齐主线实机复验，不回滚旧功能。测试只改隔离QA profile，不执行注册/注销/默认应用等系统写入，不关闭用户窗口，不push/发布。
