@@ -22,6 +22,9 @@ use crate::winassoc;
 /// 预读缓存内存预算（解码后像素总量）
 const CACHE_BUDGET_BYTES: usize = 192 * 1024 * 1024;
 
+/// 指针静止后等待 1 秒再淡出；判定和定时重绘共用此值。
+const OVERLAY_HIDE_DELAY: Duration = Duration::from_secs(1);
+
 /// 当前显示的图像。
 struct CurrentImage {
     path: PathBuf,
@@ -695,7 +698,7 @@ impl App {
     }
 
     /// 悬浮层自动显隐：指针移动或按住鼠标操作时显示，
-    /// 指针静止约 2.4s 后淡出。控件的持久焦点和静止悬停不能阻止淡出。
+    /// 指针静止 1s 后淡出。控件的持久焦点和静止悬停不能阻止淡出。
     fn update_overlay_visibility(&mut self, ctx: &egui::Context) {
         if ctx.input(|i| {
             i.events
@@ -705,9 +708,10 @@ impl App {
             self.last_move = Instant::now();
         }
         let has_image = self.current.is_some();
-        let recent = self.last_move.elapsed() < Duration::from_millis(2400);
+        let idle = self.last_move.elapsed();
+        let recent = idle < OVERLAY_HIDE_DELAY;
         let pointer_down = ctx.input(|i| i.pointer.any_down());
-        let (top_show, bot_show) = overlay_targets(has_image, recent, pointer_down);
+        let (top_show, bot_show) = overlay_targets(has_image, idle, pointer_down);
         let dt = ctx.input(|i| i.unstable_dt).min(0.1);
         fn fade(a: &mut f32, show: bool, dt: f32, reduce_motion: bool) -> bool {
             let t = if show { 1.0 } else { 0.0 };
@@ -726,7 +730,7 @@ impl App {
             ctx.request_repaint();
         } else if recent && !pointer_down {
             // 静止计时到点后再评估一次，触发淡出
-            let remain = Duration::from_millis(2400).saturating_sub(self.last_move.elapsed());
+            let remain = OVERLAY_HIDE_DELAY.saturating_sub(self.last_move.elapsed());
             ctx.request_repaint_after(remain.max(Duration::from_millis(16)));
         }
     }
@@ -2584,10 +2588,10 @@ fn borderless_chrome(ctx: &egui::Context) {
 /// 顶栏始终跟随活动状态；底栏仅在已经打开图像时显示。
 fn overlay_targets(
     has_image: bool,
-    recent_pointer_activity: bool,
+    idle: Duration,
     pointer_down: bool,
 ) -> (bool, bool) {
-    let active = recent_pointer_activity || pointer_down;
+    let active = idle < OVERLAY_HIDE_DELAY || pointer_down;
     (active, has_image && active)
 }
 
@@ -2630,22 +2634,40 @@ fn edge_cursor(d: ResizeDirection) -> CursorIcon {
 
 #[cfg(test)]
 mod tests {
-    use super::overlay_targets;
+    use super::{overlay_targets, OVERLAY_HIDE_DELAY};
+    use std::time::Duration;
+
+    #[test]
+    fn overlays_hide_at_the_one_second_boundary() {
+        assert_eq!(OVERLAY_HIDE_DELAY, Duration::from_secs(1));
+        assert_eq!(
+            overlay_targets(true, Duration::from_millis(999), false),
+            (true, true)
+        );
+        assert_eq!(
+            overlay_targets(true, Duration::from_millis(1000), false),
+            (false, false)
+        );
+        assert_eq!(
+            overlay_targets(true, Duration::from_millis(1001), false),
+            (false, false)
+        );
+    }
 
     #[test]
     fn overlays_hide_when_pointer_is_stationary() {
-        assert_eq!(overlay_targets(true, false, false), (false, false));
-        assert_eq!(overlay_targets(false, false, false), (false, false));
+        assert_eq!(overlay_targets(true, OVERLAY_HIDE_DELAY, false), (false, false));
+        assert_eq!(overlay_targets(false, OVERLAY_HIDE_DELAY, false), (false, false));
     }
 
     #[test]
     fn pointer_activity_shows_only_available_bars() {
-        assert_eq!(overlay_targets(true, true, false), (true, true));
-        assert_eq!(overlay_targets(false, true, false), (true, false));
+        assert_eq!(overlay_targets(true, Duration::ZERO, false), (true, true));
+        assert_eq!(overlay_targets(false, Duration::ZERO, false), (true, false));
     }
 
     #[test]
     fn active_interaction_keeps_bars_visible_temporarily() {
-        assert_eq!(overlay_targets(true, false, true), (true, true));
+        assert_eq!(overlay_targets(true, OVERLAY_HIDE_DELAY, true), (true, true));
     }
 }
