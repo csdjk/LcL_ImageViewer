@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N09 | 设置弹窗独立拖动（纠正拖动对象） | REVIEW | ChatGPT-AgentDock | 用户明确纠正 / N08 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/设置弹窗独立拖动验收.md` | 标题只移动内部弹窗，主窗口固定；控件不误拖；边界可见；画布右键拖窗保留；tests/check/双构建与实机验证 |
+| IV-P1-N09 | 设置弹窗独立拖动（纠正拖动对象） | DONE | ChatGPT-AgentDock | 用户明确纠正 / N08 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/设置弹窗独立拖动验收.md` | 标题只移动内部弹窗，主窗口固定；控件不误拖；边界可见；画布右键拖窗保留；tests/check/双构建与实机验证 |
 | IV-P1-N08 | 设置页紧凑列表与标题拖窗 | DONE | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
 | IV-P1-N07 | 右键菜单去掉分类与分组空白 | DONE | ChatGPT-AgentDock | 用户最新需求 / N06 DONE | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/无分类菜单验收.md` | 连续单列无分类；功能/快捷键保留；tests/check/构建及双主题双尺寸实机验证 |
 | IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | DONE | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
@@ -148,3 +148,7 @@ Worker源码 `3c89b47`，验收提交 `f1ba462`；功能集成 `d3299f57c1c0680b
 用户澄清移动的是查看器内的设置弹窗，不是操作系统窗口。独立分支 `codex/iv-p1-n09-popup-drag`，工作树 `Temp/worktrees/popup-drag`，Base `a7ae49daf317d142791058d1dcf2b7cd2ef16e35`。N08工作树冻结；仅修正设置标题拖动和说明，保留画布右键原生拖窗。当前会话记住弹窗位置并限制在客户区。验证只使用新建测试图/隔离配置，不删除用户文件、不改系统关联。
 
 N09 Review：40tests/check/Debug及四组64张实机验证通过；标题仅改变弹窗位置，原生外框固定。工作分支已提交，准备串行main复验。
+
+## N09 完成记录
+
+功能集成 `7d333f665eac9fbba3ac1beac72e7a58e13cfe0c`；main40tests/check/双构建及32张实机复验通过，分支64张截图通过。设置标题只拖动内部弹窗、原生主窗口保持不动，覆盖N08旧语义；画布右键原生拖窗保留。边界、控件、重开位置通过，未操作用户原图/关联，无push/发布。NEXT恢复IV-P1-01。
