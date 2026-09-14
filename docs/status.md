@@ -17,6 +17,10 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 
 2026-09-14 用户明确要求：浅色粉彩、单色系明暗变化、12–16px 圆角、多层柔和阴影、无硬边框、可交互元素具有凸起/凹陷效果。本轮新拟态规范优先于旧玻璃视觉方案；保留图像功能、已有显式偏好和历史本地提交。
 
+## 新拟态工作分支验收（待 main 复验）
+
+`7343033` 已通过范围审查；源码 `62b5163` 的15项测试、check和release构建通过；50张实机截图及ROI比较记录位于 `docs/ui-qa/新拟态验收.md`。当前进入main集成复验，不据此将P1标记VALIDATED。以下原始基线保留作历史参照，完成后同步最新状态。
+
 ## 当前真实状态
 
 - 玻璃 UI 实现与测试基线为 `162ee27fb712479a3474ba04ad561bc24ea6a899`；接入工作流时 `main` 工作区干净。当前 HEAD 应始终通过 Git 读取，不在本文自引用工作流配置提交的 hash。
@@ -29,7 +33,7 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-N01 IN_PROGRESS — 按用户授权实现浅色单色系新拟态
+NOW: IV-P1-N01 REVIEW — 按用户授权实现浅色单色系新拟态
 AFTER STYLE TASK: IV-P1-01 — 完整验收工具链
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 ```
