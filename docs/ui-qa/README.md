@@ -13,3 +13,7 @@ python -B tools/ui-qa/neumorphic_smoke.py --binary <imageview.exe绝对路径> -
 运行前必须关闭其他 imageview。脚本备份此应用唯一的 `%APPDATA%/LcL ImageViewer/data/app.ron` 到输出目录；临时设置测试主题及关闭桌面磨砂，退出时恢复原始字节并核对。原文件不存在时只清理该次创建的 app.ron，不删除其他数据。若脚本被强制中断，应关闭其子进程后用 `app.ron.original` 恢复配置。不要在运行时另开同一应用。脚本不修改系统 DPI、注册表或文件关联。
 
 首次无法切到前台时，仅临时连接线程输入队列激活已验证窗口并立即解除；仍失败就停止，不把鼠标/键盘事件发给别的应用。验收过程中请不要操作鼠标键盘。进入 Windows 集成区域只截图，不触发注册/解除注册/默认应用操作。
+
+## 正在使用查看器时验收
+
+当前版本增加可选 `--isolated-profile`，每次生成随机QA标识，通过子进程环境变量 `LCL_IV_QA_PROFILE` 指向 `LcL ImageViewer QA-<标识>` 独立应用ID。不修改正在使用的profile；只关闭本次启动的PID。默认模式保留原有多进程保护。仅当前支持隔离标识的二进制可使用，旧版禁止绕过保护。两侧导航动作矩阵为 `side-navigation-1280.json` / `side-navigation-880.json`，用03/02/01命名的3张测试图验证边界及切换；原始图片与截图均放忽略目录。
