@@ -1,0 +1,68 @@
+[
+  {
+    "kind": "move",
+    "x": 401,
+    "y": 300
+  },
+  {
+    "kind": "move",
+    "x": 400,
+    "y": 300
+  },
+  {
+    "kind": "wait",
+    "seconds": 0.35
+  },
+  {
+    "kind": "shot",
+    "name": "before-1s-visible"
+  },
+  {
+    "kind": "wait",
+    "seconds": 0.8
+  },
+  {
+    "kind": "shot",
+    "name": "after-1s-hidden"
+  },
+  {
+    "kind": "move",
+    "x": 401,
+    "y": 300
+  },
+  {
+    "kind": "shot",
+    "name": "pointer-move-restored"
+  },
+  {
+    "kind": "down"
+  },
+  {
+    "kind": "wait",
+    "seconds": 1.3
+  },
+  {
+    "kind": "shot",
+    "name": "held-over-1s-visible"
+  },
+  {
+    "kind": "up"
+  },
+  {
+    "kind": "wait",
+    "seconds": 0.3
+  },
+  {
+    "kind": "shot",
+    "name": "released-hidden"
+  },
+  {
+    "kind": "move",
+    "x": 400,
+    "y": 300
+  },
+  {
+    "kind": "shot",
+    "name": "restored-again"
+  }
+]

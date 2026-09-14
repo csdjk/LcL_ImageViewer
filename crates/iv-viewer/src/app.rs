@@ -22,6 +22,9 @@ use crate::winassoc;
 /// 预读缓存内存预算（解码后像素总量）
 const CACHE_BUDGET_BYTES: usize = 192 * 1024 * 1024;
 
+/// 指针静止后等待 1 秒再淡出；判定和定时重绘共用此值。
+const OVERLAY_HIDE_DELAY: Duration = Duration::from_secs(1);
+
 /// 当前显示的图像。
 struct CurrentImage {
     path: PathBuf,
@@ -694,20 +697,21 @@ impl App {
         self.theme = ThemeMode::toggle(ctx);
     }
 
-    /// 悬浮层自动显隐：指针移动或按住鼠标操作时显示，
-    /// 指针静止约 2.4s 后淡出。控件的持久焦点和静止悬停不能阻止淡出。
+    /// 悬浮层自动显隐：指针移动、点击或按住鼠标操作时显示，
+    /// 指针静止 1s 后淡出。控件的持久焦点和静止悬停不能阻止淡出。
     fn update_overlay_visibility(&mut self, ctx: &egui::Context) {
         if ctx.input(|i| {
             i.events
                 .iter()
-                .any(|event| matches!(event, egui::Event::PointerMoved(_)))
+                .any(overlay_pointer_activity)
         }) {
             self.last_move = Instant::now();
         }
         let has_image = self.current.is_some();
-        let recent = self.last_move.elapsed() < Duration::from_millis(2400);
+        let idle = self.last_move.elapsed();
+        let recent = idle < OVERLAY_HIDE_DELAY;
         let pointer_down = ctx.input(|i| i.pointer.any_down());
-        let (top_show, bot_show) = overlay_targets(has_image, recent, pointer_down);
+        let (top_show, bot_show) = overlay_targets(has_image, idle, pointer_down);
         let dt = ctx.input(|i| i.unstable_dt).min(0.1);
         fn fade(a: &mut f32, show: bool, dt: f32, reduce_motion: bool) -> bool {
             let t = if show { 1.0 } else { 0.0 };
@@ -726,7 +730,7 @@ impl App {
             ctx.request_repaint();
         } else if recent && !pointer_down {
             // 静止计时到点后再评估一次，触发淡出
-            let remain = Duration::from_millis(2400).saturating_sub(self.last_move.elapsed());
+            let remain = OVERLAY_HIDE_DELAY.saturating_sub(self.last_move.elapsed());
             ctx.request_repaint_after(remain.max(Duration::from_millis(16)));
         }
     }
@@ -761,27 +765,10 @@ impl App {
                             ui::bar_label(ui, "打开或拖入图片", 12.5, pal.dim);
                         }
 
-                        // —— 目录导航 ——
-                        let nav = self
-                            .directory
-                            .as_ref()
-                            .filter(|d| d.files.len() > 1)
-                            .map(|d| (d.index, d.files.len()));
-                        if let Some((i, n)) = nav {
+                        // 导航箭头移到窗口两侧；顶栏只保留目录位置。
+                        if let Some(d) = self.directory.as_ref().filter(|d| d.files.len() > 1) {
                             ui::sep(ui, pal);
-                            if ui::icon_btn(ui, Icon::Prev, false, pal)
-                                .on_hover_text("上一张 (←)")
-                                .clicked()
-                            {
-                                self.step(-1);
-                            }
-                            ui::bar_label_mono(ui, format!("{}/{}", i + 1, n), 11.5, pal.dim);
-                            if ui::icon_btn(ui, Icon::Next, false, pal)
-                                .on_hover_text("下一张 (→)")
-                                .clicked()
-                            {
-                                self.step(1);
-                            }
+                            ui::bar_label_mono(ui, format!("{}/{}", d.index + 1, d.files.len()), 11.5, pal.dim);
                         }
 
                         // —— 文件信息 ——
@@ -1052,7 +1039,50 @@ impl App {
             ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized));
         }
         let rect = resp.rect;
-        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        }
+    }
+
+    /// 窗口两侧的目录导航。与顶栏共用1秒显隐，但不参与标题栏的拖拽。
+    fn draw_side_navigation(&mut self, ctx: &egui::Context, pal: &Palette) {
+        if self.top_alpha <= 0.01 || self.show_settings || self.ctx_menu_pos.is_some()
+            || self.current.is_none()
+        {
+            return;
+        }
+        let Some((index, count)) = self.directory.as_ref()
+            .filter(|d| d.files.len() > 1).map(|d| (d.index, d.files.len())) else {
+            return;
+        };
+        let enabled = navigation_enabled(index, count);
+        let rects = ui::side_navigation_rects(ctx.screen_rect());
+        for (side, (icon, step, label)) in [
+            (Icon::Prev, -1, "上一张 (←)"),
+            (Icon::Next, 1, "下一张 (→)"),
+        ].into_iter().enumerate() {
+            let response = egui::Area::new(egui::Id::new(("iv-side-navigation", side)))
+                .order(egui::Order::Foreground)
+                .fixed_pos(rects[side].min)
+                .movable(false)
+                .sense(Sense::hover())
+                .show(ctx, |ui| {
+                    ui.set_opacity(self.top_alpha);
+                    ui::glass_navigation_button(ui, icon, enabled[side], pal)
+                        .on_hover_text(if enabled[side] {
+                            label
+                        } else if side == 0 {
+                            "已经是第一张"
+                        } else {
+                            "已经是最后一张"
+                        })
+                }).inner;
+            // 模糊遮罩和按钮使用同一个实际矩形、圆角及显隐系数。
+            self.glass_regions.push((response.rect, self.top_alpha, ui::SIDE_NAV_RADIUS));
+            if enabled[side] && response.clicked() {
+                self.step(step);
+            }
+        }
     }
 
     fn has_context_tools(&self) -> bool {
@@ -1157,7 +1187,9 @@ impl App {
                 });
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        }
     }
 
     /// 错误胶囊（顶栏下方，出错时常显）。
@@ -1202,7 +1234,9 @@ impl App {
                 });
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, 1.0, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, 1.0, ui::PANEL_RADIUS));
+        }
     }
 
     /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。
@@ -1358,7 +1392,9 @@ impl App {
                 });
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
+        }
     }
 
     /// 自绘右键菜单壳：定位于右键点击处，点击菜单外 / Esc 关闭。
@@ -1386,7 +1422,9 @@ impl App {
             });
         // 左键点击菜单外关闭（右键点别处由画布重新定位菜单）
         let rect = area.response.rect;
-        self.glass_regions.push((rect, 1.0, 16.0));
+        if pal.overlay.a() < 255 {
+            self.glass_regions.push((rect, 1.0, 16.0));
+        }
         let outside_click = ctx.input(|i| {
             i.pointer.primary_pressed()
                 && i.pointer
@@ -1692,7 +1730,9 @@ impl App {
         }
         self.show_props = open;
         if let Some(r) = win_rect {
-            self.glass_regions.push((r, 1.0, 16.0));
+            if pal.overlay.a() < 255 {
+                self.glass_regions.push((r, 1.0, 16.0));
+            }
         }
     }
 
@@ -1744,7 +1784,9 @@ impl App {
             .map(|r| r.response.rect);
         self.show_probe = open;
         if let Some(rect) = win_rect {
-            self.glass_regions.push((rect, 1.0, 16.0));
+            if pal.overlay.a() < 255 {
+                self.glass_regions.push((rect, 1.0, 16.0));
+            }
         }
     }
 
@@ -2001,7 +2043,9 @@ impl App {
             .map(|r| r.response.rect);
         self.show_settings = open;
         if let Some(r) = win_rect {
-            self.glass_regions.push((r, 1.0, 16.0));
+            if pal.overlay.a() < 255 {
+                self.glass_regions.push((r, 1.0, 16.0));
+            }
         }
     }
 }
@@ -2352,6 +2396,7 @@ impl eframe::App for App {
         // 玻璃区域每帧重建：各悬浮层绘制时收集其矩形与淡入系数
         self.glass_regions.clear();
         self.update_overlay_visibility(ctx);
+        self.draw_side_navigation(ctx, &pal);
         self.draw_top_overlay(ctx, &pal);
         self.draw_context_tools_overlay(ctx, &pal);
         self.draw_error_overlay(ctx, &pal);
@@ -2450,12 +2495,8 @@ impl eframe::App for App {
                     let mut glass_rects = [[0.0f32; 4]; MAX_GLASS];
                     let mut glass_alpha = [[0.0f32; 4]; 2];
                     let mut glass_corner = [[0.0f32; 4]; 2];
-                    // 不透明新拟态表面不需要玻璃采样；淡出时也保留清晰原图。
-                    let glass_count = if pal.overlay.a() < 255 {
-                        self.glass_regions.len().min(MAX_GLASS)
-                    } else {
-                        0
-                    };
+                    // 仅注册半透明表面：两侧导航有真实磨砂，其余新拟态面板保持原样。
+                    let glass_count = self.glass_regions.len().min(MAX_GLASS);
                     for (i, (rect, a, corner)) in
                         self.glass_regions.iter().take(glass_count).enumerate()
                     {
@@ -2581,13 +2622,23 @@ fn borderless_chrome(ctx: &egui::Context) {
     }
 }
 
+/// 点击也重置1秒计时，避免指针不移动时连续切图触发中途隐藏。
+fn overlay_pointer_activity(event: &egui::Event) -> bool {
+    matches!(event, egui::Event::PointerMoved(_) | egui::Event::PointerButton { .. })
+}
+
+/// 不循环目录，不在第一张/最后一张提供无效切换；单图目录隐藏两侧导航。
+fn navigation_enabled(index: usize, count: usize) -> [bool; 2] {
+    [count > 1 && index > 0 && index < count, count > 1 && index < count - 1]
+}
+
 /// 顶栏始终跟随活动状态；底栏仅在已经打开图像时显示。
 fn overlay_targets(
     has_image: bool,
-    recent_pointer_activity: bool,
+    idle: Duration,
     pointer_down: bool,
 ) -> (bool, bool) {
-    let active = recent_pointer_activity || pointer_down;
+    let active = idle < OVERLAY_HIDE_DELAY || pointer_down;
     (active, has_image && active)
 }
 
@@ -2630,22 +2681,64 @@ fn edge_cursor(d: ResizeDirection) -> CursorIcon {
 
 #[cfg(test)]
 mod tests {
-    use super::overlay_targets;
+    use super::{navigation_enabled, overlay_pointer_activity, overlay_targets, OVERLAY_HIDE_DELAY};
+    use std::time::Duration;
+
+    #[test]
+    fn stationary_pointer_clicks_restart_hide_timer() {
+        for pressed in [true, false] {
+            let event = eframe::egui::Event::PointerButton {
+                pos: eframe::egui::Pos2::ZERO,
+                button: eframe::egui::PointerButton::Primary,
+                pressed,
+                modifiers: eframe::egui::Modifiers::NONE,
+            };
+            assert!(overlay_pointer_activity(&event));
+        }
+        assert!(!overlay_pointer_activity(&eframe::egui::Event::PointerGone));
+    }
+
+    #[test]
+    fn navigation_respects_directory_boundaries() {
+        assert_eq!(navigation_enabled(0, 0), [false, false]);
+        assert_eq!(navigation_enabled(0, 1), [false, false]);
+        assert_eq!(navigation_enabled(0, 3), [false, true]);
+        assert_eq!(navigation_enabled(1, 3), [true, true]);
+        assert_eq!(navigation_enabled(2, 3), [true, false]);
+        assert_eq!(navigation_enabled(3, 3), [false, false]);
+    }
+
+    #[test]
+    fn overlays_hide_at_the_one_second_boundary() {
+        assert_eq!(OVERLAY_HIDE_DELAY, Duration::from_secs(1));
+        assert_eq!(
+            overlay_targets(true, Duration::from_millis(999), false),
+            (true, true)
+        );
+        assert_eq!(
+            overlay_targets(true, Duration::from_millis(1000), false),
+            (false, false)
+        );
+        assert_eq!(
+            overlay_targets(true, Duration::from_millis(1001), false),
+            (false, false)
+        );
+    }
 
     #[test]
     fn overlays_hide_when_pointer_is_stationary() {
-        assert_eq!(overlay_targets(true, false, false), (false, false));
-        assert_eq!(overlay_targets(false, false, false), (false, false));
+        assert_eq!(overlay_targets(true, OVERLAY_HIDE_DELAY, false), (false, false));
+        assert_eq!(overlay_targets(false, OVERLAY_HIDE_DELAY, false), (false, false));
     }
 
     #[test]
     fn pointer_activity_shows_only_available_bars() {
-        assert_eq!(overlay_targets(true, true, false), (true, true));
-        assert_eq!(overlay_targets(false, true, false), (true, false));
+        assert_eq!(overlay_targets(true, Duration::ZERO, false), (true, true));
+        assert_eq!(overlay_targets(false, Duration::ZERO, false), (true, false));
     }
 
     #[test]
     fn active_interaction_keeps_bars_visible_temporarily() {
-        assert_eq!(overlay_targets(true, false, true), (true, true));
+        assert_eq!(overlay_targets(true, OVERLAY_HIDE_DELAY, true), (true, true));
     }
 }

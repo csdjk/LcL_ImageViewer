@@ -1,7 +1,8 @@
 """Capture the real Windows viewer, never a mockup. Requires Python 3.10+ and Pillow.
 
 Temporarily seeds ONLY this application's app.ron, then restores its exact bytes.
-Refuses to run while another imageview process exists. Never clicks integration actions.
+Use --isolated-profile with current binaries to leave running viewers and their settings untouched.
+Without isolation, refuses to run while another viewer exists. Never clicks integration actions.
 Explicit --binary, --output, --input and --actions make the run reproducible.
 """
 from __future__ import annotations
@@ -16,6 +17,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import uuid
 from PIL import Image
 
 u = c.WinDLL('user32', use_last_error=True)
@@ -203,14 +205,27 @@ def run(args):
     binary = args.binary.resolve(strict=True)
     if binary.name.lower() != 'imageview.exe':
         raise ValueError('Expected the imageview.exe binary')
-    existing = subprocess.run(['powershell', '-NoProfile', '-Command',
-        "@(Get-Process -Name imageview -ErrorAction SilentlyContinue).Count"],
-        capture_output=True, text=True, check=True)
-    if int(existing.stdout.strip()) != 0:
-        raise RuntimeError('Another imageview is running; close it before app-preference isolation')
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
-    storage = Path(os.environ['APPDATA']) / 'LcL ImageViewer' / 'data' / 'app.ron'
+    child_env = os.environ.copy()
+    child_env.pop('LCL_IV_QA_PROFILE', None)
+    profile = uuid.uuid4().hex if args.isolated_profile else None
+    if profile:
+        # Only current binaries implement this marker and the opt-in isolated namespace.
+        if b'LcL ImageViewer QA-' not in binary.read_bytes():
+            raise RuntimeError('Binary does not advertise isolated QA profiles; refusing unsafe launch')
+        child_env['LCL_IV_QA_PROFILE'] = profile
+        app_id = 'LcL ImageViewer QA-' + profile
+    else:
+        existing = subprocess.run(['powershell', '-NoProfile', '-Command',
+            "@(Get-Process -Name imageview -ErrorAction SilentlyContinue).Count"],
+            capture_output=True, text=True, check=True)
+        if int(existing.stdout.strip()) != 0:
+            raise RuntimeError('Another imageview is running; use --isolated-profile with a supported binary')
+        app_id = 'LcL ImageViewer'
+    storage = Path(os.environ['APPDATA']) / app_id / 'data' / 'app.ron'
+    if profile and storage.parent.parent.exists():
+        raise RuntimeError('QA profile already exists; refusing to overwrite it')
     previous_bytes = storage.read_bytes() if storage.exists() else None
     if previous_bytes is not None:
         (out / 'app.ron.original').write_bytes(previous_bytes)
@@ -222,14 +237,15 @@ def run(args):
     pressed_releases = set()
     summary = {'theme': args.theme, 'binary': str(binary), 'binary_sha256': sha(binary),
                'commit': args.commit, 'input': str(args.input.resolve()) if args.input else None,
-               'input_sha256': sha(args.input) if args.input else None, 'captures': []}
+               'input_sha256': sha(args.input) if args.input else None, 'captures': [],
+               'isolated_profile': profile, 'preference_path': str(storage)}
     try:
         # RON maps accept the same simple string key/value syntax as this JSON subset.
         prefs = {'iv-theme': args.theme, 'iv-backdrop': 'off', 'iv-checkerboard': 'on', 'iv-reduce-motion': 'off'}
         storage.write_text(json.dumps(prefs), encoding='utf-8')
         with (out / 'runtime.log').open('wb') as log:
             proc = subprocess.Popen([str(binary)] + ([str(args.input.resolve())] if args.input else []),
-                                    stdout=log, stderr=log, cwd=binary.parent)
+                                    stdout=log, stderr=log, cwd=binary.parent, env=child_env)
         deadline = time.monotonic() + 20
         while True:
             if proc.poll() is not None:
@@ -244,6 +260,8 @@ def run(args):
         if process_path(proc.pid) != binary:
             raise RuntimeError('Launched executable identity mismatch')
         time.sleep(0.8)
+        if profile and ('QA isolated profile: ' + app_id) not in (out / 'runtime.log').read_text(encoding='utf-8', errors='replace'):
+            raise RuntimeError('Viewer did not confirm isolated persistence profile')
         wr, cr, _, dpi = geometry(hwnd)
         dw = (wr.right - wr.left) - (cr.right - cr.left)
         dh = (wr.bottom - wr.top) - (cr.bottom - cr.top)
@@ -253,13 +271,15 @@ def run(args):
         move(hwnd, args.width / 2, args.height / 2)
         current_theme = args.theme
         def shot(name):
+            title = c.create_unicode_buffer(1024)
+            bind(u, 'GetWindowTextW', [w.HWND, w.LPWSTR, c.c_int], c.c_int)(hwnd, title, len(title))
             filename = out / f'{name}.png'
             meta = capture(hwnd, filename)
             if meta['logical_client'] != [args.width, args.height]:
                 raise RuntimeError(f'Client size mismatch: {meta}')
             meta.update({key: value for key, value in summary.items() if key != 'captures'})
             meta.update({'theme': current_theme, 'state': name, 'actions': list(history),
-                         'utc': datetime.now(timezone.utc).isoformat(), 'pid': proc.pid,
+                         'utc': datetime.now(timezone.utc).isoformat(), 'pid': proc.pid, 'window_title': title.value,
                          'window_discovery': 'launched PID + verified process image path + unique visible client',
                          'background': 'theme canvas, desktop capture disabled for this run'})
             filename.with_suffix('.json').write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -337,4 +357,5 @@ if __name__ == '__main__':
     parser.add_argument('--width', type=int, default=1280)
     parser.add_argument('--height', type=int, default=860)
     parser.add_argument('--actions', type=Path)
+    parser.add_argument('--isolated-profile', action='store_true', help='Use a new QA-only preference namespace; leave running viewers untouched')
     run(parser.parse_args())

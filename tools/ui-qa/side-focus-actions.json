@@ -1,0 +1,80 @@
+[
+  {
+    "kind": "move",
+    "x": 641,
+    "y": 430
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-1"
+  },
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-2"
+  },
+  {
+    "kind": "move",
+    "x": 641,
+    "y": 430
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-3"
+  },
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-4"
+  },
+  {
+    "kind": "move",
+    "x": 641,
+    "y": 430
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-5"
+  },
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-6"
+  }
+]

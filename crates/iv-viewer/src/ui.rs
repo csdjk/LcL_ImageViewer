@@ -941,6 +941,131 @@ pub fn filename_label(
 
 /* ============================== 图标按钮 ============================== */
 
+/// 两侧导航的安全边距避开6点系统缩放热区，矩形尺寸与命中区一致。
+pub const SIDE_NAV_SIZE: Vec2 = Vec2::new(48.0, 64.0);
+pub const SIDE_NAV_RADIUS: f32 = 16.0;
+pub const SIDE_NAV_GAP: f32 = 18.0;
+
+pub fn side_navigation_rects(screen: Rect) -> [Rect; 2] {
+    let y = screen.center().y;
+    [
+        Rect::from_center_size(
+            Pos2::new(screen.left() + SIDE_NAV_GAP + SIDE_NAV_SIZE.x / 2.0, y),
+            SIDE_NAV_SIZE,
+        ),
+        Rect::from_center_size(
+            Pos2::new(screen.right() - SIDE_NAV_GAP - SIDE_NAV_SIZE.x / 2.0, y),
+            SIDE_NAV_SIZE,
+        ),
+    ]
+}
+
+fn navigation_tint(pal: &Palette, hovered: bool, pressed: bool, enabled: bool) -> Color32 {
+    let opacity = if pressed {
+        194
+    } else if hovered {
+        172
+    } else {
+        142
+    };
+    let color = if pal.is_dark {
+        rgb(0x23, 0x2e, 0x40)
+    } else {
+        rgb(0xf0, 0xf5, 0xfc)
+    };
+    alpha(color, if enabled { opacity } else { 112 })
+}
+
+/// 只画半透明玻璃调色、高光和图标；背后场景模糊由app注册圆角区域交给GPU。
+pub fn glass_navigation_button(
+    ui: &mut egui::Ui,
+    icon: Icon,
+    enabled: bool,
+    pal: &Palette,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(
+        SIDE_NAV_SIZE,
+        if enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        },
+    );
+    if ui.is_rect_visible(rect) {
+        let p = ui.painter();
+        let hovering = enabled && response.hovered();
+        let pressed = enabled && response.is_pointer_button_down_on();
+        let rounding = Rounding::same(SIDE_NAV_RADIUS);
+        let shadow = egui::epaint::Shadow {
+            offset: Vec2::new(0.0, if pressed { 1.0 } else { 3.0 }),
+            blur: if hovering { 18.0 } else { 14.0 },
+            spread: 0.0,
+            color: Color32::from_black_alpha(if pal.is_dark { 72 } else { 32 }),
+        };
+        p.add(egui::Shape::mesh(shadow.tessellate(rect, rounding)));
+        p.rect_filled(
+            rect,
+            rounding,
+            navigation_tint(pal, hovering, pressed, enabled),
+        );
+        // 沿圆角衰减的上缘柔光，不添加厚重外圈或霓虹辉光。
+        let mut sheen = egui::Mesh::default();
+        sheen.colored_vertex(rect.center(), Color32::TRANSPARENT);
+        let outline = rounded_outline(rect.shrink(0.7), SIDE_NAV_RADIUS - 0.7);
+        for (point, normal) in &outline {
+            let amount = ((-normal.x - normal.y) * 0.5).max(0.0);
+            sheen.colored_vertex(
+                *point,
+                alpha(
+                    Color32::WHITE,
+                    (amount * if pal.is_dark { 18.0 } else { 32.0 }) as u8,
+                ),
+            );
+        }
+        for i in 0..outline.len() {
+            sheen.add_triangle(0, (i + 1) as u32, ((i + 1) % outline.len() + 1) as u32);
+        }
+        p.add(egui::Shape::mesh(sheen));
+        p.rect_stroke(
+            rect.shrink(0.5),
+            rounding,
+            Stroke::new(
+                0.75_f32,
+                alpha(Color32::WHITE, if pal.is_dark { 38 } else { 100 }),
+            ),
+        );
+        let fg = if enabled {
+            pal.text_bright
+        } else {
+            alpha(pal.icon, 95)
+        };
+        let center = rect.center()
+            + if pressed {
+                Vec2::new(0.0, 1.0)
+            } else {
+                Vec2::ZERO
+            };
+        paint_icon(
+            p,
+            icon,
+            Rect::from_center_size(center, Vec2::splat(21.0)),
+            fg,
+        );
+        if enabled && response.has_focus() {
+            p.rect_stroke(
+                rect.expand(2.0),
+                rounding,
+                Stroke::new(1.25_f32, pal.accent),
+            );
+        }
+    }
+    if enabled {
+        response.on_hover_cursor(egui::CursorIcon::PointingHand)
+    } else {
+        response
+    }
+}
+
 /// 32×32 图标操作区：默认、悬停、按下、选中、焦点和禁用状态互不混淆。
 pub fn icon_btn(ui: &mut egui::Ui, icon: Icon, active: bool, pal: &Palette) -> egui::Response {
     icon_btn_impl(ui, icon, active, false, pal)
@@ -1306,6 +1431,51 @@ mod neumorphic_tests {
                 .rev()
                 .take(36)
                 .all(|v| v.color.a() == 0));
+        }
+    }
+}
+
+#[cfg(test)]
+mod side_navigation_tests {
+    use super::*;
+
+    #[test]
+    fn side_buttons_remain_symmetric_and_inside_resize_hotzone() {
+        for size in [
+            Vec2::new(880.0, 560.0),
+            Vec2::new(1280.0, 860.0),
+            Vec2::new(1920.0, 1080.0),
+        ] {
+            let screen = Rect::from_min_size(Pos2::new(17.0, 29.0), size);
+            let [left, right] = side_navigation_rects(screen);
+            assert_eq!(left.size(), SIDE_NAV_SIZE);
+            assert_eq!(right.size(), SIDE_NAV_SIZE);
+            assert_eq!(left.center().y, screen.center().y);
+            assert_eq!(right.center().y, screen.center().y);
+            assert_eq!(left.left() - screen.left(), SIDE_NAV_GAP);
+            assert_eq!(screen.right() - right.right(), SIDE_NAV_GAP);
+            assert!(screen.shrink(6.0).contains_rect(left));
+            assert!(screen.shrink(6.0).contains_rect(right));
+        }
+    }
+
+    #[test]
+    fn navigation_is_translucent_in_both_themes_and_all_states() {
+        let ctx = egui::Context::default();
+        for mode in [ThemeMode::Light, ThemeMode::Dark] {
+            ThemeMode::apply_to(&ctx, mode);
+            let pal = palette(&ctx);
+            for (hovered, pressed, enabled) in [
+                (false, false, true),
+                (true, false, true),
+                (true, true, true),
+                (false, false, false),
+            ] {
+                let tint = navigation_tint(&pal, hovered, pressed, enabled);
+                assert!((96..220).contains(&tint.a()));
+                assert!(tint.r() <= tint.a() && tint.g() <= tint.a() && tint.b() <= tint.a());
+            }
+            assert_eq!(pal.overlay.a(), 255); // new translucency must not leak into other panels
         }
     }
 }
