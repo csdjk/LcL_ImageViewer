@@ -149,10 +149,6 @@ pub struct App {
     bot_alpha: f32,
     /// 指针最后一次移动时刻（悬浮层自动显隐依据）
     last_move: Instant,
-    /// 上一帧指针是否悬停在任一悬浮层上
-    over_overlay: bool,
-    /// 固定工具栏，关闭自动隐藏。
-    toolbar_pinned: bool,
     /// 减少界面淡入淡出动效。
     reduce_motion: bool,
     /// 自绘右键菜单的打开位置（None = 关闭）
@@ -278,12 +274,6 @@ impl App {
             top_alpha: 1.0,
             bot_alpha: 1.0,
             last_move: Instant::now(),
-            over_overlay: false,
-            toolbar_pinned: cc
-                .storage
-                .and_then(|s| s.get_string("iv-toolbar-pinned"))
-                .as_deref()
-                == Some("on"),
             reduce_motion: cc
                 .storage
                 .and_then(|s| s.get_string("iv-reduce-motion"))
@@ -704,35 +694,20 @@ impl App {
         self.theme = ThemeMode::toggle(ctx);
     }
 
-    /// 指针是否悬停在指定矩形上（悬浮层显隐判断用，与层叠命中无关）。
-    fn rect_hovered(ctx: &egui::Context, rect: egui::Rect) -> bool {
-        ctx.input(|i| {
-            i.pointer
-                .latest_pos()
-                .map(|p| rect.contains(p))
-                .unwrap_or(false)
-        })
-    }
-
-    /// 悬浮层自动显隐：指针移动 / 悬停悬浮层 / 弹窗打开 / 出错时显示，
-    /// 指针静止约 2.4s 后淡出；无图像或固定工具栏时常显。
+    /// 悬浮层自动显隐：指针移动或按住鼠标操作时显示，
+    /// 指针静止约 2.4s 后淡出。控件的持久焦点和静止悬停不能阻止淡出。
     fn update_overlay_visibility(&mut self, ctx: &egui::Context) {
-        if ctx.input(|i| i.pointer.delta().length_sq() > 0.0) {
+        if ctx.input(|i| {
+            i.events
+                .iter()
+                .any(|event| matches!(event, egui::Event::PointerMoved(_)))
+        }) {
             self.last_move = Instant::now();
         }
         let has_image = self.current.is_some();
         let recent = self.last_move.elapsed() < Duration::from_millis(2400);
-        let busy = self.over_overlay
-            || ctx.input(|i| i.pointer.any_down())
-            || ctx.memory(|m| m.focused().is_some())
-            || ctx.memory(|m| m.any_popup_open())
-            || self.ctx_menu_pos.is_some()
-            || self.show_props
-            || self.show_probe
-            || self.show_settings
-            || self.error_msg.is_some();
-        let top_show = self.toolbar_pinned || !has_image || recent || busy;
-        let bot_show = has_image && (self.toolbar_pinned || recent || busy);
+        let pointer_down = ctx.input(|i| i.pointer.any_down());
+        let (top_show, bot_show) = overlay_targets(has_image, recent, pointer_down);
         let dt = ctx.input(|i| i.unstable_dt).min(0.1);
         fn fade(a: &mut f32, show: bool, dt: f32, reduce_motion: bool) -> bool {
             let t = if show { 1.0 } else { 0.0 };
@@ -749,7 +724,7 @@ impl App {
             | fade(&mut self.bot_alpha, bot_show, dt, self.reduce_motion);
         if animating {
             ctx.request_repaint();
-        } else if recent && !busy {
+        } else if recent && !pointer_down {
             // 静止计时到点后再评估一次，触发淡出
             let remain = Duration::from_millis(2400).saturating_sub(self.last_move.elapsed());
             ctx.request_repaint_after(remain.max(Duration::from_millis(16)));
@@ -757,10 +732,9 @@ impl App {
     }
 
     /// 顶部悬浮工具栏：打开 / 目录导航 / 文件信息 / 通道 / mip / 视图控制 / 动画 / 曝光 / 主题。
-    /// 返回指针是否悬停在胶囊上。
-    fn draw_top_overlay(&mut self, ctx: &egui::Context, pal: &Palette) -> bool {
+    fn draw_top_overlay(&mut self, ctx: &egui::Context, pal: &Palette) {
         if self.show_settings || self.top_alpha <= 0.01 {
-            return false;
+            return;
         }
         let alpha = self.top_alpha;
         let maximized = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
@@ -1080,7 +1054,6 @@ impl App {
         }
         let rect = resp.rect;
         self.glass_regions.push((rect, alpha, 24.0));
-        Self::rect_hovered(ctx, rect)
     }
 
     fn has_context_tools(&self) -> bool {
@@ -1090,12 +1063,12 @@ impl App {
     }
 
     /// 窄于 1200pt 时将格式专属工具放到第二行，避免挤压主标题栏。
-    fn draw_context_tools_overlay(&mut self, ctx: &egui::Context, pal: &Palette) -> bool {
+    fn draw_context_tools_overlay(&mut self, ctx: &egui::Context, pal: &Palette) {
         if self.top_alpha <= 0.01
             || ctx.screen_rect().width() >= 1200.0
             || !self.has_context_tools()
         {
-            return false;
+            return;
         }
         let alpha = self.top_alpha;
         let mip_sizes: Vec<(u32, u32)> = self
@@ -1187,13 +1160,12 @@ impl App {
             });
         let rect = area.response.rect;
         self.glass_regions.push((rect, alpha, 24.0));
-        Self::rect_hovered(ctx, rect)
     }
 
-    /// 错误胶囊（顶栏下方，出错时常显）。返回指针是否悬停。
-    fn draw_error_overlay(&mut self, ctx: &egui::Context, pal: &Palette) -> bool {
+    /// 错误胶囊（顶栏下方，出错时常显）。
+    fn draw_error_overlay(&mut self, ctx: &egui::Context, pal: &Palette) {
         let Some(err) = self.error_msg.clone() else {
-            return false;
+            return;
         };
         let frame = Frame::default()
             .fill(pal.err_bg)
@@ -1234,13 +1206,12 @@ impl App {
             });
         let rect = area.response.rect;
         self.glass_regions.push((rect, 1.0, 18.0));
-        Self::rect_hovered(ctx, rect)
     }
 
-    /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。返回指针是否悬停。
-    fn draw_bottom_overlay(&mut self, ctx: &egui::Context, pal: &Palette) -> bool {
+    /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。
+    fn draw_bottom_overlay(&mut self, ctx: &egui::Context, pal: &Palette) {
         if self.show_settings || self.bot_alpha <= 0.01 {
-            return false;
+            return;
         }
         let alpha = self.bot_alpha;
         let area = egui::Area::new(egui::Id::new("iv-bottom"))
@@ -1392,7 +1363,6 @@ impl App {
             });
         let rect = area.response.rect;
         self.glass_regions.push((rect, alpha, 24.0));
-        Self::rect_hovered(ctx, rect)
     }
 
     /// 自绘右键菜单壳：定位于右键点击处，点击菜单外 / Esc 关闭。
@@ -1861,16 +1831,6 @@ impl App {
                             ui::setting_row(
                                 ui,
                                 pal,
-                                "固定工具栏",
-                                "始终显示顶部工具栏和底部读数",
-                                |ui| {
-                                    ui::toggle(ui, &mut self.toolbar_pinned, pal);
-                                },
-                            );
-                            ui.add_space(2.0);
-                            ui::setting_row(
-                                ui,
-                                pal,
                                 "减少动效",
                                 "关闭工具栏淡入淡出动画",
                                 |ui| {
@@ -2084,10 +2044,6 @@ impl eframe::App for App {
         storage.set_string("iv-bd-opacity", self.backdrop_opacity.to_string());
         storage.set_string("iv-bd-blur", self.backdrop_blur.to_string());
         storage.set_string("iv-bd-bright", self.backdrop_brightness.to_string());
-        storage.set_string(
-            "iv-toolbar-pinned",
-            if self.toolbar_pinned { "on" } else { "off" }.into(),
-        );
         storage.set_string(
             "iv-reduce-motion",
             if self.reduce_motion { "on" } else { "off" }.into(),
@@ -2320,22 +2276,23 @@ impl eframe::App for App {
                     // 玻璃拟态底衬：画布对角渐变（回退路径）
                     ui::paint_canvas_bg(ui.painter(), rect, &pal);
                 }
-                // 画布交互：拖拽平移 + 滚轮缩放
+                // 画布交互：左键拖拽移动窗口，中键拖拽平移图像，滚轮缩放。
                 let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
                 // 右键菜单（自绘悬浮菜单，支持 Esc 关闭）
                 if resp.secondary_clicked() {
                     self.ctx_menu_pos = resp.interact_pointer_pos();
                 }
-                if resp.dragged() {
-                    // 从窗口边缘（6px 热区）发起的拖拽交给系统缩放（BeginResize），不平移图像
-                    let on_edge = ctx
-                        .input(|i| i.pointer.press_origin())
-                        .map(|p| edge_resize_dir(ctx.screen_rect(), p, 6.0).is_some())
-                        .unwrap_or(false);
-                    if !on_edge {
-                        self.view.offset += resp.drag_delta();
-                        self.auto_fit = false;
-                    }
+                // 从窗口边缘（6px 热区）发起的拖拽交给系统缩放（BeginResize）。
+                let drag_from_edge = ctx
+                    .input(|i| i.pointer.press_origin())
+                    .map(|p| edge_resize_dir(ctx.screen_rect(), p, 6.0).is_some())
+                    .unwrap_or(false);
+                if resp.drag_started_by(PointerButton::Primary) && !drag_from_edge {
+                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+                }
+                if resp.dragged_by(PointerButton::Middle) && !drag_from_edge {
+                    self.view.offset += resp.drag_delta();
+                    self.auto_fit = false;
                 }
                 let hover_pos = resp.hover_pos();
                 if let Some(p) = hover_pos {
@@ -2412,11 +2369,10 @@ impl eframe::App for App {
         // 玻璃区域每帧重建：各悬浮层绘制时收集其矩形与淡入系数
         self.glass_regions.clear();
         self.update_overlay_visibility(ctx);
-        let over_top = self.draw_top_overlay(ctx, &pal);
-        let over_context = self.draw_context_tools_overlay(ctx, &pal);
-        let over_err = self.draw_error_overlay(ctx, &pal);
-        let over_bot = self.draw_bottom_overlay(ctx, &pal);
-        self.over_overlay = over_top || over_context || over_err || over_bot;
+        self.draw_top_overlay(ctx, &pal);
+        self.draw_context_tools_overlay(ctx, &pal);
+        self.draw_error_overlay(ctx, &pal);
+        self.draw_bottom_overlay(ctx, &pal);
         self.draw_ctx_menu_overlay(ctx, &pal, canvas_rect);
         self.draw_props_window(ctx, &pal);
         self.draw_probe_window(ctx, &pal);
@@ -2618,8 +2574,7 @@ fn fmt_size(b: u64) -> String {
 
 /// 无边框窗口的边缘八向缩放：指针贴近窗口边缘（6px 热区）显示对应缩放光标，
 /// 按下即交给系统缩放（BeginResize）。最大化时禁用（窗口不可再缩放）。
-/// 拖动移动窗口 / 双击最大化由顶栏胶囊（Area + Sense::click_and_drag）处理，
-/// 见 draw_top_overlay。
+/// 拖动移动窗口由整个画布和顶栏胶囊处理；双击最大化由顶栏胶囊处理。
 fn borderless_chrome(ctx: &egui::Context) {
     let maximized = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
     if maximized {
@@ -2636,6 +2591,16 @@ fn borderless_chrome(ctx: &egui::Context) {
     if ctx.input(|i| i.pointer.primary_pressed()) {
         ctx.send_viewport_cmd(ViewportCommand::BeginResize(dir));
     }
+}
+
+/// 顶栏始终跟随活动状态；底栏仅在已经打开图像时显示。
+fn overlay_targets(
+    has_image: bool,
+    recent_pointer_activity: bool,
+    pointer_down: bool,
+) -> (bool, bool) {
+    let active = recent_pointer_activity || pointer_down;
+    (active, has_image && active)
 }
 
 /// 指针是否落在窗口边缘缩放热区（border 宽，逻辑像素），命中则返回八向之一。
@@ -2672,5 +2637,27 @@ fn edge_cursor(d: ResizeDirection) -> CursorIcon {
         ResizeDirection::NorthWest => CursorIcon::ResizeNorthWest,
         ResizeDirection::SouthEast => CursorIcon::ResizeSouthEast,
         ResizeDirection::SouthWest => CursorIcon::ResizeSouthWest,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::overlay_targets;
+
+    #[test]
+    fn overlays_hide_when_pointer_is_stationary() {
+        assert_eq!(overlay_targets(true, false, false), (false, false));
+        assert_eq!(overlay_targets(false, false, false), (false, false));
+    }
+
+    #[test]
+    fn pointer_activity_shows_only_available_bars() {
+        assert_eq!(overlay_targets(true, true, false), (true, true));
+        assert_eq!(overlay_targets(false, true, false), (true, false));
+    }
+
+    #[test]
+    fn active_interaction_keeps_bars_visible_temporarily() {
+        assert_eq!(overlay_targets(true, false, true), (true, true));
     }
 }
