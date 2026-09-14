@@ -86,3 +86,7 @@ IV-P1-01 UI 验收工具链
 ## 两侧导航与1秒隐藏追加任务
 
 `IV-P1-N02` / `IV-P1-N03` DONE，集成 `6de1d75f8b9ccb511246f61efc6efeaef3c96f9d`，main tests21/check/release及隔离profile实机复验通过。N03仅两侧按钮使用玻璃材质，其余保留新拟态。P1仍ACTIVE，NEXT为IV-P1-01；其他DPI/性能等门禁未覆盖。
+
+## 鼠标手势追加任务
+
+IV-P1-N04 DONE：左键移图/右键移窗，main24tests/check/双构建及隔离实机复验通过。N01–N03交互与视觉保留；P1仍ACTIVE，NEXT为IV-P1-01。
