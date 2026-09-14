@@ -8,6 +8,7 @@ mod app;
 mod backdrop;
 mod loader;
 mod render;
+mod recycle;
 mod ui;
 mod winassoc;
 

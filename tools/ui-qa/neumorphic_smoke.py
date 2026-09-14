@@ -348,8 +348,18 @@ def run(args):
             elif kind == 'key':
                 code = action['code']
                 code = ord(code.upper()) if isinstance(code, str) and len(code) == 1 else int(code)
-                key(hwnd, code)
-                if code == ord('T'): current_theme = 'dark' if current_theme == 'light' else 'light'
+                held_modifiers = []
+                try:
+                    for name in action.get('modifiers', []):
+                        virtual = {'ctrl': 0x11, 'shift': 0x10, 'alt': 0x12}[name]
+                        u.keybd_event(virtual, 0, 0, 0)
+                        held_modifiers.append(virtual)
+                    key(hwnd, code)
+                finally:
+                    for virtual in reversed(held_modifiers):
+                        u.keybd_event(virtual, 0, 2, 0)
+                if code == ord('T') and not action.get('modifiers'):
+                    current_theme = 'dark' if current_theme == 'light' else 'light'
             elif kind == 'wait':
                 time.sleep(float(action['seconds']))
             elif kind == 'shot':
