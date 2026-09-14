@@ -106,8 +106,8 @@ def run(args):
     assert len(traces)==7
     for index,delta in [(0,[72,36]),(2,[-36,-24])]:
         actual=traces[index]['window_delta_physical']
-        # Native Windows StartDrag starts once its drag threshold has been crossed.
-        assert all(abs(a-b)<=12 for a,b in zip(actual[:2],delta)),(index,actual,delta)
+        # Settings title dragging preserves the complete physical pointer displacement.
+        assert all(abs(a-b)<=3 for a,b in zip(actual[:2],delta)),(index,actual,delta)
         assert actual[2:]==[0,0]
     anchor=meta['blank-title-left-drag']['physical_window']
     for state in ['body-no-window-drag','switch-drag-no-window-move','reduce-motion-on','reduce-motion-off','theme-changed','theme-restored','backdrop-expanded','opacity-changed-no-drag','blur-changed-no-drag','backdrop-collapsed','settings-closed']:
