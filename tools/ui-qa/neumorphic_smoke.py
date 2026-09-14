@@ -301,7 +301,8 @@ def run(args):
                 if kind != 'up':
                     u.mouse_event(down, 0, 0, 0, 0)
                     pressed_releases.add(up)
-                if kind not in ('down', 'up'): time.sleep(0.08)
+                # Consecutive press/release avoids an unintended right-window drag
+                # if the physical mouse moves during a synthetic click.
                 if kind != 'down':
                     u.mouse_event(up, 0, 0, 0, 0)
                     pressed_releases.discard(up)
