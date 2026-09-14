@@ -196,11 +196,11 @@ pub struct App {
 
 impl App {
     pub fn new(cc: &eframe::CreationContext, initial_path: Option<PathBuf>) -> Self {
-        // 恢复上次主题（eframe persistence 存储），默认深色；
+        // 恢复已有显式主题；新用户默认使用浅色新拟态。
         // SetTheme 经 egui-winit → winit → DWM 沉浸式暗色模式同步系统标题栏
         let theme = match cc.storage.and_then(|s| s.get_string("iv-theme")).as_deref() {
-            Some("light") => ThemeMode::Light,
-            _ => ThemeMode::Dark,
+            Some("dark") => ThemeMode::Dark,
+            _ => ThemeMode::Light,
         };
         ThemeMode::apply_to(&cc.egui_ctx, theme);
         let renderer = cc
@@ -236,12 +236,12 @@ impl App {
                 .and_then(|s| s.get_string("iv-checkerboard"))
                 .as_deref()
                 != Some("off"),
-            // 窗口磨砂背景默认开启；老系统不支持截图排除时自动回退渐变画布
+            // 新安装使用安静的新拟态画布；已有用户显式开启的桌面磨砂继续保留。
             backdrop: cc
                 .storage
                 .and_then(|s| s.get_string("iv-backdrop"))
                 .as_deref()
-                != Some("off"),
+                == Some("on"),
             backdrop_opacity: load_f32(cc.storage, "iv-bd-opacity", 0.42),
             backdrop_blur: load_f32(cc.storage, "iv-bd-blur", 0.5),
             backdrop_brightness: load_f32(cc.storage, "iv-bd-bright", 1.0),
@@ -746,7 +746,7 @@ impl App {
             .sense(Sense::click_and_drag())
             .show(ctx, |ui| {
                 ui.set_opacity(alpha);
-                let frame_resp = ui::capsule(pal).show(ui, |ui| {
+                let _frame_resp = ui::capsule(pal).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
 
@@ -1041,7 +1041,6 @@ impl App {
                         }
                     });
                 });
-                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
         // 顶栏胶囊（无边框标题栏）：空白处拖拽移动窗口，双击切换最大化/还原。
         // 按钮在更上层优先捕获指针，故仅空白处会落到胶囊本体的 drag/click。
@@ -1053,7 +1052,7 @@ impl App {
             ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized));
         }
         let rect = resp.rect;
-        self.glass_regions.push((rect, alpha, 24.0));
+        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
     }
 
     fn has_context_tools(&self) -> bool {
@@ -1087,7 +1086,7 @@ impl App {
             .anchor(egui::Align2::CENTER_TOP, Vec2::new(0.0, 70.0))
             .show(ctx, |ui| {
                 ui.set_opacity(alpha);
-                let frame_resp = ui::capsule(pal).show(ui, |ui| {
+                let _frame_resp = ui::capsule(pal).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 6.0;
                         let mut has_group = false;
@@ -1156,10 +1155,9 @@ impl App {
                         }
                     });
                 });
-                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, alpha, 24.0));
+        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
     }
 
     /// 错误胶囊（顶栏下方，出错时常显）。
@@ -1170,7 +1168,7 @@ impl App {
         let frame = Frame::default()
             .fill(pal.err_bg)
             .stroke(Stroke::new(1.0f32, pal.err_border))
-            .rounding(egui::Rounding::same(18.0))
+            .rounding(egui::Rounding::same(ui::PANEL_RADIUS))
             .inner_margin(egui::Margin::symmetric(12.0, 5.0))
             .shadow(pal.shadow);
         let area = egui::Area::new(egui::Id::new("iv-error"))
@@ -1187,7 +1185,7 @@ impl App {
                 ),
             )
             .show(ctx, |ui| {
-                let frame_resp = frame.show(ui, |ui| {
+                let _frame_resp = frame.show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(
                             RichText::new(format!("无法打开：{err}"))
@@ -1202,10 +1200,9 @@ impl App {
                         }
                     });
                 });
-                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, 1.0, 18.0));
+        self.glass_regions.push((rect, 1.0, ui::PANEL_RADIUS));
     }
 
     /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。
@@ -1219,7 +1216,7 @@ impl App {
             .anchor(egui::Align2::CENTER_BOTTOM, Vec2::new(0.0, -10.0))
             .show(ctx, |ui| {
                 ui.set_opacity(alpha);
-                let frame_resp = ui::capsule(pal).show(ui, |ui| {
+                let _frame_resp = ui::capsule(pal).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 6.0;
 
@@ -1359,10 +1356,9 @@ impl App {
                         slot_resp.on_hover_text("缩放比例（滚轮 · F 适配 · 0 实际大小）");
                     });
                 });
-                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
         let rect = area.response.rect;
-        self.glass_regions.push((rect, alpha, 24.0));
+        self.glass_regions.push((rect, alpha, ui::PANEL_RADIUS));
     }
 
     /// 自绘右键菜单壳：定位于右键点击处，点击菜单外 / Esc 关闭。
@@ -1380,14 +1376,13 @@ impl App {
             .show(ctx, |ui| {
                 // 限制最大宽度：否则按钮/分隔线会把菜单撑满可用宽度
                 ui.set_max_width(232.0);
-                let frame_resp = ui::menu_frame(pal).show(ui, |ui| {
+                let _frame_resp = ui::menu_frame(pal).show(ui, |ui| {
                     egui::ScrollArea::vertical()
                         .id_source("iv-context-scroll")
                         .max_height(menu_height)
                         .auto_shrink([false, true])
                         .show(ui, |ui| self.draw_context_menu(ui, canvas));
                 });
-                ui::paint_glass_sheen(ui.painter(), frame_resp.response.rect, pal);
             });
         // 左键点击菜单外关闭（右键点别处由画布重新定位菜单）
         let rect = area.response.rect;
@@ -1737,7 +1732,7 @@ impl App {
                             );
                         });
                     });
-                    if ui.button("复制完整读数").clicked() {
+                    if ui::text_button(ui, "复制完整读数", 0.0, pal).clicked() {
                         ui.output_mut(|o| {
                             o.copied_text = format!("{}  {}", self.probe_text, self.probe_detail)
                         });
@@ -1839,9 +1834,9 @@ impl App {
                             );
                         });
 
-                        ui::settings_card(ui, pal, "面板磨砂", |ui| {
+                        ui::settings_card(ui, pal, "新拟态材质", |ui| {
                             ui.label(
-                                RichText::new("工具栏、菜单、属性和设置共享统一的画布柔化材质")
+                                RichText::new("雾蓝灰单色系 · 柔和双向阴影 · 按钮凸起，选中与按下时内凹")
                                     .small()
                                     .color(pal.dim),
                             );
@@ -1942,11 +1937,7 @@ impl App {
                             ui.horizontal(|ui| {
                                 let button_width = ((ui.available_width() - 8.0) / 2.0).max(132.0);
                                 if self.assoc_registered {
-                                    if ui
-                                        .add_sized(
-                                            [button_width, 32.0],
-                                            egui::Button::new("解除注册"),
-                                        )
+                                    if ui::text_button(ui, "解除注册", button_width, pal)
                                         .on_hover_text("从打开方式列表与默认应用候选中移除")
                                         .clicked()
                                     {
@@ -1955,11 +1946,7 @@ impl App {
                                         }
                                         self.assoc_registered = winassoc::is_registered();
                                     }
-                                } else if ui
-                                    .add_sized(
-                                        [button_width, 32.0],
-                                        egui::Button::new("注册到「打开方式」"),
-                                    )
+                                } else if ui::text_button(ui, "注册到「打开方式」", button_width, pal)
                                     .on_hover_text("写入 HKCU，无需管理员权限")
                                     .clicked()
                                 {
@@ -1968,11 +1955,7 @@ impl App {
                                     }
                                     self.assoc_registered = winassoc::is_registered();
                                 }
-                                if ui
-                                    .add_sized(
-                                        [button_width, 32.0],
-                                        egui::Button::new("设为默认看图软件…"),
-                                    )
+                                if ui::text_button(ui, "设为默认看图软件…", button_width, pal)
                                     .on_hover_text("打开系统「默认应用」设置页")
                                     .clicked()
                                 {
@@ -2467,9 +2450,14 @@ impl eframe::App for App {
                     let mut glass_rects = [[0.0f32; 4]; MAX_GLASS];
                     let mut glass_alpha = [[0.0f32; 4]; 2];
                     let mut glass_corner = [[0.0f32; 4]; 2];
-                    let glass_count = self.glass_regions.len().min(MAX_GLASS);
+                    // 不透明新拟态表面不需要玻璃采样；淡出时也保留清晰原图。
+                    let glass_count = if pal.overlay.a() < 255 {
+                        self.glass_regions.len().min(MAX_GLASS)
+                    } else {
+                        0
+                    };
                     for (i, (rect, a, corner)) in
-                        self.glass_regions.iter().take(MAX_GLASS).enumerate()
+                        self.glass_regions.iter().take(glass_count).enumerate()
                     {
                         let r = rect.translate(-canvas_rect.min.to_vec2());
                         glass_rects[i] =

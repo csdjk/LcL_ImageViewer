@@ -1,0 +1,91 @@
+[
+  {
+    "kind": "key",
+    "code": "4"
+  },
+  {
+    "kind": "move",
+    "x": 460,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "selected-alpha"
+  },
+  {
+    "kind": "key",
+    "code": "5"
+  },
+  {
+    "kind": "click",
+    "x": 480,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "channel-dropdown"
+  },
+  {
+    "kind": "click",
+    "x": 440,
+    "y": 280
+  },
+  {
+    "kind": "right-click",
+    "x": 440,
+    "y": 110
+  },
+  {
+    "kind": "shot",
+    "name": "context-menu"
+  },
+  {
+    "kind": "key",
+    "code": 27
+  },
+  {
+    "kind": "click",
+    "x": 641,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "settings"
+  },
+  {
+    "kind": "wheel",
+    "x": 500,
+    "y": 400,
+    "delta": -240
+  },
+  {
+    "kind": "shot",
+    "name": "settings-scroll"
+  },
+  {
+    "kind": "key",
+    "code": 27
+  },
+  {
+    "kind": "move",
+    "x": 440,
+    "y": 280
+  },
+  {
+    "kind": "wait",
+    "seconds": 3.2
+  },
+  {
+    "kind": "shot",
+    "name": "auto-hidden"
+  },
+  {
+    "kind": "move",
+    "x": 441,
+    "y": 280
+  },
+  {
+    "kind": "shot",
+    "name": "restored"
+  }
+]
