@@ -505,16 +505,6 @@ pub fn menu_item(
     resp
 }
 
-pub fn menu_section(ui: &mut egui::Ui, label: &str, pal: &Palette) {
-    ui.add_space(5.0);
-    ui.label(RichText::new(label).size(11.5).color(pal.dim));
-    ui.add_space(2.0);
-}
-
-pub fn menu_sep(ui: &mut egui::Ui, _pal: &Palette) {
-    ui.allocate_exact_size(Vec2::new(ui.available_width(), 9.0), Sense::hover());
-}
-
 /* ============================= 设置页组件 ============================= */
 
 /// 同色材质分组卡片，以柔影而非边框建立层级。
