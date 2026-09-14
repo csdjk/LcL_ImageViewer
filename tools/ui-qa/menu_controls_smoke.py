@@ -29,7 +29,7 @@ foreach($item in $shell.Namespace(10).Items()) {
         $matches += [pscustomobject]@{
             name=[string]$item.Name
             original_directory=$from
-            sha256=(Get-FileHash -LiteralPath $item.Path -Algorithm SHA256).Hash.ToLowerInvariant()
+            sha256=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([IO.File]::ReadAllBytes([string]$item.Path))).Replace('-','').ToLowerInvariant()
         }
     }
 }

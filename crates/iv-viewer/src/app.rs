@@ -593,6 +593,10 @@ impl App {
                 self.show_props = false;
                 return;
             }
+            if self.show_probe {
+                self.show_probe = false;
+                return;
+            }
             if self.show_settings {
                 self.show_settings = false;
                 return;

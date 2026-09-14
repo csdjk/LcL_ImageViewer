@@ -7,9 +7,12 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::SystemTime;
-use windows::core::{implement, Error, HRESULT, PCWSTR, Result as WinResult};
+use windows::core::{implement, Error, Result as WinResult, HRESULT, PCWSTR};
 use windows::Win32::Foundation::E_ABORT;
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
+    COINIT_APARTMENTTHREADED,
+};
 use windows::Win32::UI::Shell::{
     FileOperation, IFileOperation, IFileOperationProgressSink, IFileOperationProgressSink_Impl,
     IShellItem, SHCreateItemFromParsingName, FOFX_ADDUNDORECORD, FOFX_EARLYFAILURE,
@@ -35,7 +38,11 @@ impl Target {
         if !meta.file_type().is_file() {
             return Err("只支持删除普通图片文件，不处理目录或符号链接".into());
         }
-        Ok(Self { path, len: meta.len(), modified: meta.modified().map_err(|e| e.to_string())? })
+        Ok(Self {
+            path,
+            len: meta.len(),
+            modified: meta.modified().map_err(|e| e.to_string())?,
+        })
     }
 
     pub fn verify_unchanged(&self) -> Result<(), String> {
@@ -59,56 +66,154 @@ struct RecycleOnly {
     outcome: Rc<Cell<Option<HRESULT>>>,
 }
 impl IFileOperationProgressSink_Impl for RecycleOnly_Impl {
-    fn StartOperations(&self) -> WinResult<()> { Ok(()) }
+    fn StartOperations(&self) -> WinResult<()> {
+        Ok(())
+    }
     fn FinishOperations(&self, hr: HRESULT) -> WinResult<()> {
-        if hr.is_err() { self.outcome.set(Some(hr)); }
+        if hr.is_err() {
+            self.outcome.set(Some(hr));
+        }
         Ok(())
     }
     fn PreDeleteItem(&self, flags: u32, _item: Option<&IShellItem>) -> WinResult<()> {
-        if recycling_allowed(flags) { Ok(()) } else {
+        if recycling_allowed(flags) {
+            Ok(())
+        } else {
             self.outcome.set(Some(E_ABORT));
             Err(cancelled())
         }
     }
-    fn PostDeleteItem(&self, _flags: u32, _item: Option<&IShellItem>, hr: HRESULT, _new: Option<&IShellItem>) -> WinResult<()> {
+    fn PostDeleteItem(
+        &self,
+        _flags: u32,
+        _item: Option<&IShellItem>,
+        hr: HRESULT,
+        _new: Option<&IShellItem>,
+    ) -> WinResult<()> {
         self.outcome.set(Some(hr));
         Ok(())
     }
-    fn PreRenameItem(&self, _: u32, _: Option<&IShellItem>, _: &PCWSTR) -> WinResult<()> { Err(cancelled()) }
-    fn PostRenameItem(&self, _: u32, _: Option<&IShellItem>, _: &PCWSTR, _: HRESULT, _: Option<&IShellItem>) -> WinResult<()> { Ok(()) }
-    fn PreMoveItem(&self, _: u32, _: Option<&IShellItem>, _: Option<&IShellItem>, _: &PCWSTR) -> WinResult<()> { Err(cancelled()) }
-    fn PostMoveItem(&self, _: u32, _: Option<&IShellItem>, _: Option<&IShellItem>, _: &PCWSTR, _: HRESULT, _: Option<&IShellItem>) -> WinResult<()> { Ok(()) }
-    fn PreCopyItem(&self, _: u32, _: Option<&IShellItem>, _: Option<&IShellItem>, _: &PCWSTR) -> WinResult<()> { Err(cancelled()) }
-    fn PostCopyItem(&self, _: u32, _: Option<&IShellItem>, _: Option<&IShellItem>, _: &PCWSTR, _: HRESULT, _: Option<&IShellItem>) -> WinResult<()> { Ok(()) }
-    fn PreNewItem(&self, _: u32, _: Option<&IShellItem>, _: &PCWSTR) -> WinResult<()> { Err(cancelled()) }
-    fn PostNewItem(&self, _: u32, _: Option<&IShellItem>, _: &PCWSTR, _: &PCWSTR, _: u32, _: HRESULT, _: Option<&IShellItem>) -> WinResult<()> { Ok(()) }
-    fn UpdateProgress(&self, _: u32, _: u32) -> WinResult<()> { Ok(()) }
-    fn ResetTimer(&self) -> WinResult<()> { Ok(()) }
-    fn PauseTimer(&self) -> WinResult<()> { Ok(()) }
-    fn ResumeTimer(&self) -> WinResult<()> { Ok(()) }
+    fn PreRenameItem(&self, _: u32, _: Option<&IShellItem>, _: &PCWSTR) -> WinResult<()> {
+        Err(cancelled())
+    }
+    fn PostRenameItem(
+        &self,
+        _: u32,
+        _: Option<&IShellItem>,
+        _: &PCWSTR,
+        _: HRESULT,
+        _: Option<&IShellItem>,
+    ) -> WinResult<()> {
+        Ok(())
+    }
+    fn PreMoveItem(
+        &self,
+        _: u32,
+        _: Option<&IShellItem>,
+        _: Option<&IShellItem>,
+        _: &PCWSTR,
+    ) -> WinResult<()> {
+        Err(cancelled())
+    }
+    fn PostMoveItem(
+        &self,
+        _: u32,
+        _: Option<&IShellItem>,
+        _: Option<&IShellItem>,
+        _: &PCWSTR,
+        _: HRESULT,
+        _: Option<&IShellItem>,
+    ) -> WinResult<()> {
+        Ok(())
+    }
+    fn PreCopyItem(
+        &self,
+        _: u32,
+        _: Option<&IShellItem>,
+        _: Option<&IShellItem>,
+        _: &PCWSTR,
+    ) -> WinResult<()> {
+        Err(cancelled())
+    }
+    fn PostCopyItem(
+        &self,
+        _: u32,
+        _: Option<&IShellItem>,
+        _: Option<&IShellItem>,
+        _: &PCWSTR,
+        _: HRESULT,
+        _: Option<&IShellItem>,
+    ) -> WinResult<()> {
+        Ok(())
+    }
+    fn PreNewItem(&self, _: u32, _: Option<&IShellItem>, _: &PCWSTR) -> WinResult<()> {
+        Err(cancelled())
+    }
+    fn PostNewItem(
+        &self,
+        _: u32,
+        _: Option<&IShellItem>,
+        _: &PCWSTR,
+        _: &PCWSTR,
+        _: u32,
+        _: HRESULT,
+        _: Option<&IShellItem>,
+    ) -> WinResult<()> {
+        Ok(())
+    }
+    fn UpdateProgress(&self, _: u32, _: u32) -> WinResult<()> {
+        Ok(())
+    }
+    fn ResetTimer(&self) -> WinResult<()> {
+        Ok(())
+    }
+    fn PauseTimer(&self) -> WinResult<()> {
+        Ok(())
+    }
+    fn ResumeTimer(&self) -> WinResult<()> {
+        Ok(())
+    }
 }
 
 struct ComApartment;
 impl Drop for ComApartment {
-    fn drop(&mut self) { unsafe { CoUninitialize(); } }
+    fn drop(&mut self) {
+        unsafe {
+            CoUninitialize();
+        }
+    }
 }
 
 /// Run on a fresh worker thread (STA). Only called after explicit user confirmation.
 pub fn recycle(target: &Target) -> Result<(), String> {
     target.verify_unchanged()?;
-    let wide: Vec<u16> = target.path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let wide: Vec<u16> = target
+        .path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
     let execute = || -> WinResult<()> {
         unsafe {
             CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
             let _com = ComApartment;
-            let operation: IFileOperation = CoCreateInstance(&FileOperation, None, CLSCTX_INPROC_SERVER)?;
+            let operation: IFileOperation =
+                CoCreateInstance(&FileOperation, None, CLSCTX_INPROC_SERVER)?;
             operation.SetOperationFlags(
-                FOFX_RECYCLEONDELETE | FOFX_ADDUNDORECORD | FOF_ALLOWUNDO |
-                FOFX_EARLYFAILURE | FOF_NOERRORUI | FOF_SILENT |
-                FOF_NOCONFIRMATION | FOF_NO_CONNECTED_ELEMENTS,
+                FOFX_RECYCLEONDELETE
+                    | FOFX_ADDUNDORECORD
+                    | FOF_ALLOWUNDO
+                    | FOFX_EARLYFAILURE
+                    | FOF_NOERRORUI
+                    | FOF_SILENT
+                    | FOF_NOCONFIRMATION
+                    | FOF_NO_CONNECTED_ELEMENTS,
             )?;
             let outcome = Rc::new(Cell::new(None));
-            let sink: IFileOperationProgressSink = RecycleOnly { outcome: outcome.clone() }.into();
+            let sink: IFileOperationProgressSink = RecycleOnly {
+                outcome: outcome.clone(),
+            }
+            .into();
             let item: IShellItem = SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None)?;
             operation.DeleteItem(&item, &sink)?;
             operation.PerformOperations()?;
@@ -134,7 +239,10 @@ mod tests {
         assert!(!recycling_allowed(0x10));
         assert!(recycling_allowed(TSF_DELETE_RECYCLE_IF_POSSIBLE.0 as u32));
         let outcome = Rc::new(Cell::new(None));
-        let sink: IFileOperationProgressSink = RecycleOnly { outcome: outcome.clone() }.into();
+        let sink: IFileOperationProgressSink = RecycleOnly {
+            outcome: outcome.clone(),
+        }
+        .into();
         let result = unsafe { sink.PreDeleteItem(0, None) };
         assert!(result.is_err());
         assert_eq!(outcome.get(), Some(E_ABORT));
@@ -144,15 +252,30 @@ mod tests {
     fn directories_empty_and_missing_paths_are_not_deletion_targets() {
         assert!(Target::new(Path::new("")).is_err());
         assert!(Target::new(&std::env::temp_dir()).is_err());
-        assert!(Target::new(&std::env::temp_dir().join(format!("iv-missing-{}-target.png", std::process::id()))).is_err());
+        assert!(Target::new(
+            &std::env::temp_dir().join(format!("iv-missing-{}-target.png", std::process::id()))
+        )
+        .is_err());
     }
 
     #[test]
     fn changed_file_must_be_confirmed_again() {
-        let path = std::env::temp_dir().join(format!("iv-delete-target-{}-{}.tmp", std::process::id(), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos()));
-        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "iv-delete-target-{}-{}.tmp",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
         use std::io::Write;
-        file.write_all(b"test").unwrap(); drop(file);
+        file.write_all(b"test").unwrap();
+        drop(file);
         let target = Target::new(&path).unwrap();
         assert!(target.verify_unchanged().is_ok());
         std::fs::write(&path, b"changed test").unwrap();
