@@ -167,6 +167,7 @@ pub struct App {
     ctx_menu_pos: Option<Pos2>,
     /// 右键拖动窗口的屏幕坐标锚点；与右键单击菜单互斥。
     right_window_drag: Option<crate::backdrop::WindowDrag>,
+    settings_left_window_drag: Option<crate::backdrop::WindowDrag>,
     right_gesture_dragged: bool,
     /// 本帧玻璃区域（逻辑坐标矩形 + 模糊混合系数 + 圆角半径），绘制悬浮层时收集，
     /// 供图像 shader 在这些区域内做背景模糊（磨砂玻璃）
@@ -298,6 +299,7 @@ impl App {
                 == Some("on"),
             ctx_menu_pos: None,
             right_window_drag: None,
+            settings_left_window_drag: None,
             right_gesture_dragged: false,
             glass_regions: Vec::new(),
         };
@@ -577,6 +579,9 @@ impl App {
         }
         // Esc 逐层关闭：右键菜单 → 下拉弹窗 → 属性/设置窗口 → 退出程序
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
+            if self.settings_left_window_drag.take().is_some() {
+                return;
+            }
             if self.right_window_drag.take().is_some() {
                 self.right_gesture_dragged = true;
                 return;
@@ -1862,7 +1867,10 @@ impl App {
                         || i.viewport().fullscreen.unwrap_or(false)
                 });
                 if !fixed_window && header.drag_started_by(PointerButton::Primary) {
-                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+                    if let (Some(hwnd), Some(start)) = (self.hwnd, ctx.input(|i| i.pointer.press_origin())) {
+                        self.settings_left_window_drag = crate::backdrop::WindowDrag::begin_left(
+                            hwnd, [start.x, start.y], ctx.pixels_per_point());
+                    }
                 }
                 self.begin_right_window_drag(ctx, &header);
                 ui.add_space(4.0);
@@ -2330,7 +2338,14 @@ impl eframe::App for App {
             self.draw_probe_window(ctx, &pal);
             self.draw_settings_window(ctx, &pal);
             // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
-            if let Some(drag) = &self.right_window_drag {
+            if let Some(drag) = &self.settings_left_window_drag {
+                if ctx.input(|i| i.pointer.button_down(PointerButton::Primary)) && drag.advance() {
+                    ctx.set_cursor_icon(CursorIcon::Grabbing);
+                    ctx.request_repaint_after(Duration::from_millis(16));
+                } else {
+                    self.settings_left_window_drag = None;
+                }
+            } else if let Some(drag) = &self.right_window_drag {
                 if ctx.input(|i| i.pointer.button_down(PointerButton::Secondary)) && drag.advance() {
                     ctx.set_cursor_icon(CursorIcon::Move);
                     ctx.request_repaint_after(Duration::from_millis(16));

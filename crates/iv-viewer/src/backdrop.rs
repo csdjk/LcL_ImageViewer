@@ -222,6 +222,7 @@ pub struct WindowDrag {
     hwnd: isize,
     cursor_start: [i32; 2],
     window_start: [i32; 2],
+    button_vk: i32,
 }
 
 impl WindowDrag {
@@ -250,7 +251,15 @@ impl WindowDrag {
             hwnd,
             cursor_start: [cursor.x, cursor.y],
             window_start: [window.left, window.top],
+            button_vk: 0x02,
         })
+    }
+
+    /// 设置标题左键与右键共用屏幕坐标差，不进入系统模态拖动循环。
+    pub fn begin_left(hwnd: isize, press_client: [f32; 2], pixels_per_point: f32) -> Option<Self> {
+        let mut drag = Self::begin(hwnd, press_client, pixels_per_point)?;
+        drag.button_vk = 0x01;
+        Some(drag)
     }
 
     /// 松键、失焦、最大化或API失败时结束，不修改窗口大小、Z序和激活状态。
@@ -258,7 +267,7 @@ impl WindowDrag {
         let mut cursor = WPoint { x: 0, y: 0 };
         let mut window = WRect { left: 0, top: 0, right: 0, bottom: 0 };
         unsafe {
-            if GetAsyncKeyState(0x02) >= 0 || GetForegroundWindow() != self.hwnd
+            if GetAsyncKeyState(self.button_vk) >= 0 || GetForegroundWindow() != self.hwnd
                 || IsIconic(self.hwnd) != 0 || IsZoomed(self.hwnd) != 0
                 || GetCursorPos(&mut cursor) == 0 || GetWindowRect(self.hwnd, &mut window) == 0
             {
