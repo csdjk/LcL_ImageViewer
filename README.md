@@ -93,6 +93,17 @@ cargo build --release --workspace
 # 输出 dist\LcL-ImageViewer-Setup-vX.Y.Z-win64.exe
 ```
 
+## 开发协作
+
+- [当前状态](docs/status.md)：当前阶段、已验证事实和唯一 NEXT。
+- [路线图](docs/roadmap.md)：阶段顺序与 Stage Gate。
+- [任务板](docs/task-board.md)：Task、Owner、依赖、修改范围和验收。
+- [当前开发计划](docs/development-plan.md)：复杂 Task 的完整执行合同。
+- [待决策事项](docs/needs-decision.md)：必须由用户决定的问题与恢复条件。
+- [玻璃磨砂 UI 优化方案](docs/玻璃磨砂UI优化方案.md)：视觉、渲染与验收规范。
+
+所有开发 Agent 先阅读根目录 [`AGENTS.md`](AGENTS.md)。定时开发只在人工跑通一个完整 Task 闭环后启用，Prompt 见 [`docs/scheduled-developer-prompt.md`](docs/scheduled-developer-prompt.md)。
+
 ## 技术栈
 
 - **Rust** workspace：`iv-viewer`（主程序）/ `iv-core`（格式解码）/ `iv-shell`（Explorer 缩略图扩展）
