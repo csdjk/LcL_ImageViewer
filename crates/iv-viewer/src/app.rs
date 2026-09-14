@@ -75,6 +75,13 @@ impl ImageCache {
         self.map.get(path).cloned()
     }
 
+    fn remove(&mut self, path: &Path) {
+        if let Some(img) = self.map.remove(path) {
+            self.bytes = self.bytes.saturating_sub(Self::image_bytes(&img));
+        }
+        self.order.retain(|p| p != path);
+    }
+
     fn contains(&self, path: &Path) -> bool {
         self.map.contains_key(path)
     }
@@ -115,6 +122,8 @@ pub struct App {
     exposure: f32,
     renderer: Option<Renderer>,
     error_msg: Option<String>,
+    delete_prompt: Option<crate::recycle::Target>,
+    delete_job: Option<(PathBuf, Receiver<Result<(), String>>)>,
     /// 底部状态栏文本（像素检查器，每帧更新）
     probe_text: String,
     /// 像素检查器的完整 RGBA / 浮点读数。
@@ -231,6 +240,8 @@ impl App {
             exposure: 1.0,
             renderer,
             error_msg: None,
+            delete_prompt: None,
+            delete_job: None,
             probe_text: String::new(),
             probe_detail: String::new(),
             probe_color: None,
@@ -298,6 +309,8 @@ impl App {
 
     /// 打开一个文件：扫目录 → 缓存命中直接显示，否则异步加载。
     fn open(&mut self, path: PathBuf) {
+        // Keep cache keys, directory entries and confirmed deletion paths consistent.
+        let path = std::path::absolute(&path).unwrap_or(path);
         self.error_msg = None;
         self.refresh_directory(&path);
         self.mip_index = 0;
@@ -523,6 +536,10 @@ impl App {
         while let Some(msg) = self.loader.poll() {
             match msg {
                 Msg::Ready(Ok((path, img))) => {
+                    if !path.is_file() {
+                        self.cache.remove(&path);
+                        continue;
+                    }
                     if self.pending.as_ref() == Some(&path) {
                         if let Some(d) = &mut self.directory {
                             if let Some(i) = d.files.iter().position(|p| *p == path) {
@@ -552,6 +569,12 @@ impl App {
     }
 
     fn handle_global_input(&mut self, ctx: &egui::Context, canvas: Vec2) {
+        if self.delete_active() {
+            if self.delete_job.is_none() && ctx.input(|i| i.key_pressed(Key::Escape)) {
+                self.delete_prompt = None;
+            }
+            return; // dialog owns all keys, including held Delete and navigation
+        }
         // Esc 逐层关闭：右键菜单 → 下拉弹窗 → 属性/设置窗口 → 退出程序
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             if self.right_window_drag.take().is_some() {
@@ -596,11 +619,20 @@ impl App {
             return;
         }
 
-        let key = |k: Key| ctx.input(|i| i.key_pressed(k));
-        if key(Key::ArrowLeft) || key(Key::PageUp) {
+        let blocked = self.show_settings || self.show_props || self.show_probe
+            || self.ctx_menu_pos.is_some() || ctx.memory(|m| m.any_popup_open());
+        if !viewer_shortcuts_allowed(ctx.wants_keyboard_input(), blocked) {
+            return;
+        }
+        if ctx.input(|i| fresh_delete_press(&i.events)) {
+            self.request_delete();
+            return;
+        }
+        let key = |k: Key| ctx.input(|i| i.modifiers == egui::Modifiers::NONE && i.key_pressed(k));
+        if key(Key::ArrowLeft) || key(Key::PageUp) || key(Key::A) {
             self.step(-1);
         }
-        if key(Key::ArrowRight) || key(Key::PageDown) {
+        if key(Key::ArrowRight) || key(Key::PageDown) || key(Key::D) {
             self.step(1);
         }
         if key(Key::Home) {
@@ -668,6 +700,117 @@ impl App {
             self.upload_current_mip();
             self.auto_fit = true;
         }
+    }
+
+    fn delete_active(&self) -> bool {
+        self.delete_prompt.is_some() || self.delete_job.is_some()
+    }
+
+    fn request_delete(&mut self) {
+        if self.delete_active() || self.pending.is_some() { return; }
+        let Some(current) = &self.current else { return; };
+        match crate::recycle::Target::new(&current.path) {
+            Ok(target) => {
+                self.delete_prompt = Some(target);
+                self.ctx_menu_pos = None;
+                self.right_window_drag = None;
+            }
+            Err(err) => { self.error_msg = Some(err); self.ctx_menu_pos = None; }
+        }
+    }
+
+    fn draw_delete_dialog(&mut self, ctx: &egui::Context, pal: &Palette) {
+        if !self.delete_active() { return; }
+        let screen = ctx.screen_rect();
+        ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("iv-delete-shield")))
+            .rect_filled(screen, 0.0, Color32::from_black_alpha(80));
+        let mut cancel = false;
+        let mut confirm = false;
+        let busy = self.delete_job.is_some();
+        let name = self.delete_prompt.as_ref().map(|t| t.path.clone())
+            .or_else(|| self.delete_job.as_ref().map(|j| j.0.clone())).unwrap_or_default();
+        egui::Area::new(egui::Id::new("iv-delete-confirm"))
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO).movable(false)
+            .show(ctx, |ui| { ui::menu_frame(pal).show(ui, |ui| {
+                ui.set_width(400.0);
+                ui.heading("删除图片");
+                ui.add_space(8.0);
+                ui.label(if busy { "正在移入回收站…" } else { "将当前图片移入回收站？" });
+                ui.add_space(8.0);
+                ui::filename_label(ui, name.file_name().unwrap_or_default().to_string_lossy().as_ref(),
+                    370.0, pal.text_bright).on_hover_text(name.display().to_string());
+                ui.label(RichText::new("可从回收站恢复；无法回收时取消，不永久删除。").small().color(pal.dim));
+                ui.add_space(16.0);
+                if busy {
+                    ui.spinner();
+                } else {
+                    ui.horizontal(|ui| {
+                        cancel = ui.add_sized([175.0, 34.0], egui::Button::new("取消 (Esc)")).clicked();
+                        ui.add_space(10.0);
+                        confirm = ui.add_sized([175.0, 34.0], egui::Button::new("移入回收站")).clicked();
+                    });
+                }
+                ui.add_space(8.0);
+            }); });
+        if cancel { self.delete_prompt = None; }
+        if confirm {
+            if let Some(target) = self.delete_prompt.take() {
+                let path = target.path.clone();
+                let (tx, rx) = mpsc::channel();
+                let wake = ctx.clone();
+                match std::thread::Builder::new().name("iv-recycle".into()).spawn(move || {
+                    let _ = tx.send(crate::recycle::recycle(&target));
+                    wake.request_repaint();
+                }) {
+                    Ok(_) => self.delete_job = Some((path, rx)),
+                    Err(err) => self.error_msg = Some(format!("无法启动回收操作：{err}")),
+                }
+            }
+        }
+    }
+
+    fn poll_delete(&mut self, ctx: &egui::Context) {
+        let Some((_, receiver)) = &self.delete_job else { return; };
+        let result = match receiver.try_recv() {
+            Ok(result) => result,
+            Err(mpsc::TryRecvError::Empty) => {
+                ctx.request_repaint_after(Duration::from_millis(50));
+                return;
+            }
+            Err(mpsc::TryRecvError::Disconnected) => Err("回收任务异常结束，请检查文件状态".into()),
+        };
+        let (path, _) = self.delete_job.take().unwrap();
+        match result {
+            Err(err) => self.error_msg = Some(err),
+            Ok(()) => {
+                // A stale decoder/prefetch result must not re-add the deleted image.
+                let old_index = self.directory.as_ref().map_or(0, |d| d.index);
+                self.cache.remove(&path);
+                self.current = None;
+                self.pending = None;
+                self.playing = false;
+                self.probe_color = None;
+                self.probe_text.clear();
+                self.probe_detail.clear();
+                self.show_props = false;
+                self.show_probe = false;
+                self.error_msg = None;
+                self.refresh_directory(&path);
+                let next = self.directory.as_ref().and_then(|d| {
+                    next_index_after_delete(old_index, d.files.len()).and_then(|i| d.files.get(i).cloned())
+                });
+                if let Some(next) = next { self.open(next); }
+                else {
+                    self.directory = None;
+                    self.pending_fit = false;
+                    self.pending_actual = false;
+                    self.zoom_flash = None;
+                    self.view = ViewTransform { offset: Vec2::ZERO, scale: 1.0 };
+                }
+            }
+        }
+        self.last_move = Instant::now();
     }
 
     /// 弹出打开文件对话框。
@@ -1088,8 +1231,8 @@ impl App {
         let enabled = navigation_enabled(index, count);
         let rects = ui::side_navigation_rects(ctx.screen_rect());
         for (side, (icon, step, label)) in [
-            (Icon::Prev, -1, "上一张 (←)"),
-            (Icon::Next, 1, "下一张 (→)"),
+            (Icon::Prev, -1, "上一张 (A / ←)"),
+            (Icon::Next, 1, "下一张 (D / →)"),
         ].into_iter().enumerate() {
             let response = egui::Area::new(egui::Id::new(("iv-side-navigation", side)))
                 .order(egui::Order::Foreground)
@@ -1467,8 +1610,8 @@ impl App {
         }
     }
 
-    /// 画布右键菜单：像素 / 文件 / 导航 / 视图 / 属性 / 主题。
-    fn draw_context_menu(&mut self, ui: &mut egui::Ui, canvas: egui::Rect) {
+    /// 精简菜单只放文件操作与图像检查；视图/通道/动画功能由工具栏和快捷键提供。
+    fn draw_context_menu(&mut self, ui: &mut egui::Ui, _canvas: egui::Rect) {
         ui.set_min_width(232.0);
         let has_image = self.current.is_some();
         let ctx = ui.ctx().clone();
@@ -1537,9 +1680,24 @@ impl App {
                 }
                 self.ctx_menu_pos = None;
             }
+            if ui::menu_item(ui, "删除图片…", "Del", false, &pal).clicked() {
+                self.request_delete();
+            }
             ui::menu_sep(ui, &pal);
         }
 
+        if has_image {
+            ui::menu_section(ui, "图像检查", &pal);
+            if ui::menu_item(ui, "图像属性…", "", false, &pal).clicked() {
+                self.show_props = true;
+                self.ctx_menu_pos = None;
+            }
+            if ui::menu_item(ui, "像素检查器…", "", false, &pal).clicked() {
+                self.show_probe = true;
+                self.ctx_menu_pos = None;
+            }
+            ui::menu_sep(ui, &pal);
+        }
         if ui::menu_item(ui, "打开文件…", "Ctrl+O", false, &pal).clicked() {
             self.open_dialog();
             self.ctx_menu_pos = None;
@@ -1547,154 +1705,6 @@ impl App {
         if ui::menu_item(ui, "设置…", "", false, &pal).clicked() {
             self.show_settings = true;
             self.assoc_registered = winassoc::is_registered();
-            self.ctx_menu_pos = None;
-        }
-
-        // 目录导航
-        if self
-            .directory
-            .as_ref()
-            .map(|d| d.files.len() > 1)
-            .unwrap_or(false)
-        {
-            ui::menu_sep(ui, &pal);
-            if ui::menu_item(ui, "上一张", "←", false, &pal).clicked() {
-                self.step(-1);
-                self.ctx_menu_pos = None;
-            }
-            if ui::menu_item(ui, "下一张", "→", false, &pal).clicked() {
-                self.step(1);
-                self.ctx_menu_pos = None;
-            }
-        }
-
-        if !has_image {
-            return;
-        }
-
-        // 动画播放控制
-        let anim = self
-            .current
-            .as_ref()
-            .map(|c| c.img.frames.len())
-            .unwrap_or(0);
-        if anim > 1 {
-            ui::menu_sep(ui, &pal);
-            ui::menu_section(ui, "动画", &pal);
-            let playback = if self.playing {
-                "暂停动画"
-            } else {
-                "播放动画"
-            };
-            if ui::menu_item(ui, playback, "Space", self.playing, &pal).clicked() {
-                self.toggle_play();
-                self.ctx_menu_pos = None;
-            }
-            if ui::menu_item(ui, "上一帧", ",", false, &pal).clicked() {
-                self.step_frame(-1);
-                self.ctx_menu_pos = None;
-            }
-            if ui::menu_item(ui, "下一帧", ".", false, &pal).clicked() {
-                self.step_frame(1);
-                self.ctx_menu_pos = None;
-            }
-        }
-
-        // 视图操作
-        ui::menu_sep(ui, &pal);
-        ui::menu_section(ui, "视图", &pal);
-        if ui::menu_item(ui, "适配窗口", "F", false, &pal).clicked() {
-            self.fit(canvas.size());
-            self.ctx_menu_pos = None;
-        }
-        if ui::menu_item(ui, "实际大小 100%", "0", false, &pal).clicked() {
-            self.actual_size(canvas.size());
-            self.ctx_menu_pos = None;
-        }
-        if ui::menu_item(ui, "放大", "滚轮 ↑", false, &pal).clicked() {
-            self.zoom_at(canvas.center(), 1.25);
-            self.ctx_menu_pos = None;
-        }
-        if ui::menu_item(ui, "缩小", "滚轮 ↓", false, &pal).clicked() {
-            self.zoom_at(canvas.center(), 0.8);
-            self.ctx_menu_pos = None;
-        }
-        if ui::menu_item(ui, "最近邻采样", "N", self.nearest, &pal).clicked() {
-            self.nearest = !self.nearest;
-            self.ctx_menu_pos = None;
-        }
-        let is_hdr = self.current.as_ref().is_some_and(|c| c.img.is_hdr);
-        if is_hdr {
-            ui::menu_section(ui, "HDR 曝光", &pal);
-            ui.add(
-                Slider::new(&mut self.exposure, 0.01..=64.0)
-                    .logarithmic(true)
-                    .show_value(true),
-            );
-        }
-
-        // 通道（内联按钮行，替代 egui 子菜单）
-        ui::menu_sep(ui, &pal);
-        ui::menu_section(ui, "通道", &pal);
-        ui.horizontal(|ui| {
-            for (target, label, tip) in [
-                (
-                    ChannelMode::Rgb,
-                    "RGB",
-                    "完整 RGBA（5 或 C），O 键忽略 Alpha",
-                ),
-                (ChannelMode::R, "R", "红通道 (1)"),
-                (ChannelMode::G, "G", "绿通道 (2)"),
-                (ChannelMode::B, "B", "蓝通道 (3)"),
-                (ChannelMode::A, "A", "Alpha 通道 (4)"),
-            ] {
-                if ui::segment_button(ui, label, self.channel == target, &pal)
-                    .on_hover_text(tip)
-                    .clicked()
-                {
-                    self.channel = target;
-                    self.ctx_menu_pos = None;
-                }
-            }
-        });
-        // mip（多 mip 时内联列出）
-        let mip_sizes: Vec<(u32, u32)> = self
-            .current
-            .as_ref()
-            .map(|c| c.img.mips.iter().map(|m| (m.width, m.height)).collect())
-            .unwrap_or_default();
-        if mip_sizes.len() > 1 {
-            ui::menu_sep(ui, &pal);
-            ui::menu_section(ui, "Mip 级别", &pal);
-            let before = self.mip_index;
-            for (i, (w, h)) in mip_sizes.iter().enumerate() {
-                let label = format!("Mip {i} · {w}×{h}");
-                if ui::menu_item(ui, &label, "", self.mip_index == i, &pal).clicked() {
-                    self.mip_index = i;
-                    self.ctx_menu_pos = None;
-                }
-            }
-            if self.mip_index != before {
-                self.upload_current_mip();
-                self.auto_fit = true;
-            }
-        }
-
-        ui::menu_sep(ui, &pal);
-        if ui::menu_item(ui, "图像属性…", "", false, &pal).clicked() {
-            self.show_props = true;
-            self.ctx_menu_pos = None;
-        }
-        if ui::menu_item(ui, "像素检查器…", "", false, &pal).clicked() {
-            self.show_probe = true;
-            self.ctx_menu_pos = None;
-        }
-        let theme_label = match self.theme {
-            ThemeMode::Dark => "切换到浅色主题",
-            ThemeMode::Light => "切换到深色主题",
-        };
-        if ui::menu_item(ui, theme_label, "T", false, &pal).clicked() {
-            self.toggle_theme(&ctx);
             self.ctx_menu_pos = None;
         }
     }
@@ -2109,6 +2119,7 @@ impl eframe::App for App {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.poll_delete(ctx);
         self.handle_loader_messages();
         self.update_window_title(ctx);
         let pal = ui::palette(ctx);
@@ -2297,6 +2308,7 @@ impl eframe::App for App {
         let (canvas_rect, canvas_hover) = egui::CentralPanel::default()
             .frame(Frame::default().fill(pal.canvas))
             .show(ctx, |ui| {
+                ui.set_enabled(!self.delete_active());
                 let rect = ui.available_rect_before_wrap();
                 if let Some(tex_id) = backdrop_tex_id {
                     // 伪磨砂：窗口背后画面的模糊快照铺满画布
@@ -2441,26 +2453,29 @@ impl eframe::App for App {
         // 玻璃区域每帧重建：各悬浮层绘制时收集其矩形与淡入系数
         self.glass_regions.clear();
         self.update_overlay_visibility(ctx);
-        self.draw_side_navigation(ctx, &pal);
-        self.draw_top_overlay(ctx, &pal);
-        self.draw_context_tools_overlay(ctx, &pal);
-        self.draw_error_overlay(ctx, &pal);
-        self.draw_bottom_overlay(ctx, &pal);
-        self.draw_ctx_menu_overlay(ctx, &pal, canvas_rect);
-        self.draw_props_window(ctx, &pal);
-        self.draw_probe_window(ctx, &pal);
-        self.draw_settings_window(ctx, &pal);
-        // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
-        if let Some(drag) = &self.right_window_drag {
-            if ctx.input(|i| i.pointer.button_down(PointerButton::Secondary)) && drag.advance() {
-                ctx.set_cursor_icon(CursorIcon::Move);
-                ctx.request_repaint_after(Duration::from_millis(16));
+        if !self.delete_active() {
+            self.draw_side_navigation(ctx, &pal);
+            self.draw_top_overlay(ctx, &pal);
+            self.draw_context_tools_overlay(ctx, &pal);
+            self.draw_error_overlay(ctx, &pal);
+            self.draw_bottom_overlay(ctx, &pal);
+            self.draw_ctx_menu_overlay(ctx, &pal, canvas_rect);
+            self.draw_props_window(ctx, &pal);
+            self.draw_probe_window(ctx, &pal);
+            self.draw_settings_window(ctx, &pal);
+            // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
+            if let Some(drag) = &self.right_window_drag {
+                if ctx.input(|i| i.pointer.button_down(PointerButton::Secondary)) && drag.advance() {
+                    ctx.set_cursor_icon(CursorIcon::Move);
+                    ctx.request_repaint_after(Duration::from_millis(16));
+                } else {
+                    self.right_window_drag = None;
+                }
             } else {
-                self.right_window_drag = None;
+                borderless_chrome(ctx);
             }
-        } else {
-            borderless_chrome(ctx);
         }
+        self.draw_delete_dialog(ctx, &pal);
 
         // 像素检查器（光标 → 图像坐标 → 像素值）
         // 右键菜单弹出 / 拖拽时 hover 消失 → 冻结上一帧值；指针离开窗口才清空
@@ -2888,5 +2903,45 @@ mod folder_open_tests {
         ] {
             assert_eq!(containing_directory(Path::new(file)).unwrap(), Path::new(directory));
         }
+    }
+}
+
+/// New shortcuts only belong to the viewer, not text fields or other open UI.
+fn viewer_shortcuts_allowed(wants_keyboard: bool, overlay_open: bool) -> bool {
+    !wants_keyboard && !overlay_open
+}
+fn fresh_delete_press(events: &[egui::Event]) -> bool {
+    events.iter().any(|e| matches!(e, egui::Event::Key {
+        key: Key::Delete, pressed: true, repeat: false, modifiers, ..
+    } if *modifiers == egui::Modifiers::NONE))
+}
+fn next_index_after_delete(old_index: usize, remaining: usize) -> Option<usize> {
+    if remaining == 0 { None } else { Some(old_index.min(remaining - 1)) }
+}
+
+#[cfg(test)]
+mod menu_key_tests {
+    use super::*;
+    #[test]
+    fn text_fields_and_overlays_do_not_trigger_viewer_shortcuts() {
+        assert!(viewer_shortcuts_allowed(false, false));
+        assert!(!viewer_shortcuts_allowed(true, false));
+        assert!(!viewer_shortcuts_allowed(false, true));
+    }
+    #[test]
+    fn delete_is_single_press_and_never_shift_delete() {
+        let event = |modifiers, repeat| egui::Event::Key {
+            key: Key::Delete, physical_key: None, pressed: true, repeat, modifiers,
+        };
+        assert!(fresh_delete_press(&[event(egui::Modifiers::NONE, false)]));
+        assert!(!fresh_delete_press(&[event(egui::Modifiers::SHIFT, false)]));
+        assert!(!fresh_delete_press(&[event(egui::Modifiers::CTRL, false)]));
+        assert!(!fresh_delete_press(&[event(egui::Modifiers::NONE, true)]));
+    }
+    #[test]
+    fn delete_advances_then_falls_back_then_clears() {
+        assert_eq!(next_index_after_delete(1, 2), Some(1));
+        assert_eq!(next_index_after_delete(2, 2), Some(1));
+        assert_eq!(next_index_after_delete(0, 0), None);
     }
 }
