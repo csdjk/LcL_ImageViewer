@@ -82,3 +82,7 @@ IV-P1-01 UI 验收工具链
 ## 2026-09-14 新拟态任务实施记录
 
 `IV-P1-N01` DONE，已合入main（`635b7dcc195c5c220882cb9589b3762ebc124eff`）并通过main tests15/check/release及Release双主题实机复验。用户新视觉规范优先于旧玻璃装饰参数。完整多DPI、捕获恢复、性能及其他矩阵未全部覆盖，P1仍为ACTIVE，P2仍受门禁约束。NEXT为IV-P1-01；复用本轮tools/ui-qa而非重写截图入口。
+
+## 两侧导航与1秒隐藏追加任务
+
+`IV-P1-N02` / `IV-P1-N03` DONE，集成 `6de1d75f8b9ccb511246f61efc6efeaef3c96f9d`，main tests21/check/release及隔离profile实机复验通过。N03仅两侧按钮使用玻璃材质，其余保留新拟态。P1仍ACTIVE，NEXT为IV-P1-01；其他DPI/性能等门禁未覆盖。

@@ -2,7 +2,7 @@
 
 <!-- project-stage: P1 -->
 
-> 当前阶段：**P1 ACTIVE**。用户于 2026-09-14 明确将 UI 方向改为浅色新拟态；`IV-P1-N01` 已完成并经 main 复验；用户追加1秒自动隐藏要求，本轮先执行 `IV-P1-N02`，之后恢复 `IV-P1-01`。
+> 当前阶段：**P1 ACTIVE**。N01新拟态、N02的1秒隐藏和N03两侧玻璃导航均已集成复验；当前NEXT为 `IV-P1-01`。
 
 ## 执行规则
 
@@ -22,8 +22,8 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N03 | 窗口两侧半透明磨砂切图按钮 | REVIEW | ChatGPT-AgentDock | 用户追加需求；串行复用 N02 的1秒计时 | `crates/iv-viewer/src/{app.rs,ui.rs,main.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md` | 左右边缘垂直居中；顶栏移除重复箭头；半透明真实场景模糊；边界禁用；1秒隐藏恢复；tests/check/release及双主题双尺寸实机验收 |
-| IV-P1-N02 | 菜单栏 1 秒自动隐藏 | REVIEW | ChatGPT-AgentDock | 用户最新授权 / IV-P1-N01 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/autohide-actions.json`, `docs/ui-qa/自动隐藏1秒验收.md` | 等待1秒；淡入120ms/淡出180ms不变；计时边界测试；实机双主题双尺寸隐藏恢复；tests/check/release PASS |
+| IV-P1-N03 | 窗口两侧半透明磨砂切图按钮 | DONE | ChatGPT-AgentDock | 用户追加需求；串行复用 N02 的1秒计时 | `crates/iv-viewer/src/{app.rs,ui.rs,main.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md` | 左右边缘垂直居中；顶栏移除重复箭头；半透明真实场景模糊；边界禁用；1秒隐藏恢复；tests/check/release及双主题双尺寸实机验收 |
+| IV-P1-N02 | 菜单栏 1 秒自动隐藏 | DONE | ChatGPT-AgentDock | 用户最新授权 / IV-P1-N01 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/autohide-actions.json`, `docs/ui-qa/自动隐藏1秒验收.md` | 等待1秒；淡入120ms/淡出180ms不变；计时边界测试；实机双主题双尺寸隐藏恢复；tests/check/release PASS |
 | IV-P1-N01 | 浅色单色系新拟态 UI | DONE | ChatGPT-AgentDock | 用户最新授权 / P0 VALIDATED | `crates/iv-viewer/src/{ui.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md`, `README.md` | 12–16pt 圆角；双主题单色系；多层双向柔影；凸起/凹陷、禁用/焦点；图片功能不变；真实双主题双尺寸/关键交互截图；tests/check/release build PASS |
 | IV-P1-01 | 建立可重复的 Windows UI 截图验收工具链 | READY | — | P0 VALIDATED | `tools/ui-qa/**`, `docs/ui-qa/**`; 运行产物写入忽略目录 | 动态发现窗口；记录 commit/输入/主题/状态/逻辑与物理客户区/DPI；可重复捕获至少 880×560 与 1280×860；无固定 HWND/旧机器路径；workspace tests PASS |
 | IV-P1-02 | 补齐新拟态 UI 视觉/交互矩阵并闭环范围内缺陷 | BACKLOG | — | IV-P1-01 | `crates/iv-viewer/src/{app.rs,ui.rs,render.rs,image.wgsl,backdrop.rs}`, `docs/ui-qa/**` | 深浅主题、两种视口、关键交互/弹层/长文本有实际截图；对比度与裁切有记录；发现的本轮缺陷修复后重截；workspace tests PASS |
@@ -33,9 +33,8 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-N02 BLOCKED — 等待关闭运行中的旧Debug查看器
-AFTER: IV-P1-01 READY
-COMPLETED: IV-P1-N01 DONE
+NOW: IV-P1-01 READY
+COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
 
@@ -70,9 +69,9 @@ Worker HEAD: `7343033`；功能源码 `62b5163`。15 tests、check、release bui
 
 Owner: ChatGPT-AgentDock；Branch: `codex/iv-p1-n02-autohide-1s`；Worktree: `Temp/worktrees/autohide-1s`；Base: `ad607e9bd32baad96f056cc80d152d468bfe28ab`。用户只要求等待改为1秒，不改变样式、动画或图片功能。
 
-## IV-P1-N02 当前阻塞
+## IV-P1-N02 阻塞解除
 
-源码 `a23f07d` 已完成1秒计时调整；16tests/check/Release构建通过，新Release位于主工作区target/release。旧target/debug/imageview.exe仍在运行，未强制终止。Debug更新及本次实机复验未完成，功能分支尚未合入main；关闭旧查看器后从现有分支恢复，不重复实现。证据与恢复步骤位于该分支docs/ui-qa/自动隐藏1秒验收.md。
+已随N03串行集成并复验。N03增加显式QA隔离profile，在不关闭用户旧Debug、不覆盖其偏好的前提下完成当前Release双主题/双尺寸隐藏恢复验收，旧阻塞已解除。等待1秒、动画不变，点击也重置等待以支持连续切图。
 
 ## IV-P1-N03 执行合同
 
@@ -83,3 +82,7 @@ Owner: ChatGPT-AgentDock；Branch: `codex/iv-p1-n03-side-glass`；Worktree: `Tem
 ## N03 / N02 集成审查
 
 N03 Worker HEAD `31947ea`，功能源码 `7611014`，串行包含N02提交。Allowed Paths核对通过，21tests/check/release PASS；最终64张实机截图四组标题/边界/隐藏恢复/图片ROI检查通过。隔离profile解除N02旧窗口占用的验收阻塞，用户旧Debug不动；两任务进入main串行集成复验。
+
+## N02 / N03 完成记录
+
+集成提交 `6de1d75f8b9ccb511246f61efc6efeaef3c96f9d`；main tests21/check/release PASS。最终任务源码64张截图、main Release40张截图及标题/像素检查通过。用户旧Debug及其配置保留。完整证据见 `docs/ui-qa/两侧玻璃导航验收.md`；未push。NEXT恢复IV-P1-01，P1不标为VALIDATED。
