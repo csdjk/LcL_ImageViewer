@@ -255,13 +255,6 @@ impl WindowDrag {
         })
     }
 
-    /// 设置标题左键与右键共用屏幕坐标差，不进入系统模态拖动循环。
-    pub fn begin_left(hwnd: isize, press_client: [f32; 2], pixels_per_point: f32) -> Option<Self> {
-        let mut drag = Self::begin(hwnd, press_client, pixels_per_point)?;
-        drag.button_vk = 0x01;
-        Some(drag)
-    }
-
     /// 松键、失焦、最大化或API失败时结束，不修改窗口大小、Z序和激活状态。
     pub fn advance(&self) -> bool {
         let mut cursor = WPoint { x: 0, y: 0 };

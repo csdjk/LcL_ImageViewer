@@ -167,7 +167,8 @@ pub struct App {
     ctx_menu_pos: Option<Pos2>,
     /// 右键拖动窗口的屏幕坐标锚点；与右键单击菜单互斥。
     right_window_drag: Option<crate::backdrop::WindowDrag>,
-    settings_left_window_drag: Option<crate::backdrop::WindowDrag>,
+    /// 设置弹窗在客户区中的位置；首次居中，此后在当前会话保留拖动位置。
+    settings_popup_pos: Option<Pos2>,
     right_gesture_dragged: bool,
     /// 本帧玻璃区域（逻辑坐标矩形 + 模糊混合系数 + 圆角半径），绘制悬浮层时收集，
     /// 供图像 shader 在这些区域内做背景模糊（磨砂玻璃）
@@ -299,7 +300,7 @@ impl App {
                 == Some("on"),
             ctx_menu_pos: None,
             right_window_drag: None,
-            settings_left_window_drag: None,
+            settings_popup_pos: None,
             right_gesture_dragged: false,
             glass_regions: Vec::new(),
         };
@@ -579,9 +580,6 @@ impl App {
         }
         // Esc 逐层关闭：右键菜单 → 下拉弹窗 → 属性/设置窗口 → 退出程序
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
-            if self.settings_left_window_drag.take().is_some() {
-                return;
-            }
             if self.right_window_drag.take().is_some() {
                 self.right_gesture_dragged = true;
                 return;
@@ -1836,7 +1834,7 @@ impl App {
         }
     }
 
-    /// 设置使用单层紧凑列表；自绘标题仅移动原生窗口，不拖动内部面板。
+    /// 设置使用单层紧凑列表；标题只拖动客户区内的弹窗，不移动原生窗口。
     fn draw_settings_window(&mut self, ctx: &egui::Context, pal: &Palette) {
         if !self.show_settings {
             return;
@@ -1845,34 +1843,43 @@ impl App {
         let content_width = ui::SETTINGS_CONTENT_WIDTH.min((screen.width() - 64.0).max(280.0));
         let scroll_height = (screen.height() - 144.0).max(180.0);
         let mut close = false;
-        egui::Window::new("设置")
+        let mut popup_delta = Vec2::ZERO;
+        let window = egui::Window::new("设置")
             .title_bar(false)
             .collapsible(false)
             .resizable(false)
             .movable(false)
-            .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+            .constrain_to(screen.shrink(8.0))
             .frame(egui::Frame::none()
                 .fill(pal.overlay)
                 .rounding(ui::PANEL_RADIUS)
                 .shadow(pal.shadow)
                 .inner_margin(16.0))
-            .default_width(content_width)
-            .show(ctx, |ui| {
+            .default_width(content_width);
+        let window = if let Some(pos) = self.settings_popup_pos {
+            window.fixed_pos(pos)
+        } else {
+            window.anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+        };
+        let shown = window.show(ctx, |ui| {
                 ui.set_width(content_width);
                 ui.spacing_mut().item_spacing.y = 0.0;
                 let (header, closed) = ui::settings_header(ui, pal);
                 close = closed;
-                let fixed_window = ctx.input(|i| {
-                    i.viewport().maximized.unwrap_or(false)
-                        || i.viewport().fullscreen.unwrap_or(false)
-                });
-                if !fixed_window && header.drag_started_by(PointerButton::Primary) {
-                    if let (Some(hwnd), Some(start)) = (self.hwnd, ctx.input(|i| i.pointer.press_origin())) {
-                        self.settings_left_window_drag = crate::backdrop::WindowDrag::begin_left(
-                            hwnd, [start.x, start.y], ctx.pixels_per_point());
-                    }
+                if header.dragged_by(PointerButton::Primary)
+                    || header.dragged_by(PointerButton::Secondary)
+                {
+                    // 首次起拖补齐阈值内位移，后续按逻辑坐标增量移动内部面板。
+                    let starting = header.drag_started_by(PointerButton::Primary)
+                        || header.drag_started_by(PointerButton::Secondary);
+                    popup_delta = if starting {
+                        ctx.input(|i| i.pointer.interact_pos().zip(i.pointer.press_origin()))
+                            .map_or(header.drag_delta(), |(now, start)| now - start)
+                    } else {
+                        header.drag_delta()
+                    };
+                    ctx.set_cursor_icon(CursorIcon::Grabbing);
                 }
-                self.begin_right_window_drag(ctx, &header);
                 ui.add_space(4.0);
                 egui::ScrollArea::vertical()
                     .id_source("iv-settings-scroll")
@@ -1958,6 +1965,16 @@ impl App {
                 ui.label(RichText::new(format!("{} · v{}", winassoc::APP_NAME, env!("CARGO_PKG_VERSION")))
                     .size(11.5).color(pal.faint));
             });
+        if let Some(shown) = shown {
+            if popup_delta != Vec2::ZERO || self.settings_popup_pos.is_some() {
+                // 收缩窗口或展开磨砂参数后也重新约束，保证标题与关闭按钮可见。
+                let pos = ui::clamp_settings_popup(shown.response.rect.translate(popup_delta), screen);
+                if self.settings_popup_pos != Some(pos) {
+                    self.settings_popup_pos = Some(pos);
+                    ctx.request_repaint();
+                }
+            }
+        }
         if close {
             self.show_settings = false;
         }
@@ -2338,14 +2355,7 @@ impl eframe::App for App {
             self.draw_probe_window(ctx, &pal);
             self.draw_settings_window(ctx, &pal);
             // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
-            if let Some(drag) = &self.settings_left_window_drag {
-                if ctx.input(|i| i.pointer.button_down(PointerButton::Primary)) && drag.advance() {
-                    ctx.set_cursor_icon(CursorIcon::Grabbing);
-                    ctx.request_repaint_after(Duration::from_millis(16));
-                } else {
-                    self.settings_left_window_drag = None;
-                }
-            } else if let Some(drag) = &self.right_window_drag {
+            if let Some(drag) = &self.right_window_drag {
                 if ctx.input(|i| i.pointer.button_down(PointerButton::Secondary)) && drag.advance() {
                     ctx.set_cursor_icon(CursorIcon::Move);
                     ctx.request_repaint_after(Duration::from_millis(16));

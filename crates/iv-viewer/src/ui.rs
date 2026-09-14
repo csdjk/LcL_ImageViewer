@@ -513,6 +513,15 @@ pub const SETTINGS_ROW_HEIGHT: f32 = 40.0;
 pub const SETTINGS_HEADER_HEIGHT: f32 = 40.0;
 
 /// 标题拖动区与关闭按钮严格分开，二者之间保留8点安全间隔。
+/// 限制弹窗到客户区内；极小窗口也保证左上标题与关闭区域有可访问的位置。
+pub fn clamp_settings_popup(rect: Rect, screen: Rect) -> Pos2 {
+    let bounds = screen.shrink(8.0);
+    Pos2::new(
+        rect.left().clamp(bounds.left(), (bounds.right() - rect.width()).max(bounds.left())),
+        rect.top().clamp(bounds.top(), (bounds.bottom() - rect.height()).max(bounds.top())),
+    )
+}
+
 pub fn settings_header_rects(row: Rect) -> [Rect; 2] {
     let close = Rect::from_center_size(
         Pos2::new(row.right() - 16.0, row.center().y), Vec2::splat(32.0));
@@ -525,7 +534,7 @@ pub fn settings_header(ui: &mut egui::Ui, pal: &Palette) -> (egui::Response, boo
     let [drag, close] = settings_header_rects(row);
     let response = ui.interact(drag, ui.id().with("settings-title-drag"), Sense::click_and_drag())
         .on_hover_cursor(egui::CursorIcon::Grab)
-        .on_hover_text("按住左键或右键拖动窗口");
+        .on_hover_text("按住左键或右键移动设置弹窗（主窗口不动）");
     ui.painter().text(drag.left_center(), Align2::LEFT_CENTER, "设置",
         FontId::new(18.0, FontFamily::Proportional), pal.text_bright);
     let closed = ui.allocate_ui_at_rect(close, |ui| {
@@ -1484,5 +1493,33 @@ mod settings_layout_tests {
         let expanded_height = fixed_height + 6.0 * SETTINGS_ROW_HEIGHT + 3.0 * 32.0;
         assert!(expanded_height < 560.0 - 48.0);
         assert!(SETTINGS_CONTENT_WIDTH + frame_margin < 880.0 - 48.0);
+    }
+}
+
+#[cfg(test)]
+mod settings_popup_drag_tests {
+    use super::*;
+
+    #[test]
+    fn popup_moves_in_client_coordinates() {
+        let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(880.0, 560.0));
+        let popup = Rect::from_min_size(Pos2::new(244.0, 113.0), Vec2::new(392.0, 334.0));
+        assert_eq!(clamp_settings_popup(popup.translate(Vec2::new(72.0, 36.0)), screen), Pos2::new(316.0, 149.0));
+    }
+
+    #[test]
+    fn popup_is_kept_visible_at_all_edges() {
+        let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(880.0, 560.0));
+        for (at, expected) in [(Pos2::new(-1000.0, -1000.0), Pos2::new(8.0, 8.0)),
+                               (Pos2::new(1000.0, 1000.0), Pos2::new(480.0, 218.0))] {
+            assert_eq!(clamp_settings_popup(Rect::from_min_size(at, Vec2::new(392.0, 334.0)), screen), expected);
+        }
+    }
+
+    #[test]
+    fn expanded_popup_and_small_viewports_do_not_panic() {
+        let popup = Rect::from_min_size(Pos2::new(400.0, 200.0), Vec2::new(392.0, 430.0));
+        assert_eq!(clamp_settings_popup(popup, Rect::from_min_size(Pos2::ZERO, Vec2::new(880.0, 560.0))), Pos2::new(400.0, 122.0));
+        assert_eq!(clamp_settings_popup(popup, Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, 240.0))), Pos2::new(8.0, 8.0));
     }
 }
