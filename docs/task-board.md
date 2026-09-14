@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-P1-N05 | 直接打开当前图片所在文件夹 | IN_PROGRESS | ChatGPT-AgentDock | 用户明确修复需求 / N04 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/ui-qa/打开所在目录验收.md` | 打开当前父目录，不使用/select；中文/空格路径、相对路径测试；实机菜单打开Explorer定位核对；tests/check/构建/main复验 |
 | IV-P1-N04 | 左键平移图像、右键拖动窗口 | DONE | ChatGPT-AgentDock | 用户2026-09-14明确授权 / N03 DONE | `crates/iv-viewer/src/{app.rs,backdrop.rs}`, `tools/ui-qa/**`, `docs/ui-qa/鼠标拖拽验收.md`, `README.md` | 左键移图不移窗；右键移窗不移图且拖后不弹菜单；单击菜单/边缘缩放/导航保留；tests/check/release及实机双主题双尺寸验证 |
 | IV-P1-N03 | 窗口两侧半透明磨砂切图按钮 | DONE | ChatGPT-AgentDock | 用户追加需求；串行复用 N02 的1秒计时 | `crates/iv-viewer/src/{app.rs,ui.rs,main.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md` | 左右边缘垂直居中；顶栏移除重复箭头；半透明真实场景模糊；边界禁用；1秒隐藏恢复；tests/check/release及双主题双尺寸实机验收 |
 | IV-P1-N02 | 菜单栏 1 秒自动隐藏 | DONE | ChatGPT-AgentDock | 用户最新授权 / IV-P1-N01 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/autohide-actions.json`, `docs/ui-qa/自动隐藏1秒验收.md` | 等待1秒；淡入120ms/淡出180ms不变；计时边界测试；实机双主题双尺寸隐藏恢复；tests/check/release PASS |
@@ -34,7 +35,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-01 READY
+NOW: IV-P1-N05 IN_PROGRESS
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -97,3 +98,7 @@ N04分支复验：24tests/check/Debug及Release构建通过，48张双主题双�
 ## N04 完成记录
 
 功能集成 `dec4c0abf81a873277fbc5d22cb2485f5c5fbad5`；main24tests/check/Debug/Release及24张实机复验通过，分支48张截图四组几何/像素检查通过。两种构建已同步更新；保留旧用户窗口，不改系统快捷方式/关联，不push。详细结果见 `docs/ui-qa/鼠标拖拽验收.md`。
+
+## N05 执行合同及领取记录
+
+用户要求在资源管理器中直接打开当前文件所在目录。READY后领取，独立分支 `codex/iv-p1-n05-open-folder`，工作树 `Temp/worktrees/open-folder`，基线 `1fd9489`。只更换菜单文件操作和必要的路径测试/验收，保留旧功能；不修改文件关联、不关闭用户窗口、不push。运行程序占用时使用有明确标识的备用构建路径，避免覆盖或终止运行中的程序。完成后集成本地main、复验并记录实际产物。

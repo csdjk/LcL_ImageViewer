@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。以磁盘、Git和可重复实机结果为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N05 -->
 
 ## 当前实现
 
@@ -27,7 +27,7 @@ N01新拟态主题、N02的1秒隐藏、N03两侧玻璃导航、N04鼠标手势�
 
 ## NEXT
 
-NOW: IV-P1-01 READY — 完善通用验收入口。
+NOW: IV-P1-N05 IN_PROGRESS — 修复为直接打开当前图片所在目录；之后恢复IV-P1-01。
 
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 / IV-P1-N04 DONE。
 
