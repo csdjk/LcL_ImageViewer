@@ -2352,7 +2352,16 @@ impl eframe::App for App {
                     canvas_pan_allowed(button, drag_from_edge, secondary_down) && resp.dragged_by(button)
                 });
                 if pan && self.current.is_some() {
-                    self.view.offset += resp.drag_delta();
+                    // 起拖时补上越过拖拽阈值前的位移，避免手感滞后。
+                    let starting = resp.drag_started_by(PointerButton::Primary)
+                        || resp.drag_started_by(PointerButton::Middle);
+                    let delta = if starting {
+                        ctx.input(|i| i.pointer.interact_pos().zip(i.pointer.press_origin()))
+                            .map_or(resp.drag_delta(), |(now, start)| now - start)
+                    } else {
+                        resp.drag_delta()
+                    };
+                    self.view.offset += delta;
                     self.auto_fit = false;
                     ctx.set_cursor_icon(CursorIcon::Grabbing);
                 }
