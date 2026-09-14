@@ -2,7 +2,7 @@
 
 <!-- project-stage: P1 -->
 
-> 当前阶段：**P1 ACTIVE**。N01新拟态、N02的1秒隐藏和N03两侧玻璃导航均已集成复验；N04鼠标手势已集成复验，当前NEXT为 `IV-P1-01`。
+> 当前阶段：**P1 ACTIVE**。N01–N08均已集成复验；当前NEXT为 `IV-P1-01`。
 
 ## 执行规则
 
@@ -22,8 +22,8 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N08 | 设置页紧凑列表与标题拖窗 | REVIEW | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
-| IV-P1-N07 | 右键菜单去掉分类与分组空白 | REVIEW | ChatGPT-AgentDock | 用户最新需求 / N06 DONE | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/无分类菜单验收.md` | 连续单列无分类；功能/快捷键保留；tests/check/构建及双主题双尺寸实机验证 |
+| IV-P1-N08 | 设置页紧凑列表与标题拖窗 | DONE | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
+| IV-P1-N07 | 右键菜单去掉分类与分组空白 | DONE | ChatGPT-AgentDock | 用户最新需求 / N06 DONE | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/无分类菜单验收.md` | 连续单列无分类；功能/快捷键保留；tests/check/构建及双主题双尺寸实机验证 |
 | IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | DONE | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
 | IV-P1-N05 | 直接打开当前图片所在文件夹 | DONE | ChatGPT-AgentDock | 用户明确修复需求 / N04 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/ui-qa/打开所在目录验收.md` | 打开当前父目录，不使用/select；中文/空格路径、相对路径测试；实机菜单打开Explorer定位核对；tests/check/构建/main复验 |
 | IV-P1-N04 | 左键平移图像、右键拖动窗口 | DONE | ChatGPT-AgentDock | 用户2026-09-14明确授权 / N03 DONE | `crates/iv-viewer/src/{app.rs,backdrop.rs}`, `tools/ui-qa/**`, `docs/ui-qa/鼠标拖拽验收.md`, `README.md` | 左键移图不移窗；右键移窗不移图且拖后不弹菜单；单击菜单/边缘缩放/导航保留；tests/check/release及实机双主题双尺寸验证 |
@@ -38,7 +38,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-N08 REVIEW
+NOW: IV-P1-01 READY
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -133,3 +133,11 @@ READY后串行领取。Base `2452ffacd7d6d81f5d0fe018c1b2c8ced164dbdd`；branch 
 N08范围补充：设置标题左键复用已有物理坐标WindowDrag，只新增按键标识与独立状态，避免系统StartDrag吞掉起拖前位移；原右键行为及系统关联不变。
 
 N08 Review：源码3c89b47；37tests/check/双构建通过，双主题双尺寸104张最终截图及几何/配置回归PASS。范围7文件已检查，串行集成后补齐N07/N08主线收尾。
+
+## N07 收尾完成
+
+原功能集成 `2452ffa` 保留。本轮在main `d3299f57c1c0680beb2cfc4eec884a4239d62445` 重建并补齐未完成的主线复验：专门入口 `flat-menu-main-finish-dark-880` 10张，含/不含像素行、属性、Delete确认取消、A/D和隐藏恢复PASS；N08主线52张同样覆盖双主题无分类菜单。实际查看截图无分类标题和组间空白；测试文件未变。N07为DONE。
+
+## N08 完成记录
+
+Worker源码 `3c89b47`，验收提交 `f1ba462`；功能集成 `d3299f57c1c0680beb2cfc4eec884a4239d62445`。37tests/check/Debug/Release均PASS；分支104张及main52张真实设置回归通过，标题三种拖动准确跟手，正文/开关/两条滑条零窗口位移，参数保存、主题、关闭、菜单、A/D及删除确认取消通过。常规Debug/Release已更新；没有系统关联写入、push或发布。完整证据见 `docs/ui-qa/紧凑设置页验收.md`。NEXT恢复IV-P1-01；P1仍ACTIVE。

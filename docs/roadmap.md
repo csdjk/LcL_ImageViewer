@@ -98,3 +98,7 @@ IV-P1-N05 DONE：菜单直接打开当前图片父目录；29tests/check/构建�
 ## 菜单与图片快捷键
 
 IV-P1-N06 DONE：精简右键菜单、A/D导航及确认后回收站删除。main `85bb27e077d62356f2e6957f6fd2e0b0834d0e6f` 35tests/check/双构建、双主题实机复验通过；P1仍ACTIVE，NEXT为IV-P1-01。
+
+## 设置精简与菜单收尾
+
+N07/N08 DONE：无分类右键菜单、紧凑设置及标题左/右键整体拖窗。main `d3299f57c1c0680beb2cfc4eec884a4239d62445` 37tests/check/双构建、52张设置和10张菜单专门复验PASS。保留实际功能与偏好，未执行系统集成按钮。P1仍ACTIVE，NEXT为IV-P1-01；其他DPI/性能/辅助功能等门禁保留。
