@@ -697,13 +697,13 @@ impl App {
         self.theme = ThemeMode::toggle(ctx);
     }
 
-    /// 悬浮层自动显隐：指针移动或按住鼠标操作时显示，
+    /// 悬浮层自动显隐：指针移动、点击或按住鼠标操作时显示，
     /// 指针静止 1s 后淡出。控件的持久焦点和静止悬停不能阻止淡出。
     fn update_overlay_visibility(&mut self, ctx: &egui::Context) {
         if ctx.input(|i| {
             i.events
                 .iter()
-                .any(|event| matches!(event, egui::Event::PointerMoved(_)))
+                .any(overlay_pointer_activity)
         }) {
             self.last_move = Instant::now();
         }
@@ -2622,6 +2622,11 @@ fn borderless_chrome(ctx: &egui::Context) {
     }
 }
 
+/// 点击也重置1秒计时，避免指针不移动时连续切图触发中途隐藏。
+fn overlay_pointer_activity(event: &egui::Event) -> bool {
+    matches!(event, egui::Event::PointerMoved(_) | egui::Event::PointerButton { .. })
+}
+
 /// 不循环目录，不在第一张/最后一张提供无效切换；单图目录隐藏两侧导航。
 fn navigation_enabled(index: usize, count: usize) -> [bool; 2] {
     [count > 1 && index > 0 && index < count, count > 1 && index < count - 1]
@@ -2676,8 +2681,22 @@ fn edge_cursor(d: ResizeDirection) -> CursorIcon {
 
 #[cfg(test)]
 mod tests {
-    use super::{navigation_enabled, overlay_targets, OVERLAY_HIDE_DELAY};
+    use super::{navigation_enabled, overlay_pointer_activity, overlay_targets, OVERLAY_HIDE_DELAY};
     use std::time::Duration;
+
+    #[test]
+    fn stationary_pointer_clicks_restart_hide_timer() {
+        for pressed in [true, false] {
+            let event = eframe::egui::Event::PointerButton {
+                pos: eframe::egui::Pos2::ZERO,
+                button: eframe::egui::PointerButton::Primary,
+                pressed,
+                modifiers: eframe::egui::Modifiers::NONE,
+            };
+            assert!(overlay_pointer_activity(&event));
+        }
+        assert!(!overlay_pointer_activity(&eframe::egui::Event::PointerGone));
+    }
 
     #[test]
     fn navigation_respects_directory_boundaries() {
