@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | IN_PROGRESS | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
 | IV-P1-N05 | 直接打开当前图片所在文件夹 | DONE | ChatGPT-AgentDock | 用户明确修复需求 / N04 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/ui-qa/打开所在目录验收.md` | 打开当前父目录，不使用/select；中文/空格路径、相对路径测试；实机菜单打开Explorer定位核对；tests/check/构建/main复验 |
 | IV-P1-N04 | 左键平移图像、右键拖动窗口 | DONE | ChatGPT-AgentDock | 用户2026-09-14明确授权 / N03 DONE | `crates/iv-viewer/src/{app.rs,backdrop.rs}`, `tools/ui-qa/**`, `docs/ui-qa/鼠标拖拽验收.md`, `README.md` | 左键移图不移窗；右键移窗不移图且拖后不弹菜单；单击菜单/边缘缩放/导航保留；tests/check/release及实机双主题双尺寸验证 |
 | IV-P1-N03 | 窗口两侧半透明磨砂切图按钮 | DONE | ChatGPT-AgentDock | 用户追加需求；串行复用 N02 的1秒计时 | `crates/iv-viewer/src/{app.rs,ui.rs,main.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md` | 左右边缘垂直居中；顶栏移除重复箭头；半透明真实场景模糊；边界禁用；1秒隐藏恢复；tests/check/release及双主题双尺寸实机验收 |
@@ -35,7 +36,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-01 READY
+NOW: IV-P1-N06 IN_PROGRESS
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -106,3 +107,7 @@ N04分支复验：24tests/check/Debug及Release构建通过，48张双主题双�
 ## N05 完成记录
 
 集成 `9ba63ec28ae226af8722a2844e0998b4f3b0251c`；main29tests/check/双构建通过。分支4组、main Release2组实机菜单点击及实际Explorer父目录核验PASS，DPI96。菜单更名“打开所在文件夹”，直接传父目录，不用/select。修复版 `target/folder-fix/release/imageview.exe`，Debug已更新。原 `target/release/imageview.exe` 仍被用户运行占用，未覆盖或终止；本轮修复版位于上述备用路径。详见 `docs/ui-qa/打开所在目录验收.md`。无push/发布；NEXT恢复IV-P1-01。
+
+## N06 执行合同
+
+用户要求精简菜单及A/D切图；上一条Delete删除修复尚未执行，本轮一并完成。READY后领取，Owner ChatGPT-AgentDock，分支 `codex/iv-p1-n06-menu-keys`，工作树 `Temp/worktrees/menu-keys`，Base `dda28fddd2cbc60c9c86860170b248a4b6f29ee3`。保留文件操作、属性、像素检查、设置；移除重复的切图/视图/通道/主题/动画/Mip控制入口，功能仍由顶栏/快捷键提供。删除只在显式确认后通过IFileOperation移入回收站，拒绝非回收模式，不提供永久删除；阻止输入框、弹层和Ctrl/Alt/Shift组合误触。只回收本轮生成的测试文件，不操作用户原图。保留既有提交与用户窗口，主线验收后DONE，不push/发布。
