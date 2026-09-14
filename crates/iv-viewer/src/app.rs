@@ -1530,10 +1530,11 @@ impl App {
                     .output_mut(|o| o.copied_text = path.display().to_string());
                 self.ctx_menu_pos = None;
             }
-            if ui::menu_item(ui, "在资源管理器中显示", "", false, &pal).clicked() {
-                let _ = std::process::Command::new("explorer")
-                    .arg(format!("/select,{}", path.display()))
-                    .spawn();
+            if ui::menu_item(ui, "打开所在文件夹", "", false, &pal).clicked() {
+                // 打开当前图片的父目录，而不是用 /select 拼接文件路径。
+                if let Err(err) = open_containing_directory(&path) {
+                    self.error_msg = Some(format!("打开所在文件夹失败：{err}"));
+                }
                 self.ctx_menu_pos = None;
             }
             ui::menu_sep(ui, &pal);
@@ -2636,6 +2637,33 @@ impl eframe::App for App {
     }
 }
 
+/// 相对图片路径先转为绝对路径，再取父目录；不依赖显示字符串或图片仍存在。
+fn containing_directory(path: &Path) -> std::io::Result<PathBuf> {
+    let absolute = std::path::absolute(path)?;
+    absolute.parent().map(Path::to_path_buf).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "图片路径没有所在目录")
+    })
+}
+
+/// 参数保持为原生路径，交由 Command 处理空格/引号；不经过 cmd 或 PowerShell。
+fn containing_directory_command(path: &Path) -> std::io::Result<std::process::Command> {
+    let directory = containing_directory(path)?;
+    if !std::fs::metadata(&directory)?.is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotADirectory,
+            "图片所在路径不是文件夹",
+        ));
+    }
+    let mut command = std::process::Command::new("explorer.exe");
+    command.arg(directory);
+    Ok(command)
+}
+
+fn open_containing_directory(path: &Path) -> std::io::Result<()> {
+    containing_directory_command(path)?.spawn()?;
+    Ok(())
+}
+
 /// 从 eframe storage 读取 f32 设置项，缺失/解析失败时用默认值。
 fn load_f32(storage: Option<&dyn eframe::Storage>, key: &str, default: f32) -> f32 {
     storage
@@ -2809,5 +2837,56 @@ mod tests {
     #[test]
     fn active_interaction_keeps_bars_visible_temporarily() {
         assert_eq!(overlay_targets(true, OVERLAY_HIDE_DELAY, true), (true, true));
+    }
+}
+
+#[cfg(test)]
+mod folder_open_tests {
+    use super::{containing_directory, containing_directory_command};
+    use std::path::Path;
+
+    #[test]
+    fn bare_filename_opens_current_directory() {
+        assert_eq!(
+            containing_directory(Path::new("图片 副本.png")).unwrap(),
+            std::env::current_dir().unwrap()
+        );
+    }
+
+    #[test]
+    fn relative_nested_file_uses_its_own_directory() {
+        let expected = std::env::current_dir().unwrap().join("素材 空格");
+        assert_eq!(
+            containing_directory(Path::new("素材 空格").join("贴图.png").as_path()).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn explorer_gets_one_directory_argument_not_a_file_or_select_switch() {
+        let directory = std::env::current_dir().unwrap();
+        // 图片即使已删除，只要父目录存在仍应能打开；这里不创建或启动任何文件。
+        let command = containing_directory_command(&directory.join("未保存文件, & (副本).png")).unwrap();
+        assert_eq!(command.get_program(), "explorer.exe");
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![directory.as_os_str()]);
+    }
+
+    #[test]
+    fn missing_directory_reports_an_error_instead_of_opening_explorer_home() {
+        let path = std::env::current_dir().unwrap()
+            .join("__iv_nonexistent_parent_for_folder_test__").join("图片.png");
+        assert!(containing_directory_command(&path).is_err());
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_roots_unicode_spaces_and_punctuation_are_preserved() {
+        for (file, directory) in [
+            (r"C:\image.png", r"C:\"),
+            (r"E:\中文 素材, & (1)\图片 - 副本.png", r"E:\中文 素材, & (1)"),
+            (r"\\server\share\中文 空格\image.png", r"\\server\share\中文 空格"),
+        ] {
+            assert_eq!(containing_directory(Path::new(file)).unwrap(), Path::new(directory));
+        }
     }
 }
