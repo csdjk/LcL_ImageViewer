@@ -35,6 +35,9 @@ extern "system" {
     fn MonitorFromWindow(hwnd: isize, flags: u32) -> isize;
     fn GetMonitorInfoW(mon: isize, info: *mut MonitorInfo) -> i32;
     fn IsZoomed(hwnd: isize) -> i32;
+    fn GetCursorPos(pt: *mut WPoint) -> i32;
+    fn GetAsyncKeyState(key: i32) -> i16;
+    fn GetForegroundWindow() -> isize;
 }
 
 #[link(name = "gdi32")]
@@ -213,6 +216,86 @@ pub fn set_rounded_corners(hwnd: isize) -> bool {
 }
 
 /// 启动时把窗口夹回最近显示器的工作区：无边框窗口没有系统标题栏，
+/// 右键拖窗使用屏幕物理坐标，不模拟左键、不进入只支持左键的系统拖动循环。
+/// winit 已为真实右键按下捕获鼠标，因此移出客户区后仍能收到释放事件。
+pub struct WindowDrag {
+    hwnd: isize,
+    cursor_start: [i32; 2],
+    window_start: [i32; 2],
+}
+
+impl WindowDrag {
+    pub fn begin(hwnd: isize, press_client: [f32; 2], pixels_per_point: f32) -> Option<Self> {
+        if !pixels_per_point.is_finite() || pixels_per_point <= 0.0
+            || !press_client.iter().all(|v| v.is_finite())
+        {
+            return None;
+        }
+        let mut owner = 0u32;
+        let mut window = WRect { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut cursor = WPoint {
+            x: (press_client[0] * pixels_per_point).round() as i32,
+            y: (press_client[1] * pixels_per_point).round() as i32,
+        };
+        unsafe {
+            GetWindowThreadProcessId(hwnd, &mut owner);
+            if owner != std::process::id() || IsIconic(hwnd) != 0 || IsZoomed(hwnd) != 0
+                || GetWindowRect(hwnd, &mut window) == 0
+                || ClientToScreen(hwnd, &mut cursor) == 0
+            {
+                return None;
+            }
+        }
+        Some(Self {
+            hwnd,
+            cursor_start: [cursor.x, cursor.y],
+            window_start: [window.left, window.top],
+        })
+    }
+
+    /// 松键、失焦、最大化或API失败时结束，不修改窗口大小、Z序和激活状态。
+    pub fn advance(&self) -> bool {
+        let mut cursor = WPoint { x: 0, y: 0 };
+        let mut window = WRect { left: 0, top: 0, right: 0, bottom: 0 };
+        unsafe {
+            if GetAsyncKeyState(0x02) >= 0 || GetForegroundWindow() != self.hwnd
+                || IsIconic(self.hwnd) != 0 || IsZoomed(self.hwnd) != 0
+                || GetCursorPos(&mut cursor) == 0 || GetWindowRect(self.hwnd, &mut window) == 0
+            {
+                return false;
+            }
+            let target = dragged_window_origin(self.window_start, self.cursor_start, [cursor.x, cursor.y]);
+            if [window.left, window.top] == target {
+                return true;
+            }
+            SetWindowPos(self.hwnd, 0, target[0], target[1], 0, 0,
+                0x0001 | 0x0004 | 0x0010) != 0 // NOSIZE | NOZORDER | NOACTIVATE
+        }
+    }
+}
+
+fn dragged_window_origin(window: [i32; 2], start: [i32; 2], cursor: [i32; 2]) -> [i32; 2] {
+    [window[0].saturating_add(cursor[0].saturating_sub(start[0])),
+     window[1].saturating_add(cursor[1].saturating_sub(start[1]))]
+}
+
+#[cfg(test)]
+mod window_drag_tests {
+    use super::dragged_window_origin;
+
+    #[test]
+    fn drag_uses_absolute_screen_delta_without_position_feedback() {
+        assert_eq!(dragged_window_origin([40, 60], [200, 300], [280, 345]), [120, 105]);
+        assert_eq!(dragged_window_origin([40, 60], [200, 300], [280, 345]), [120, 105]);
+        assert_eq!(dragged_window_origin([40, 60], [200, 300], [200, 300]), [40, 60]);
+    }
+
+    #[test]
+    fn physical_coordinates_support_negative_monitor_origins() {
+        assert_eq!(dragged_window_origin([-1800, -50], [-1600, 100], [-1500, 25]), [-1700, -125]);
+    }
+}
+
 /// 若上次退出时窗口被拖到屏幕外，恢复后将无从抓取（仅剩任务栏右键）。
 /// 仅在首帧调用一次（不影响用户之后正常拖动到任意位置）。
 pub fn clamp_window_onscreen(hwnd: isize) {

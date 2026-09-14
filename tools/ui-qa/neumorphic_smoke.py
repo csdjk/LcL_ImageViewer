@@ -142,7 +142,8 @@ def capture(hwnd, output: Path):
         if hi - lo < 4 or hi <= 4:
             raise RuntimeError('Blank or uniform capture; no usable UI evidence')
         img.save(output)
-        return {'physical_client': [cw, ch], 'logical_client': [cw * 96 / dpi, ch * 96 / dpi],
+        return {'physical_window': [wr.left, wr.top, wr.right, wr.bottom],
+                'physical_client': [cw, ch], 'logical_client': [cw * 96 / dpi, ch * 96 / dpi],
                 'dpi': dpi, 'scale': dpi / 96, 'crop': [left, top, cw, ch],
                 'capture_method': 'PrintWindow(PW_RENDERFULLCONTENT), client-only RGB crop'}
     finally:
@@ -305,6 +306,45 @@ def run(args):
                     u.mouse_event(up, 0, 0, 0, 0)
                     pressed_releases.discard(up)
                 time.sleep(0.15)
+            elif kind == 'drag':
+                # Client start, then absolute screen path: never chase the moving window.
+                button = action.get('button', 'left')
+                down, up = {'left': (2, 4), 'right': (8, 16), 'middle': (32, 64)}[button]
+                move(hwnd, action['x'], action['y'])
+                wr, cr, origin, dpi = geometry(hwnd)
+                before = [wr.left, wr.top, cr.right, cr.bottom]
+                start = w.POINT()
+                checked(u.GetCursorPos(c.byref(start)), 'Read drag start')
+                u.mouse_event(down, 0, 0, 0, 0)
+                pressed_releases.add(up)
+                path = action.get('path', [[action.get('dx', 0), action.get('dy', 0)]])
+                prior = [0, 0]
+                trace = []
+                try:
+                    time.sleep(0.1)
+                    for end in path:
+                        for step in range(1, 17):
+                            x = prior[0] + (end[0] - prior[0]) * step / 16
+                            y = prior[1] + (end[1] - prior[1]) * step / 16
+                            checked(u.SetCursorPos(start.x + round(x * dpi / 96),
+                                                  start.y + round(y * dpi / 96)), 'Drag cursor')
+                            time.sleep(0.025)
+                            r, _, _, _ = geometry(hwnd)
+                            trace.append([r.left, r.top])
+                        prior = end
+                    time.sleep(0.08)
+                finally:
+                    u.mouse_event(up, 0, 0, 0, 0)
+                    pressed_releases.discard(up)
+                time.sleep(0.18)
+                wr, cr, _, _ = geometry(hwnd)
+                actual = [wr.left - before[0], wr.top - before[1], cr.right - before[2], cr.bottom - before[3]]
+                action['window_delta_physical'] = actual
+                action['window_trace'] = trace
+                if 'expect_window_delta' in action:
+                    expected = [round(v * dpi / 96) for v in action['expect_window_delta']]
+                    if any(abs(a-b)>3 for a,b in zip(actual, expected)):
+                        raise AssertionError(f'Drag {button}: window delta {actual}, expected {expected}')
             elif kind == 'key':
                 code = action['code']
                 code = ord(code.upper()) if isinstance(code, str) and len(code) == 1 else int(code)

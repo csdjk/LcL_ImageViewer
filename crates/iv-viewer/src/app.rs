@@ -156,6 +156,9 @@ pub struct App {
     reduce_motion: bool,
     /// 自绘右键菜单的打开位置（None = 关闭）
     ctx_menu_pos: Option<Pos2>,
+    /// 右键拖动窗口的屏幕坐标锚点；与右键单击菜单互斥。
+    right_window_drag: Option<crate::backdrop::WindowDrag>,
+    right_gesture_dragged: bool,
     /// 本帧玻璃区域（逻辑坐标矩形 + 模糊混合系数 + 圆角半径），绘制悬浮层时收集，
     /// 供图像 shader 在这些区域内做背景模糊（磨砂玻璃）
     glass_regions: Vec<(egui::Rect, f32, f32)>,
@@ -283,6 +286,8 @@ impl App {
                 .as_deref()
                 == Some("on"),
             ctx_menu_pos: None,
+            right_window_drag: None,
+            right_gesture_dragged: false,
             glass_regions: Vec::new(),
         };
         if let Some(p) = initial_path {
@@ -549,6 +554,10 @@ impl App {
     fn handle_global_input(&mut self, ctx: &egui::Context, canvas: Vec2) {
         // Esc 逐层关闭：右键菜单 → 下拉弹窗 → 属性/设置窗口 → 退出程序
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
+            if self.right_window_drag.take().is_some() {
+                self.right_gesture_dragged = true;
+                return;
+            }
             if self.ctx_menu_pos.is_some() {
                 self.ctx_menu_pos = None;
                 return;
@@ -732,6 +741,26 @@ impl App {
             // 静止计时到点后再评估一次，触发淡出
             let remain = OVERLAY_HIDE_DELAY.saturating_sub(self.last_move.elapsed());
             ctx.request_repaint_after(remain.max(Duration::from_millis(16)));
+        }
+    }
+
+    /// 只允许从当前响应拥有的右键拖拽启动，按钮/菜单不会穿透到画布。
+    fn begin_right_window_drag(&mut self, ctx: &egui::Context, response: &egui::Response) {
+        if !response.drag_started_by(PointerButton::Secondary) {
+            return;
+        }
+        self.right_gesture_dragged = true;
+        self.ctx_menu_pos = None;
+        let fixed_window = ctx.input(|i| {
+            i.viewport().maximized.unwrap_or(false) || i.viewport().fullscreen.unwrap_or(false)
+        });
+        if fixed_window {
+            return;
+        }
+        if let (Some(hwnd), Some(start)) = (self.hwnd, ctx.input(|i| i.pointer.press_origin())) {
+            self.right_window_drag = crate::backdrop::WindowDrag::begin(
+                hwnd, [start.x, start.y], ctx.pixels_per_point(),
+            );
         }
     }
 
@@ -1032,6 +1061,7 @@ impl App {
         // 顶栏胶囊（无边框标题栏）：空白处拖拽移动窗口，双击切换最大化/还原。
         // 按钮在更上层优先捕获指针，故仅空白处会落到胶囊本体的 drag/click。
         let resp = area.response;
+        self.begin_right_window_drag(ctx, &resp);
         if resp.drag_started_by(PointerButton::Primary) && !maximized {
             ctx.send_viewport_cmd(ViewportCommand::StartDrag);
         }
@@ -2303,10 +2333,13 @@ impl eframe::App for App {
                     // 玻璃拟态底衬：画布对角渐变（回退路径）
                     ui::paint_canvas_bg(ui.painter(), rect, &pal);
                 }
-                // 画布交互：左键拖拽移动窗口，中键拖拽平移图像，滚轮缩放。
+                // 画布左键/中键平移图像；右键拖窗；右键单击仍打开菜单。
                 let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
-                // 右键菜单（自绘悬浮菜单，支持 Esc 关闭）
-                if resp.secondary_clicked() {
+                if ctx.input(|i| i.pointer.button_pressed(PointerButton::Secondary)) {
+                    self.right_gesture_dragged = false;
+                }
+                self.begin_right_window_drag(ctx, &resp);
+                if resp.secondary_clicked() && !self.right_gesture_dragged {
                     self.ctx_menu_pos = resp.interact_pointer_pos();
                 }
                 // 从窗口边缘（6px 热区）发起的拖拽交给系统缩放（BeginResize）。
@@ -2314,12 +2347,23 @@ impl eframe::App for App {
                     .input(|i| i.pointer.press_origin())
                     .map(|p| edge_resize_dir(ctx.screen_rect(), p, 6.0).is_some())
                     .unwrap_or(false);
-                if resp.drag_started_by(PointerButton::Primary) && !drag_from_edge {
-                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
-                }
-                if resp.dragged_by(PointerButton::Middle) && !drag_from_edge {
-                    self.view.offset += resp.drag_delta();
+                let secondary_down = ctx.input(|i| i.pointer.button_down(PointerButton::Secondary));
+                let pan = [PointerButton::Primary, PointerButton::Middle].into_iter().any(|button| {
+                    canvas_pan_allowed(button, drag_from_edge, secondary_down) && resp.dragged_by(button)
+                });
+                if pan && self.current.is_some() {
+                    // 起拖时补上越过拖拽阈值前的位移，避免手感滞后。
+                    let starting = resp.drag_started_by(PointerButton::Primary)
+                        || resp.drag_started_by(PointerButton::Middle);
+                    let delta = if starting {
+                        ctx.input(|i| i.pointer.interact_pos().zip(i.pointer.press_origin()))
+                            .map_or(resp.drag_delta(), |(now, start)| now - start)
+                    } else {
+                        resp.drag_delta()
+                    };
+                    self.view.offset += delta;
                     self.auto_fit = false;
+                    ctx.set_cursor_icon(CursorIcon::Grabbing);
                 }
                 let hover_pos = resp.hover_pos();
                 if let Some(p) = hover_pos {
@@ -2406,7 +2450,16 @@ impl eframe::App for App {
         self.draw_probe_window(ctx, &pal);
         self.draw_settings_window(ctx, &pal);
         // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
-        borderless_chrome(ctx);
+        if let Some(drag) = &self.right_window_drag {
+            if ctx.input(|i| i.pointer.button_down(PointerButton::Secondary)) && drag.advance() {
+                ctx.set_cursor_icon(CursorIcon::Move);
+                ctx.request_repaint_after(Duration::from_millis(16));
+            } else {
+                self.right_window_drag = None;
+            }
+        } else {
+            borderless_chrome(ctx);
+        }
 
         // 像素检查器（光标 → 图像坐标 → 像素值）
         // 右键菜单弹出 / 拖拽时 hover 消失 → 冻结上一帧值；指针离开窗口才清空
@@ -2622,6 +2675,11 @@ fn borderless_chrome(ctx: &egui::Context) {
     }
 }
 
+/// 画布左键和中键都可平移；边缘留给缩放，右键组合不同时移动图片。
+fn canvas_pan_allowed(button: PointerButton, from_edge: bool, secondary_down: bool) -> bool {
+    matches!(button, PointerButton::Primary | PointerButton::Middle) && !from_edge && !secondary_down
+}
+
 /// 点击也重置1秒计时，避免指针不移动时连续切图触发中途隐藏。
 fn overlay_pointer_activity(event: &egui::Event) -> bool {
     matches!(event, egui::Event::PointerMoved(_) | egui::Event::PointerButton { .. })
@@ -2683,6 +2741,17 @@ fn edge_cursor(d: ResizeDirection) -> CursorIcon {
 mod tests {
     use super::{navigation_enabled, overlay_pointer_activity, overlay_targets, OVERLAY_HIDE_DELAY};
     use std::time::Duration;
+
+    #[test]
+    fn canvas_left_and_middle_pan_but_right_and_resize_do_not() {
+        use eframe::egui::PointerButton::{Primary, Secondary, Middle};
+        for button in [Primary, Middle] {
+            assert!(super::canvas_pan_allowed(button, false, false));
+            assert!(!super::canvas_pan_allowed(button, true, false));
+            assert!(!super::canvas_pan_allowed(button, false, true));
+        }
+        assert!(!super::canvas_pan_allowed(Secondary, false, false));
+    }
 
     #[test]
     fn stationary_pointer_clicks_restart_hide_timer() {
