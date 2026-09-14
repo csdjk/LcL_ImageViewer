@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N08 | 设置页紧凑列表与标题拖窗 | IN_PROGRESS | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
+| IV-P1-N08 | 设置页紧凑列表与标题拖窗 | REVIEW | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
 | IV-P1-N07 | 右键菜单去掉分类与分组空白 | REVIEW | ChatGPT-AgentDock | 用户最新需求 / N06 DONE | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/无分类菜单验收.md` | 连续单列无分类；功能/快捷键保留；tests/check/构建及双主题双尺寸实机验证 |
 | IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | DONE | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
 | IV-P1-N05 | 直接打开当前图片所在文件夹 | DONE | ChatGPT-AgentDock | 用户明确修复需求 / N04 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/ui-qa/打开所在目录验收.md` | 打开当前父目录，不使用/select；中文/空格路径、相对路径测试；实机菜单打开Explorer定位核对；tests/check/构建/main复验 |
@@ -38,7 +38,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-N08 IN_PROGRESS
+NOW: IV-P1-N08 REVIEW
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -131,3 +131,5 @@ N07 Review：Worker `515dc89b1266d952a0b3e57c4dcdd7314f85931c`，35tests/check/D
 READY后串行领取。Base `2452ffacd7d6d81f5d0fe018c1b2c8ced164dbdd`；branch `codex/iv-p1-n08-compact-settings`，worktree `Temp/worktrees/compact-settings`。移除设置分类卡片/装饰说明，保留实际设置、错误诊断和持久化键；固定设置面板随原生窗口移动，标题和顶部空白为独立拖动区，关闭/开关/滑条区域不启动拖窗。N07已在main且原工作树冻结，本轮一并补齐主线实机复验，不回滚旧功能。测试只改隔离QA profile，不执行注册/注销/默认应用等系统写入，不关闭用户窗口，不push/发布。
 
 N08范围补充：设置标题左键复用已有物理坐标WindowDrag，只新增按键标识与独立状态，避免系统StartDrag吞掉起拖前位移；原右键行为及系统关联不变。
+
+N08 Review：源码3c89b47；37tests/check/双构建通过，双主题双尺寸104张最终截图及几何/配置回归PASS。范围7文件已检查，串行集成后补齐N07/N08主线收尾。
