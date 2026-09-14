@@ -1,0 +1,143 @@
+[
+  {
+    "kind": "key",
+    "code": "1"
+  },
+  {
+    "kind": "move",
+    "x": 688,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "selected-r"
+  },
+  {
+    "kind": "key",
+    "code": "2"
+  },
+  {
+    "kind": "move",
+    "x": 722,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "selected-g"
+  },
+  {
+    "kind": "key",
+    "code": "3"
+  },
+  {
+    "kind": "move",
+    "x": 756,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "selected-b"
+  },
+  {
+    "kind": "key",
+    "code": "4"
+  },
+  {
+    "kind": "move",
+    "x": 790,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "selected-alpha"
+  },
+  {
+    "kind": "key",
+    "code": "5"
+  },
+  {
+    "kind": "move",
+    "x": 870,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "hover-fit"
+  },
+  {
+    "kind": "down"
+  },
+  {
+    "kind": "shot",
+    "name": "pressed-fit"
+  },
+  {
+    "kind": "up"
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "keyboard-focus"
+  },
+  {
+    "kind": "right-click",
+    "x": 640,
+    "y": 150
+  },
+  {
+    "kind": "shot",
+    "name": "context-menu"
+  },
+  {
+    "kind": "key",
+    "code": 27
+  },
+  {
+    "kind": "click",
+    "x": 988,
+    "y": 34
+  },
+  {
+    "kind": "shot",
+    "name": "settings"
+  },
+  {
+    "kind": "wheel",
+    "x": 700,
+    "y": 550,
+    "delta": -120
+  },
+  {
+    "kind": "shot",
+    "name": "settings-scroll"
+  },
+  {
+    "kind": "key",
+    "code": 27
+  },
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "wait",
+    "seconds": 3.2
+  },
+  {
+    "kind": "shot",
+    "name": "auto-hidden"
+  },
+  {
+    "kind": "move",
+    "x": 641,
+    "y": 430
+  },
+  {
+    "kind": "shot",
+    "name": "restored"
+  }
+]

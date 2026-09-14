@@ -135,7 +135,7 @@ pub fn palette(ctx: &egui::Context) -> Palette {
                 offset: Vec2::new(5.0, 6.0),
                 blur: 20.0,
                 spread: 0.0,
-                color: Color32::from_rgba_unmultiplied(0x12, 0x1a, 0x27, 160),
+                color: alpha(rgb(0x12, 0x1a, 0x27), 160),
             },
             glass_window: rgb(0x2c, 0x37, 0x48),
             shadow_light: rgb(0x4e, 0x60, 0x7b),
@@ -167,7 +167,7 @@ pub fn palette(ctx: &egui::Context) -> Palette {
                 offset: Vec2::new(5.0, 6.0),
                 blur: 20.0,
                 spread: 0.0,
-                color: Color32::from_rgba_unmultiplied(0x9a, 0xac, 0xc5, 105),
+                color: alpha(rgb(0x9a, 0xac, 0xc5), 105),
             },
             glass_window: rgb(0xe6, 0xeb, 0xf2),
             shadow_light: Color32::WHITE,
@@ -253,7 +253,9 @@ pub fn apply(ctx: &egui::Context) {
 /* ============================== 悬浮胶囊 ============================== */
 
 fn alpha(color: Color32, a: u8) -> Color32 {
-    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), a)
+    // egui-wgpu 0.27 的首选非 sRGB 交换链在 gamma 空间混合。
+    // 必须同步缩放 RGB/Alpha，避免线性预乘的彩色阴影在此后端变成发光描边。
+    color.gamma_multiply(a as f32 / 255.0)
 }
 
 /// 圆角轮廓及外法线；内阴影逐层向内衰减，不用硬描边模拟凹陷。
@@ -1253,6 +1255,22 @@ mod neumorphic_tests {
                 );
             }
             assert!(contrast(pal.selected_text, pal.btn_pressed) >= 4.5);
+        }
+    }
+
+    #[test]
+    fn colored_shadows_darken_in_the_gamma_framebuffer() {
+        let ctx = egui::Context::default();
+        for theme in [ThemeMode::Light, ThemeMode::Dark] {
+            ThemeMode::apply_to(&ctx, theme);
+            let pal = palette(&ctx);
+            for opacity in [32, 110, 180] {
+                let shadow = alpha(pal.shadow_dark, opacity);
+                for (src, dst) in shadow.to_array()[..3].iter().zip(&pal.bar.to_array()[..3]) {
+                    let blended = *src as f32 + *dst as f32 * (1.0 - shadow.a() as f32 / 255.0);
+                    assert!(blended <= *dst as f32 + 1.0);
+                }
+            }
         }
     }
 
