@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。本文是当前阶段和唯一 NEXT 的权威来源。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-N02 -->
+<!-- project-next: IV-P1-N03 -->
 
 ## 当前阶段
 
@@ -33,7 +33,7 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-N02 BLOCKED — 源码/Release已改为1秒，等待关闭旧Debug查看器后实机复验
+NOW: IV-P1-N03 READY — 两侧玻璃切图按钮，串行复用并验证N02的1秒隐藏
 AFTER: IV-P1-01 READY — 完善通用验收入口
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 COMPLETED: IV-P1-N01 DONE — 新拟态 UI 已集成且 main 复验
