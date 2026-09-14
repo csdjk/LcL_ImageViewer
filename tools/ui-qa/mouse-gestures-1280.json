@@ -1,0 +1,181 @@
+[
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "shot",
+    "name": "baseline"
+  },
+  {
+    "kind": "drag",
+    "button": "left",
+    "x": 640,
+    "y": 430,
+    "dx": 80,
+    "dy": 45,
+    "expect_window_delta": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "kind": "shot",
+    "name": "left-pan"
+  },
+  {
+    "kind": "drag",
+    "button": "right",
+    "x": 640,
+    "y": 430,
+    "dx": 72,
+    "dy": 36,
+    "expect_window_delta": [
+      72,
+      36,
+      0,
+      0
+    ]
+  },
+  {
+    "kind": "shot",
+    "name": "right-window"
+  },
+  {
+    "kind": "drag",
+    "button": "right",
+    "x": 640,
+    "y": 430,
+    "path": [
+      [
+        60,
+        30
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "expect_window_delta": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "kind": "shot",
+    "name": "right-out-and-back"
+  },
+  {
+    "kind": "right-click",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "shot",
+    "name": "right-click-menu"
+  },
+  {
+    "kind": "key",
+    "code": 27
+  },
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "shot",
+    "name": "menu-closed"
+  },
+  {
+    "kind": "drag",
+    "button": "middle",
+    "x": 640,
+    "y": 430,
+    "dx": -80,
+    "dy": -45,
+    "expect_window_delta": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "kind": "shot",
+    "name": "middle-pan"
+  },
+  {
+    "kind": "click",
+    "x": 1238,
+    "y": 430
+  },
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "shot",
+    "name": "next-image"
+  },
+  {
+    "kind": "drag",
+    "button": "left",
+    "x": 1278,
+    "y": 430,
+    "dx": 40,
+    "dy": 0,
+    "expect_window_delta": [
+      0,
+      0,
+      40,
+      0
+    ]
+  },
+  {
+    "kind": "drag",
+    "button": "left",
+    "x": 1318,
+    "y": 430,
+    "dx": -40,
+    "dy": 0,
+    "expect_window_delta": [
+      0,
+      0,
+      -40,
+      0
+    ]
+  },
+  {
+    "kind": "move",
+    "x": 640,
+    "y": 430
+  },
+  {
+    "kind": "shot",
+    "name": "resize-restored"
+  },
+  {
+    "kind": "wait",
+    "seconds": 1.3
+  },
+  {
+    "kind": "shot",
+    "name": "hidden"
+  },
+  {
+    "kind": "move",
+    "x": 641,
+    "y": 430
+  },
+  {
+    "kind": "shot",
+    "name": "restored"
+  }
+]
