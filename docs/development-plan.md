@@ -2,6 +2,18 @@
 
 > 本文保存复杂 Task 的执行合同。Task Board 只保留摘要、依赖和状态。
 
+## Task IV-P1-N01 — 新拟态 UI（2026-09-14 用户授权）
+
+Outcome：在现有 egui 桌面实现中统一浅色单色系新拟态样式，不重写功能和渲染架构。
+
+Allowed Paths：`crates/iv-viewer/src/ui.rs`、`crates/iv-viewer/src/app.rs`、`tools/ui-qa/**`、`docs/ui-qa/**`、`docs/新拟态UI规范.md`、`README.md`。Coordinator 在 main 维护协调文档，Worker 不修改协调状态。
+
+实现：统一色板、12/14/16pt 圆角、上左高光和下右柔影、内凹按下/选中、可辨识禁用/焦点；默认浅色并保留已有显式主题；桌面磨砂作为已有可选功能保留，新安装默认关闭。不改变图像原始数据。
+
+验收：workspace tests、cargo check、release 主程序构建；真实 Windows 双主题、880×560/1280×860、默认/悬停/按下/选中/焦点、设置/菜单、自动隐藏与恢复；输出 commit、binary hash、输入、主题、状态、客户区和 DPI 元数据。完整多 DPI、性能及剩余玻璃恢复矩阵未覆盖时如实记录，不宣称整个 P1 VALIDATED。
+
+禁止：解码/取样/关联代码、全仓格式化、覆盖用户改动、push、发布、安装包和注册表操作。业务代码在独立 Task worktree 开发；提交后串行集成本地 main 并复验。
+
 ## Task IV-P1-01 — Windows UI 截图验收工具链
 
 ### Outcome

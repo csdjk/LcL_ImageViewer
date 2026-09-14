@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。本文是当前阶段和唯一 NEXT 的权威来源。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N01 -->
 
 ## 当前阶段
 
@@ -12,6 +12,10 @@ P0 Viewer Foundation      VALIDATED
 P1 Glass UI Stabilization ACTIVE
 P2 Release Hardening      GATED BY P1 VALIDATED
 ```
+
+## 本轮用户授权
+
+2026-09-14 用户明确要求：浅色粉彩、单色系明暗变化、12–16px 圆角、多层柔和阴影、无硬边框、可交互元素具有凸起/凹陷效果。本轮新拟态规范优先于旧玻璃视觉方案；保留图像功能、已有显式偏好和历史本地提交。
 
 ## 当前真实状态
 
@@ -25,7 +29,8 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-01 READY — 建立可重复的 Windows UI 截图验收工具链
+NOW: IV-P1-N01 READY — 按用户授权实现浅色单色系新拟态
+AFTER STYLE TASK: IV-P1-01 — 完整验收工具链
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 ```
 
