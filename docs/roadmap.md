@@ -90,3 +90,7 @@ IV-P1-01 UI 验收工具链
 ## 鼠标手势追加任务
 
 IV-P1-N04 DONE：左键移图/右键移窗，main24tests/check/双构建及隔离实机复验通过。N01–N03交互与视觉保留；P1仍ACTIVE，NEXT为IV-P1-01。
+
+## 打开所在目录修复
+
+IV-P1-N05 DONE：菜单直接打开当前图片父目录；29tests/check/构建和真实Explorer目录核验通过。现有鼠标手势与视觉保留，具体部署路径见status.md；P1仍ACTIVE，NEXT为IV-P1-01。

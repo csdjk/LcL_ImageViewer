@@ -3,34 +3,34 @@
 > 更新时间：2026-09-14。以磁盘、Git和可重复实机结果为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-N05 -->
+<!-- project-next: IV-P1-01 -->
 
 ## 当前实现
 
 P0 VALIDATED；P1 UI Stabilization ACTIVE；P2仍受P1门禁约束。
 
-N01新拟态主题、N02的1秒隐藏、N03两侧玻璃导航、N04鼠标手势均已在独立工作树完成、串行合入main并复验。最新功能集成提交 `dec4c0abf81a873277fbc5d22cb2485f5c5fbad5`；最终状态文档HEAD通过Git读取。
+N01新拟态主题、N02的1秒隐藏、N03两侧玻璃导航、N04鼠标手势、N05打开图片所在文件夹均已在独立工作树完成、串行合入main并复验。最新功能集成 `9ba63ec28ae226af8722a2844e0998b4f3b0251c`；最终状态文档HEAD通过Git读取。
 
-画布左键/中键拖拽平移图像，右键拖拽移动整个窗口；右键单击仍显示菜单，右键拖出再回原位不弹菜单。保留顶部工具栏空白左键拖窗、左键窗口边缘缩放、方向键与两侧玻璃按钮切图、滚轮缩放和1秒隐藏。原图解码、Shader、取样及用户主题偏好不变。
+右键项“打开所在文件夹”直接打开当前图片的父目录，不再用/select选择文件；相对路径先转绝对路径，参数保留原生路径，不手工拼接引号。目录不可用或程序启动失败会显示提示。
 
-左右按钮保持窗口两侧居中、半透明真实场景模糊；其余UI为新拟态。首末无效方向禁用，顶栏无重复箭头。
+画布左键/中键移图，右键拖窗，右键单击菜单；保留侧边玻璃导航、窗口边缘缩放、原图解码/Shader/取样、1秒隐藏及已有用户偏好。
 
-## 最新验证
+## 最新验证与运行入口
 
-- main上24tests / 0失败；workspace check、Debug与Release构建通过。
-- N04最终分支源码48张实际Windows截图：双主题、1280×860/880×560，DPI96。
-- main重建Release后24张实机截图：浅色1280与深色880，各12状态。真实几何与像素检查通过：左键80×45平移不移动窗口，右键72×36只移动窗口，图像相对位置不变；右键拖出返回/单击菜单、Esc关菜单、中键兼容、侧导航、边缘缩放及隐藏恢复通过。
-- 证据为 `docs/ui-qa/鼠标拖拽验收.md`、`ui-verify-shots/mouse-final-*`、`ui-verify-shots/mouse-main-*`；逐张JSON记录commit、程序/输入hash、窗口标题、DPI、尺寸、窗口外框、真实拖拽轨迹。
-- Release：`target/release/imageview.exe`，SHA256 `f371791ff6e6583a1eedb764b07b8dde86d7cca91880461517d0b780bd3c74e3`。
-- Debug：`target/debug/imageview.exe`，SHA256 `f96429a241c506ab2970d20ba2a9c7f9129c64f1836f7c7c173a5c3dc62895e2`。本次两种程序均更新，旧运行窗口不会自动热更新。
-- 使用隔离QA profile，不操作用户已有窗口/文件关联/安装目录/快捷方式。没有push或发布。
+- main29tests/0失败；workspace check、Debug和Release构建通过。
+- 分支双主题双尺寸4组真实菜单操作全部PASS；main Release再验浅色1280×860与深色880×560两组PASS。全部DPI96。
+- 通过Shell.Application的实际目录和Explorer截图确认进入当前图片父目录，测试目录含中文、空格、逗号、&、括号；不是只检查spawn返回。
+- 修复版Release：`target/folder-fix/release/imageview.exe`；SHA256 `5700c72092f1d26cd8f69353f0a85c986c1f3d8f743b5bcc4bfe53b395634e2d`。
+- Debug：`target/debug/imageview.exe`；SHA256 `222c9abddbeba7620effebe3ddfdc226e65f9a89f6de2ca4fb66180505f85fee`，已同步更新。
+- 原 `target/release/imageview.exe` 仍被用户运行占用，未覆盖或终止；本轮修复版位于上述备用路径。
+- 记录：`docs/ui-qa/打开所在目录验收.md`；截图/元数据：`ui-verify-shots/folder-final-*`、`folder-main-*`。旧鼠标/导航验收记录保留。
 
 ## NEXT
 
-NOW: IV-P1-N05 IN_PROGRESS — 修复为直接打开当前图片所在目录；之后恢复IV-P1-01。
+NOW: IV-P1-01 READY — 完善通用验收入口。
 
-COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 / IV-P1-N04 DONE。
+COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 / IV-P1-N04 / IV-P1-N05 DONE。
 
 ## 保留限制
 
-全仓历史rustfmt差异未清理。其他DPI、跨屏、全部最大化/全屏手势、动画/HDR全矩阵、桌面捕获性能和完整辅助功能尚未覆盖；P1不标为VALIDATED。既有本地提交均保留；新主程序只在工程目录构建，不会更新其他安装副本或开始菜单目标。旧截图不作为新构建证明。
+既有历史提交保留，无push/发布/文件关联或快捷方式修改。用户运行中的旧窗口不会热更新。UNC仅测试路径构造，未实测网络共享/超长路径/全部权限情形。其他DPI、跨屏、完整性能与辅助功能矩阵仍未覆盖；全仓历史rustfmt差异未清理，P1不标为VALIDATED。
