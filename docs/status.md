@@ -29,7 +29,7 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-N01 READY — 按用户授权实现浅色单色系新拟态
+NOW: IV-P1-N01 IN_PROGRESS — 按用户授权实现浅色单色系新拟态
 AFTER STYLE TASK: IV-P1-01 — 完整验收工具链
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 ```
