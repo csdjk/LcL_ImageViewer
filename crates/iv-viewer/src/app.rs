@@ -1614,7 +1614,7 @@ impl App {
         }
     }
 
-    /// 精简菜单只放文件操作与图像检查；视图/通道/动画功能由工具栏和快捷键提供。
+    /// 无分类单列菜单，所有操作统一行高；视图/通道/动画由工具栏和快捷键提供。
     fn draw_context_menu(&mut self, ui: &mut egui::Ui, _canvas: egui::Rect) {
         ui.set_min_width(232.0);
         let has_image = self.current.is_some();
@@ -1625,7 +1625,7 @@ impl App {
         if let Some([r, g, b, a]) = self.probe_color {
             let hex = format!("#{r:02X}{g:02X}{b:02X}{a:02X}");
             let (header, resp) =
-                ui.allocate_exact_size(Vec2::new(ui.available_width(), 36.0), Sense::click());
+                ui.allocate_exact_size(Vec2::new(ui.available_width(), 32.0), Sense::click());
             if resp.hovered() {
                 ui.painter().rect_filled(
                     header.shrink2(Vec2::new(2.0, 1.0)),
@@ -1666,7 +1666,6 @@ impl App {
                 ui.ctx().output_mut(|o| o.copied_text = hex.clone());
                 self.ctx_menu_pos = None;
             }
-            ui::menu_sep(ui, &pal);
         }
 
         // 文件操作
@@ -1687,11 +1686,9 @@ impl App {
             if ui::menu_item(ui, "删除图片…", "Del", false, &pal).clicked() {
                 self.request_delete();
             }
-            ui::menu_sep(ui, &pal);
         }
 
         if has_image {
-            ui::menu_section(ui, "图像检查", &pal);
             if ui::menu_item(ui, "图像属性…", "", false, &pal).clicked() {
                 self.show_props = true;
                 self.ctx_menu_pos = None;
@@ -1700,7 +1697,6 @@ impl App {
                 self.show_probe = true;
                 self.ctx_menu_pos = None;
             }
-            ui::menu_sep(ui, &pal);
         }
         if ui::menu_item(ui, "打开文件…", "Ctrl+O", false, &pal).clicked() {
             self.open_dialog();
