@@ -1,0 +1,39 @@
+[
+  {
+    "kind": "move",
+    "x": 350,
+    "y": 34
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-1"
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-2"
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-3"
+  },
+  {
+    "kind": "key",
+    "code": 9
+  },
+  {
+    "kind": "shot",
+    "name": "tab-4"
+  }
+]

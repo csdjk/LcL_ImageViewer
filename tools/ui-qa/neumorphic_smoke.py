@@ -184,9 +184,14 @@ def move(hwnd, x, y):
 
 def key(hwnd, code):
     focus(hwnd)
-    u.keybd_event(code, 0, 0, 0)
-    time.sleep(0.06)
-    u.keybd_event(code, 0, 2, 0)
+    bind(u, 'MapVirtualKeyW', [w.UINT, w.UINT], w.UINT)
+    scan = u.MapVirtualKeyW(code, 0) & 0xff
+    extended = 1 if code in (0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2d, 0x2e) else 0
+    u.keybd_event(code, scan, extended, 0)
+    try:
+        time.sleep(0.06)
+    finally:
+        u.keybd_event(code, scan, extended | 2, 0)
     time.sleep(0.18)
 
 
