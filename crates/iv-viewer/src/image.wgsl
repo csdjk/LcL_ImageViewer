@@ -128,6 +128,14 @@ fn scene_at(screen_px: vec2f, nearest: bool) -> vec3f {
     return mix(bg, c.rgb, c.a);
 }
 
+fn gaussian_weight(i: u32) -> f32 {
+    switch i {
+        case 0u, 4u: { return 1.0; }
+        case 1u, 3u: { return 4.0; }
+        default: { return 6.0; }
+    }
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4f {
     let nearest = (u.flags & 1u) != 0u;
@@ -137,20 +145,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4f {
         return vec4f(sharp, 1.0);
     }
 
-    // Vogel 螺线高斯采样完整场景。半径来自逻辑 16pt × pixels_per_point，
-    // 不再随图像缩放变化，因此图内、图外和透明区的磨砂尺度一致。
+    // 5×5 二项式高斯核（外积 [1,4,6,4,1]²），25 次采样与旧实现成本相当，
+    // 但权重对称、可预测，没有 Vogel 螺线的方向性和散点感。半径为 20pt × DPI。
     let radius = max(u.backdrop_params.w, 1.5);
-    let sigma = radius * 0.5;
-    let inv_2s2 = 1.0 / (2.0 * sigma * sigma);
-    var sum = scene_at(in.screen_px, false);
-    var wsum = 1.0;
-    for (var k = 0u; k < 24u; k = k + 1u) {
-        let fi = f32(k) + 0.5;
-        let rr = sqrt(fi / 24.0) * radius;
-        let th = fi * 2.39996;
-        let weight = exp(-(rr * rr) * inv_2s2);
-        sum += scene_at(in.screen_px + vec2f(cos(th), sin(th)) * rr, false) * weight;
-        wsum += weight;
+    let step = radius * 0.5;
+    var sum = vec3f(0.0);
+    var wsum = 0.0;
+    for (var y = 0u; y < 5u; y = y + 1u) {
+        for (var x = 0u; x < 5u; x = x + 1u) {
+            let weight = gaussian_weight(x) * gaussian_weight(y);
+            let offset = vec2f(f32(x) - 2.0, f32(y) - 2.0) * step;
+            sum += scene_at(in.screen_px + offset, false) * weight;
+            wsum += weight;
+        }
     }
     return vec4f(mix(sharp, sum / wsum, ga), 1.0);
 }

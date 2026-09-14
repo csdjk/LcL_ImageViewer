@@ -283,7 +283,7 @@ pub struct Capture {
     pub height: u32,
 }
 
-/// 抓取本窗口背后的屏幕区域，直接降采样到约 1/8 尺寸并柔化。
+/// 抓取本窗口背后的屏幕区域，适度降采样后做可分离高斯模糊。
 /// 调用前须先 set_exclude_from_capture(hwnd, true) 并等待约 80ms
 /// （让 DWM 合成器应用排除标志），否则会把本窗口内容一起抓进去。
 pub fn capture_behind(hwnd: isize, blur: f32) -> Result<Capture, String> {
@@ -316,11 +316,15 @@ pub fn capture_behind(hwnd: isize, blur: f32) -> Result<Capture, String> {
                 std::io::Error::last_os_error()
             ));
         }
-        // 模糊强度 0..1 → 降采样因子 5..14（采样越少越糊）；采样边长限制 48..480
+        // 模糊强度 0..1 → 降采样因子 1.5..3。旧实现为 5..14，默认会缩到约
+        // 1/10，大面积渐变和文字轮廓容易出现糊块。统一 scale 保持长宽比，
+        // 超大窗口才把长边限制为 1280，然后使用更宽的高斯核。
         let blur = blur.clamp(0.0, 1.0);
-        let divisor = (5.0 + blur * 9.0).round() as i32;
-        let tw = ((w + divisor / 2) / divisor).clamp(48, 480);
-        let th = ((h + divisor / 2) / divisor).clamp(48, 480);
+        let divisor = 1.5 + blur * 1.5;
+        let max_dimension = w.max(h) as f32;
+        let scale = (1.0 / divisor).min(1280.0 / max_dimension);
+        let tw = ((w as f32 * scale).round() as i32).max(1);
+        let th = ((h as f32 * scale).round() as i32).max(1);
 
         let screen = GetDC(0); // 整个虚拟屏幕（多显示器/负坐标均有效）
         if screen == 0 {
@@ -402,13 +406,13 @@ pub fn capture_behind(hwnd: isize, blur: f32) -> Result<Capture, String> {
 
 /// 可分离高斯模糊（水平 + 垂直两遍）：低分辨率快照上开销可忽略，
 /// 相比盒式模糊更接近真实大半径高斯，磨砂无方块感、更细腻。
-/// `strength` 0..1 → 高斯半径 1..=4（作用于降采样后的快照像素）。
+/// `strength` 0..1 → 高斯半径 3..=12（作用于降采样后的快照像素）。
 fn soften(cap: &mut Capture, strength: f32) {
     let (w, h) = (cap.width as usize, cap.height as usize);
     if w == 0 || h == 0 {
         return;
     }
-    let radius = 1 + (strength.clamp(0.0, 1.0) * 3.0).round() as i32;
+    let radius = 3 + (strength.clamp(0.0, 1.0) * 9.0).round() as i32;
     let kernel = gaussian_kernel(radius);
     let mut tmp = vec![0u8; cap.rgba.len()];
     blur_pass(&cap.rgba, &mut tmp, w, h, &kernel, true); // 水平

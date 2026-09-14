@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -175,6 +176,12 @@ pub struct App {
     backdrop_capture_error: Option<String>,
     /// 截图排除恢复失败是独立故障，不能被后续成功捕获覆盖。
     backdrop_restore_error: Option<String>,
+    /// 桌面捕获与 CPU 高斯在单一后台任务中执行，避免阻塞 UI 线程。
+    backdrop_capture_tx: Sender<Result<crate::backdrop::Capture, String>>,
+    backdrop_capture_rx: Receiver<Result<crate::backdrop::Capture, String>>,
+    backdrop_job_running: bool,
+    /// 后台任务执行期间又发生位移/周期刷新时，仅保留一次最新请求。
+    backdrop_capture_requested: bool,
     /// 截图排除标志（WDA_EXCLUDEFROMCAPTURE）当前是否已施加到窗口
     capture_excluded: bool,
     /// 截图排除施加时刻（DWM 生效需等待约 80ms 才能 BitBlt）
@@ -204,6 +211,7 @@ impl App {
             .wgpu_render_state
             .as_ref()
             .map(crate::render::Renderer::new);
+        let (backdrop_capture_tx, backdrop_capture_rx) = mpsc::channel();
         let mut app = Self {
             loader: Loader::spawn(),
             cache: ImageCache::new(),
@@ -245,6 +253,10 @@ impl App {
             backdrop_tex: None,
             backdrop_capture_error: None,
             backdrop_restore_error: None,
+            backdrop_capture_tx,
+            backdrop_capture_rx,
+            backdrop_job_running: false,
+            backdrop_capture_requested: false,
             capture_excluded: false,
             exclude_since: None,
             // 拨回过去：首帧立即可触发第一次背景捕获
@@ -2102,40 +2114,15 @@ impl eframe::App for App {
         // wgpu flip-model swapchain 窗口上 DWM 磨砂材质（Acrylic/Mica）不生效，
         // 故自实现：捕获时临时把窗口设为"截图排除"（不影响屏幕显示），
         // BitBlt 抓到的即是窗口背后的画面。
-        if self.backdrop && !self.exclude_unsupported {
-            if let Some(hwnd) = self.hwnd {
-                let now = Instant::now();
-                let outer = ctx.input(|i| i.viewport().outer_rect);
-                let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
-                let moved = outer.is_some() && outer != self.last_outer_rect;
-                if outer.is_some() {
-                    self.last_outer_rect = outer;
-                }
-                let due_periodic =
-                    now.duration_since(self.last_capture) > Duration::from_millis(1500);
-                let want_capture = !minimized && (moved || due_periodic);
-
-                if want_capture && !self.capture_excluded {
-                    let ok = crate::backdrop::set_exclude_from_capture(hwnd, true);
-                    if ok {
-                        self.capture_excluded = true;
-                        self.exclude_since = Some(now);
-                    } else {
-                        self.exclude_unsupported = true; // 老系统：回退渐变画布
-                        self.backdrop_capture_error =
-                            Some("Windows 未接受截图排除，已回退为主题渐变".into());
-                    }
-                }
-                if self.capture_excluded {
-                    let mut captured = false;
-                    // 排除生效要等 DWM 合成几帧；拖动中按 150ms 节流连续捕获
-                    let settled = self
-                        .exclude_since
-                        .is_some_and(|t| now.duration_since(t) >= Duration::from_millis(80));
-                    let throttled =
-                        now.duration_since(self.last_capture) >= Duration::from_millis(150);
-                    if want_capture && settled && throttled {
-                        match crate::backdrop::capture_behind(hwnd, self.backdrop_blur) {
+        let now = Instant::now();
+        let mut capture_completed = false;
+        if self.backdrop_job_running {
+            match self.backdrop_capture_rx.try_recv() {
+                Ok(result) => {
+                    self.backdrop_job_running = false;
+                    capture_completed = true;
+                    if self.backdrop {
+                        match result {
                             Ok(cap) => {
                                 if let Some(renderer) = &mut self.renderer {
                                     renderer.upload_backdrop(cap.width, cap.height, &cap.rgba);
@@ -2150,39 +2137,112 @@ impl eframe::App for App {
                                     egui::TextureOptions::LINEAR,
                                 ));
                                 self.backdrop_capture_error = None;
-                                self.last_capture = now;
-                                captured = true;
                             }
                             Err(error) => self.backdrop_capture_error = Some(error),
+                        }
+                    }
+                }
+                Err(mpsc::TryRecvError::Empty) => {}
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    self.backdrop_job_running = false;
+                    capture_completed = true;
+                    self.backdrop_capture_error = Some("桌面磨砂后台任务已断开".into());
+                }
+            }
+        }
+
+        if self.backdrop && !self.exclude_unsupported {
+            if let Some(hwnd) = self.hwnd {
+                let outer = ctx.input(|i| i.viewport().outer_rect);
+                let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
+                let moved = outer.is_some() && outer != self.last_outer_rect;
+                if outer.is_some() {
+                    self.last_outer_rect = outer;
+                }
+                let due_periodic =
+                    now.duration_since(self.last_capture) > Duration::from_millis(1500);
+                if !minimized && (moved || due_periodic) {
+                    self.backdrop_capture_requested = true;
+                }
+
+                if self.backdrop_capture_requested && !self.capture_excluded {
+                    let ok = crate::backdrop::set_exclude_from_capture(hwnd, true);
+                    if ok {
+                        self.capture_excluded = true;
+                        self.exclude_since = Some(now);
+                    } else {
+                        self.exclude_unsupported = true; // 老系统：回退渐变画布
+                        self.backdrop_capture_error =
+                            Some("Windows 未接受截图排除，已回退为主题渐变".into());
+                    }
+                }
+                if self.capture_excluded {
+                    // 排除生效要等 DWM 合成几帧；同时只运行一个后台捕获任务。
+                    let settled = self
+                        .exclude_since
+                        .is_some_and(|t| now.duration_since(t) >= Duration::from_millis(80));
+                    let throttled =
+                        now.duration_since(self.last_capture) >= Duration::from_millis(150);
+                    if self.backdrop_capture_requested
+                        && !self.backdrop_job_running
+                        && settled
+                        && throttled
+                    {
+                        let tx = self.backdrop_capture_tx.clone();
+                        let blur = self.backdrop_blur;
+                        match std::thread::Builder::new()
+                            .name("iv-backdrop-capture".into())
+                            .spawn(move || {
+                                let result = std::panic::catch_unwind(|| {
+                                    crate::backdrop::capture_behind(hwnd, blur)
+                                })
+                                .unwrap_or_else(|_| Err("桌面磨砂后台任务异常终止".into()));
+                                let _ = tx.send(result);
+                            }) {
+                            Ok(_) => {
+                                self.backdrop_job_running = true;
+                                self.backdrop_capture_requested = false;
+                                self.last_capture = now;
+                            }
+                            Err(error) => {
+                                self.backdrop_capture_error =
+                                    Some(format!("无法启动桌面磨砂后台任务：{error}"));
+                                self.backdrop_capture_requested = false;
+                            }
                         }
                     }
                     if moved {
                         // 拖动/调整中持续持有排除标志，停止 250ms 后释放
                         self.exclude_release_at = Some(now + Duration::from_millis(250));
-                    } else if captured {
+                    } else if capture_completed && !self.backdrop_capture_requested {
                         // 空闲周期快照完成：立即释放，尽量缩短对系统截图的影响
                         self.exclude_release_at = Some(now);
-                    } else if self
-                        .exclude_since
-                        .is_some_and(|t| now.duration_since(t) > Duration::from_secs(2))
+                    } else if !self.backdrop_job_running
+                        && self
+                            .exclude_since
+                            .is_some_and(|t| now.duration_since(t) > Duration::from_secs(2))
                     {
                         // 兜底：捕获持续失败（如中途最小化）也必须释放
                         self.exclude_release_at = Some(now);
                     }
-                    if let Some(at) = self.exclude_release_at {
-                        if now >= at {
-                            if crate::backdrop::set_exclude_from_capture(hwnd, false) {
-                                self.backdrop_restore_error = None;
+                    if !self.backdrop_job_running && !self.backdrop_capture_requested {
+                        if let Some(at) = self.exclude_release_at {
+                            if now < at {
+                                ctx.request_repaint_after(at - now);
                             } else {
-                                self.backdrop_restore_error =
-                                    Some("截图排除状态恢复失败，请重启应用".into());
+                                if crate::backdrop::set_exclude_from_capture(hwnd, false) {
+                                    self.backdrop_restore_error = None;
+                                } else {
+                                    self.backdrop_restore_error =
+                                        Some("截图排除状态恢复失败，请重启应用".into());
+                                }
+                                self.capture_excluded = false;
+                                self.exclude_since = None;
+                                self.exclude_release_at = None;
                             }
-                            self.capture_excluded = false;
-                            self.exclude_since = None;
-                            self.exclude_release_at = None;
                         }
                     }
-                    if self.capture_excluded {
+                    if self.capture_excluded || self.backdrop_job_running {
                         ctx.request_repaint_after(Duration::from_millis(40));
                     }
                 } else if !minimized {
@@ -2190,6 +2250,9 @@ impl eframe::App for App {
                     ctx.request_repaint_after(Duration::from_millis(1600));
                 }
             }
+        } else if self.backdrop_job_running {
+            // 设置被关闭时先等待已在读取屏幕的后台任务完成，再恢复截图状态。
+            ctx.request_repaint_after(Duration::from_millis(40));
         } else if self.capture_excluded {
             // 设置被关闭：释放截图排除并丢弃快照
             if let Some(hwnd) = self.hwnd {
@@ -2202,6 +2265,7 @@ impl eframe::App for App {
             self.capture_excluded = false;
             self.exclude_since = None;
             self.exclude_release_at = None;
+            self.backdrop_capture_requested = false;
             self.backdrop_tex = None;
             if let Some(renderer) = &mut self.renderer {
                 renderer.clear_backdrop();
@@ -2476,7 +2540,7 @@ impl eframe::App for App {
                             self.backdrop_brightness,
                             self.backdrop_opacity,
                             if pal.is_dark { 1.0 } else { 0.0 },
-                            16.0 * ppp,
+                            20.0 * ppp,
                         ],
                         glass_rects,
                         glass_alpha,
