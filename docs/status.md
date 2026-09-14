@@ -33,7 +33,7 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-N03 READY — 两侧玻璃切图按钮，串行复用并验证N02的1秒隐藏
+NOW: IV-P1-N03 IN_PROGRESS — 两侧玻璃切图按钮，串行复用并验证N02的1秒隐藏
 AFTER: IV-P1-01 READY — 完善通用验收入口
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 COMPLETED: IV-P1-N01 DONE — 新拟态 UI 已集成且 main 复验
