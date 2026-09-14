@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。本文是当前阶段和唯一NEXT的权威来源。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N04 -->
 
 ## 当前阶段
 
@@ -36,7 +36,8 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-01 READY — 完善通用验收入口
+NOW: IV-P1-N04 IN_PROGRESS — 左键移图、右键拖窗
+AFTER: IV-P1-01 READY — 完善通用验收入口
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 ```
