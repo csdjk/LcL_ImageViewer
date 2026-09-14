@@ -26,14 +26,14 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 - 工作分支最终源码50张实际Windows原始截图：双主题、1280×860/880×560、通道、悬停、按下、Tab焦点、菜单、设置/滚动、自动隐藏/恢复、空态、DDS与长中文文件名。
 - main重建的Release程序又完成22张截图：浅色1280×860的13状态、深色880×560的8状态、浅色空态；全部DPI96/100%，元数据及配置恢复核对通过。
 - 相同测试PNG内部ROI与旧版RGB差异为0；四个主题/尺寸组合工具栏恢复区域差异为0。该比较不扩展为全格式或设计稿相似度承诺。
-- 主程序：`target/release/imageview.exe`，SHA-256 `ec37f483172dad922561aee51b097b6c5a432d200541ad908f95b8cb55483256`。没有发布、push、安装器分发或注册表写操作。
+- 上轮已验收主程序（历史构建），SHA-256 `ec37f483172dad922561aee51b097b6c5a432d200541ad908f95b8cb55483256`。没有发布、push、安装器分发或注册表写操作。
 
 完整证据位于忽略目录 `ui-verify-shots/neumorphic-*`。原始PNG逐张配有commit、二进制/输入hash、动作、主题、尺寸、DPI和裁剪JSON。较早迭代截图不能替代最终证据。
 
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-N02 IN_PROGRESS — 菜单栏自动隐藏等待改为1秒
+NOW: IV-P1-N02 BLOCKED — 源码/Release已改为1秒，等待关闭旧Debug查看器后实机复验
 AFTER: IV-P1-01 READY — 完善通用验收入口
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 COMPLETED: IV-P1-N01 DONE — 新拟态 UI 已集成且 main 复验
@@ -46,3 +46,7 @@ COMPLETED: IV-P1-N01 DONE — 新拟态 UI 已集成且 main 复验
 全仓rustfmt原有差异尚未清理；本轮只格式化UI实现文件，未将大规模历史格式化混入功能修改。未验证其他DPI、HDR/动画/全格式、全键盘/辅助功能/全部禁用态、桌面捕获恢复、窗口状态矩阵和性能预算；不声明GPU≤2ms，也不将P1标为VALIDATED。
 
 当前没有新增阻塞产品/架构决策。push、Release与安装包分发需要另外明确授权。
+
+## 当前1秒延时追加任务
+
+`IV-P1-N02 BLOCKED`：任务分支 `codex/iv-p1-n02-autohide-1s` 的源码 `a23f07dff8cd1f2a5e1f5c85830a667313e34cdb` 将等待改为1秒；16tests/check/Release构建通过。主工作区 `target/release/imageview.exe` 现为该分支的新构建，SHA-256 `17afe8948da9af871ee407cc8abbfd1cc1c8fcae56870850d58fe5a3f65a219b`；main源码尚未包含此功能变更。旧Debug程序仍被用户运行占用，未强制关闭。本轮实机复验、Debug更新和main合入待关闭旧窗口后继续。
