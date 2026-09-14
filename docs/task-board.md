@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-P1-N07 | 右键菜单去掉分类与分组空白 | IN_PROGRESS | ChatGPT-AgentDock | 用户最新需求 / N06 DONE | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/无分类菜单验收.md` | 连续单列无分类；功能/快捷键保留；tests/check/构建及双主题双尺寸实机验证 |
 | IV-P1-N06 | 精简右键菜单、A/D切图及Delete回收站删除 | DONE | ChatGPT-AgentDock | 用户最新菜单需求及上一条Delete修复 / N05 DONE | `crates/iv-viewer/{Cargo.toml,src/app.rs,src/main.rs,src/recycle.rs}`, `Cargo.lock`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/菜单快捷键验收.md` | 菜单精简；A/D与原方向键；输入焦点/组合键保护；确认后仅回收站删除、取消/失败保留；tests/check/双构建及隔离实机回归 |
 | IV-P1-N05 | 直接打开当前图片所在文件夹 | DONE | ChatGPT-AgentDock | 用户明确修复需求 / N04 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/ui-qa/打开所在目录验收.md` | 打开当前父目录，不使用/select；中文/空格路径、相对路径测试；实机菜单打开Explorer定位核对；tests/check/构建/main复验 |
 | IV-P1-N04 | 左键平移图像、右键拖动窗口 | DONE | ChatGPT-AgentDock | 用户2026-09-14明确授权 / N03 DONE | `crates/iv-viewer/src/{app.rs,backdrop.rs}`, `tools/ui-qa/**`, `docs/ui-qa/鼠标拖拽验收.md`, `README.md` | 左键移图不移窗；右键移窗不移图且拖后不弹菜单；单击菜单/边缘缩放/导航保留；tests/check/release及实机双主题双尺寸验证 |
@@ -36,7 +37,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-01 READY
+NOW: IV-P1-N07 IN_PROGRESS
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -117,3 +118,7 @@ N06 Review：工作树b45b3a5，源码5130492，35tests/check/双构建通过，
 ## N06 完成记录
 
 功能集成 `85bb27e077d62356f2e6957f6fd2e0b0834d0e6f`；main35tests/check/双构建PASS；分支100张及主线Release50张实机回归，A/D、精简菜单、确认/取消/回收站原始hash、后继/空态校验PASS。常规Debug/Release均更新，用户旧folder-fix副本未关闭或覆盖；使用隔离配置、只回收新建测试图，无push/发布。详见菜单快捷键验收.md。NEXT恢复IV-P1-01。
+
+## N07 领取记录
+
+READY后由ChatGPT-AgentDock串行领取；Base `2ba8e09700b4da9a917c324d48ca68612ff0c4b3`，分支`codex/iv-p1-n07-flat-menu`，工作树`Temp/worktrees/flat-menu`。只移除菜单分类/分组留白并统一行高，不改操作回调及快捷键。旧N06工作树已集成且冻结。验收仅对测试图打开/取消弹层，不回收或删除文件；保持用户窗口，不改关联，不push。
