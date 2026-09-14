@@ -2450,9 +2450,14 @@ impl eframe::App for App {
                     let mut glass_rects = [[0.0f32; 4]; MAX_GLASS];
                     let mut glass_alpha = [[0.0f32; 4]; 2];
                     let mut glass_corner = [[0.0f32; 4]; 2];
-                    let glass_count = self.glass_regions.len().min(MAX_GLASS);
+                    // 不透明新拟态表面不需要玻璃采样；淡出时也保留清晰原图。
+                    let glass_count = if pal.overlay.a() < 255 {
+                        self.glass_regions.len().min(MAX_GLASS)
+                    } else {
+                        0
+                    };
                     for (i, (rect, a, corner)) in
-                        self.glass_regions.iter().take(MAX_GLASS).enumerate()
+                        self.glass_regions.iter().take(glass_count).enumerate()
                     {
                         let r = rect.translate(-canvas_rect.min.to_vec2());
                         glass_rects[i] =

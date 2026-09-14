@@ -214,6 +214,7 @@ def run(args):
     u.GetCursorPos(c.byref(cursor))
     proc = None
     history = []
+    pressed_releases = set()
     summary = {'theme': args.theme, 'binary': str(binary), 'binary_sha256': sha(binary),
                'commit': args.commit, 'input': str(args.input.resolve()) if args.input else None,
                'input_sha256': sha(args.input) if args.input else None, 'captures': []}
@@ -271,9 +272,13 @@ def run(args):
                     move(hwnd, action['x'], action['y'])
                 focus(hwnd)
                 down, up = (8, 16) if kind == 'right-click' else (2, 4)
-                if kind != 'up': u.mouse_event(down, 0, 0, 0, 0)
+                if kind != 'up':
+                    u.mouse_event(down, 0, 0, 0, 0)
+                    pressed_releases.add(up)
                 if kind not in ('down', 'up'): time.sleep(0.08)
-                if kind != 'down': u.mouse_event(up, 0, 0, 0, 0)
+                if kind != 'down':
+                    u.mouse_event(up, 0, 0, 0, 0)
+                    pressed_releases.discard(up)
                 time.sleep(0.15)
             elif kind == 'key':
                 code = action['code']
@@ -292,6 +297,8 @@ def run(args):
                 raise ValueError(f'Unknown action: {kind}')
         summary['result'] = 'captured; visual review required'
     finally:
+        for release in pressed_releases:
+            u.mouse_event(release, 0, 0, 0, 0)
         if proc is not None and proc.poll() is None:
             for hwnd in windows_for_pid(proc.pid):
                 u.PostMessageW(hwnd, 0x0010, 0, 0)

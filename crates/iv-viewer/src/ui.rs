@@ -73,8 +73,6 @@ pub struct Palette {
     pub selected_text: Color32,
     /// 新拟态悬浮面板底色（不透明）
     pub overlay: Color32,
-    /// 悬浮胶囊描边
-    pub overlay_border: Color32,
     /// 图标常态色
     pub icon: Color32,
     /// 图标按钮悬停底
@@ -124,7 +122,6 @@ pub fn palette(ctx: &egui::Context) -> Palette {
             accent: rgb(0xb1, 0xc7, 0xe6),
             selected_text: rgb(0xe0, 0xeb, 0xfa),
             overlay: rgb(0x2c, 0x37, 0x48),
-            overlay_border: Color32::TRANSPARENT,
             icon: rgb(0xc5, 0xd2, 0xe5),
             btn_hover: rgb(0x32, 0x3f, 0x52),
             btn_pressed: rgb(0x23, 0x2f, 0x42),
@@ -157,7 +154,6 @@ pub fn palette(ctx: &egui::Context) -> Palette {
             accent: rgb(0x49, 0x65, 0x8e),
             selected_text: rgb(0x35, 0x51, 0x79),
             overlay: rgb(0xe6, 0xeb, 0xf2),
-            overlay_border: Color32::TRANSPARENT,
             icon: rgb(0x4b, 0x60, 0x7b),
             btn_hover: rgb(0xec, 0xf1, 0xf8),
             btn_pressed: rgb(0xd3, 0xde, 0xed),
@@ -295,9 +291,9 @@ fn inset_mesh(rect: Rect, radius: f32, pal: &Palette) -> egui::Mesh {
         for (point, normal) in rounded_outline(rect.shrink(inset), (radius - inset).max(0.0)) {
             let direction = (normal.x + normal.y) * std::f32::consts::FRAC_1_SQRT_2;
             let (color, strength) = if direction < 0.0 {
-                (pal.shadow_dark, if pal.is_dark { 175.0 } else { 140.0 })
+                (pal.shadow_dark, if pal.is_dark { 155.0 } else { 110.0 })
             } else {
-                (pal.shadow_light, if pal.is_dark { 72.0 } else { 230.0 })
+                (pal.shadow_light, if pal.is_dark { 60.0 } else { 150.0 })
             };
             let a = (direction.abs() * strength * (1.0 - t).powi(2)) as u8;
             mesh.colored_vertex(point, alpha(color, a));
@@ -333,7 +329,7 @@ fn surface_shapes(
             (
                 Vec2::splat(-2.5 * elevation),
                 7.0 * elevation,
-                alpha(pal.shadow_light, if pal.is_dark { 55 } else { 205 }),
+                alpha(pal.shadow_light, if pal.is_dark { 45 } else { 115 }),
             ),
             (
                 Vec2::new(3.0, 3.5) * elevation,
@@ -1248,7 +1244,7 @@ mod neumorphic_tests {
             let pal = palette(&ctx);
             assert_eq!(pal.overlay.a(), 255);
             assert_eq!(pal.glass_window.a(), 255);
-            assert_eq!(pal.overlay_border, Color32::TRANSPARENT);
+            assert_eq!(ctx.style().visuals.window_stroke, Stroke::NONE);
             for fg in [pal.text, pal.dim, pal.faint] {
                 assert!(
                     contrast(fg, pal.bar) >= 4.5,
