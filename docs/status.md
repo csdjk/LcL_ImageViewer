@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。本文是当前阶段和唯一 NEXT 的权威来源。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N02 -->
 
 ## 当前阶段
 
@@ -33,7 +33,8 @@ P2 Release Hardening      GATED BY P1 VALIDATED
 ## 当前 NEXT
 
 ```text
-NOW: IV-P1-01 READY — 在现有可重复截图工具上完善通用验收入口
+NOW: IV-P1-N02 IN_PROGRESS — 菜单栏自动隐藏等待改为1秒
+AFTER: IV-P1-01 READY — 完善通用验收入口
 AFTER: IV-P1-02 / IV-P1-03 blocked by IV-P1-01
 COMPLETED: IV-P1-N01 DONE — 新拟态 UI 已集成且 main 复验
 ```
