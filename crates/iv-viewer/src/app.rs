@@ -1831,264 +1831,130 @@ impl App {
         }
     }
 
-    /// 设置窗口（顶栏齿轮 / 右键菜单打开）：外观 + Windows 集成 + 关于。
+    /// 设置使用单层紧凑列表；自绘标题仅移动原生窗口，不拖动内部面板。
     fn draw_settings_window(&mut self, ctx: &egui::Context, pal: &Palette) {
         if !self.show_settings {
             return;
         }
-        let mut open = self.show_settings;
-        let content_height = (ctx.screen_rect().height() - 160.0).clamp(320.0, 720.0);
-        let win_rect = egui::Window::new("设置")
-            .open(&mut open)
+        let screen = ctx.screen_rect();
+        let content_width = ui::SETTINGS_CONTENT_WIDTH.min((screen.width() - 64.0).max(280.0));
+        let scroll_height = (screen.height() - 144.0).max(180.0);
+        let mut close = false;
+        egui::Window::new("设置")
+            .title_bar(false)
             .collapsible(false)
             .resizable(false)
+            .movable(false)
             .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-            .default_width(400.0)
-            .min_height(content_height)
-            .max_width((ctx.screen_rect().width() - 32.0).max(320.0))
-            .max_height((ctx.screen_rect().height() - 96.0).max(352.0))
+            .frame(egui::Frame::none()
+                .fill(pal.overlay)
+                .rounding(ui::PANEL_RADIUS)
+                .shadow(pal.shadow)
+                .inner_margin(16.0))
+            .default_width(content_width)
             .show(ctx, |ui| {
+                ui.set_width(content_width);
+                ui.spacing_mut().item_spacing.y = 0.0;
+                let (header, closed) = ui::settings_header(ui, pal);
+                close = closed;
+                let fixed_window = ctx.input(|i| {
+                    i.viewport().maximized.unwrap_or(false)
+                        || i.viewport().fullscreen.unwrap_or(false)
+                });
+                if !fixed_window && header.drag_started_by(PointerButton::Primary) {
+                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+                }
+                self.begin_right_window_drag(ctx, &header);
+                ui.add_space(4.0);
                 egui::ScrollArea::vertical()
                     .id_source("iv-settings-scroll")
-                    .max_height(content_height)
+                    .max_height(scroll_height)
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
+                        ui.set_width(content_width);
                         ui.spacing_mut().interact_size.y = 32.0;
-                        ui.spacing_mut().item_spacing.y = 10.0;
-
-                        // —— 外观 ——
-                        ui::settings_card(ui, pal, "外观", |ui| {
-                            ui::setting_row(ui, pal, "主题", "", |ui| {
-                                ui.horizontal(|ui| {
-                                    if ui::segment_button(
-                                        ui,
-                                        "深色",
-                                        self.theme == ThemeMode::Dark,
-                                        pal,
-                                    )
-                                    .clicked()
-                                    {
-                                        ThemeMode::apply_to(ctx, ThemeMode::Dark);
-                                        self.theme = ThemeMode::Dark;
-                                    }
-                                    if ui::segment_button(
-                                        ui,
-                                        "浅色",
-                                        self.theme == ThemeMode::Light,
-                                        pal,
-                                    )
-                                    .clicked()
-                                    {
-                                        ThemeMode::apply_to(ctx, ThemeMode::Light);
-                                        self.theme = ThemeMode::Light;
-                                    }
-                                });
-                            });
-                            ui.add_space(2.0);
-                            ui::setting_row(
-                                ui,
-                                pal,
-                                "Alpha 衬底",
-                                "透明图片区域使用棋盘格或画布色",
-                                |ui| {
-                                    ui.horizontal(|ui| {
-                                        if ui::segment_button(ui, "纯色", !self.checkerboard, pal)
-                                            .clicked()
-                                        {
-                                            self.checkerboard = false;
-                                        }
-                                        if ui::segment_button(ui, "棋盘格", self.checkerboard, pal)
-                                            .clicked()
-                                        {
-                                            self.checkerboard = true;
-                                        }
-                                    });
-                                },
-                            );
-                            ui.add_space(2.0);
-                            ui::setting_row(
-                                ui,
-                                pal,
-                                "减少动效",
-                                "关闭工具栏淡入淡出动画",
-                                |ui| {
-                                    ui::toggle(ui, &mut self.reduce_motion, pal);
-                                },
-                            );
-                        });
-
-                        ui::settings_card(ui, pal, "新拟态材质", |ui| {
-                            ui.label(
-                                RichText::new("雾蓝灰单色系 · 柔和双向阴影 · 按钮凸起，选中与按下时内凹")
-                                    .small()
-                                    .color(pal.dim),
-                            );
-                        });
-
-                        // —— 画布背景 ——
-                        ui::settings_card(ui, pal, "画布背景", |ui| {
-                            ui::setting_row(
-                                ui,
-                                pal,
-                                "桌面磨砂",
-                                "柔化窗口后方内容；不可用时回退为主题渐变",
-                                |ui| {
-                                    let mut on = self.backdrop;
-                                    if ui::toggle(ui, &mut on, pal).changed() && on != self.backdrop
-                                    {
-                                        self.backdrop = on;
-                                        // update 内的捕获状态机会在下一帧自动开始/停止捕获
-                                        if on {
-                                            // 拨回周期计时，下一帧立即重捕
-                                            self.last_capture =
-                                                Instant::now() - Duration::from_secs(10);
-                                        } else {
-                                            self.backdrop_tex = None;
-                                            if let Some(renderer) = &mut self.renderer {
-                                                renderer.clear_backdrop();
-                                            }
-                                        }
-                                    }
-                                },
-                            );
-                            if let Some(error) = &self.backdrop_restore_error {
-                                ui.label(
-                                    RichText::new(format!("截图状态异常：{error}"))
-                                        .small()
-                                        .color(pal.err_text),
-                                );
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        ui::setting_row(ui, pal, "主题", "切换查看器外观", |ui| {
+                            if ui::segment_button(ui, "深色", self.theme == ThemeMode::Dark, pal).clicked() {
+                                ThemeMode::apply_to(ctx, ThemeMode::Dark);
+                                self.theme = ThemeMode::Dark;
                             }
-                            if self.backdrop {
-                                if self.backdrop_restore_error.is_none() {
-                                    if let Some(error) = &self.backdrop_capture_error {
-                                        ui.label(
-                                            RichText::new(format!("桌面磨砂不可用：{error}"))
-                                                .small()
-                                                .color(pal.err_text),
-                                        );
-                                    } else if self.backdrop_tex.is_some() {
-                                        ui.label(
-                                            RichText::new("桌面磨砂已就绪")
-                                                .small()
-                                                .color(pal.accent),
-                                        );
-                                    }
-                                }
-                                ui.add_space(6.0);
-                                // 不透明度：绘制时实时生效
-                                let mut op = self.backdrop_opacity;
-                                if ui::slider_row(ui, pal, "不透明度", &mut op, 0.05..=0.95, true)
-                                {
-                                    self.backdrop_opacity = op;
-                                }
-                                ui.add_space(2.0);
-                                // 模糊强度：烘焙在捕获里，改后触发重捕
-                                let mut bl = self.backdrop_blur;
-                                if ui::slider_row(ui, pal, "模糊强度", &mut bl, 0.0..=1.0, true)
-                                {
-                                    self.backdrop_blur = bl;
+                            if ui::segment_button(ui, "浅色", self.theme == ThemeMode::Light, pal).clicked() {
+                                ThemeMode::apply_to(ctx, ThemeMode::Light);
+                                self.theme = ThemeMode::Light;
+                            }
+                        });
+                        ui::setting_row(ui, pal, "透明背景", "透明图片区域使用棋盘格或画布色", |ui| {
+                            if ui::segment_button(ui, "纯色", !self.checkerboard, pal).clicked() {
+                                self.checkerboard = false;
+                            }
+                            if ui::segment_button(ui, "棋盘格", self.checkerboard, pal).clicked() {
+                                self.checkerboard = true;
+                            }
+                        });
+                        ui::setting_row(ui, pal, "减少动效", "关闭工具栏淡入淡出动画", |ui| {
+                            ui::toggle(ui, &mut self.reduce_motion, pal);
+                        });
+                        ui::setting_row(ui, pal, "桌面磨砂", "柔化窗口后方内容；不可用时回退为主题渐变", |ui| {
+                            let mut on = self.backdrop;
+                            if ui::toggle(ui, &mut on, pal).changed() && on != self.backdrop {
+                                self.backdrop = on;
+                                if on {
                                     self.last_capture = Instant::now() - Duration::from_secs(10);
-                                }
-                                ui.add_space(2.0);
-                                // 背景亮度：绘制时实时生效
-                                let mut br = self.backdrop_brightness;
-                                if ui::slider_row(ui, pal, "背景亮度", &mut br, 0.6..=1.4, true)
-                                {
-                                    self.backdrop_brightness = br;
+                                } else {
+                                    self.backdrop_tex = None;
+                                    if let Some(renderer) = &mut self.renderer {
+                                        renderer.clear_backdrop();
+                                    }
                                 }
                             }
                         });
-
-                        // —— Windows 集成 ——
-                        ui::settings_card(ui, pal, "Windows 集成", |ui| {
-                            let (status, tip) = if self.assoc_registered {
-                                (
-                                    "已注册到「打开方式」",
-                                    "列表中将显示图标与名称，可选「始终」",
-                                )
-                            } else {
-                                ("未注册", "注册后才能出现在打开方式列表并支持「始终」")
-                            };
-                            let status_color = if self.assoc_registered {
-                                pal.accent
-                            } else {
-                                pal.faint
-                            };
-                            ui.label(RichText::new(status).color(status_color).size(13.0));
-                            ui.label(RichText::new(tip).small().color(pal.faint));
-                            ui.add_space(8.0);
-                            ui.horizontal(|ui| {
-                                let button_width = ((ui.available_width() - 8.0) / 2.0).max(132.0);
-                                if self.assoc_registered {
-                                    if ui::text_button(ui, "解除注册", button_width, pal)
-                                        .on_hover_text("从打开方式列表与默认应用候选中移除")
-                                        .clicked()
-                                    {
-                                        if let Err(e) = winassoc::unregister() {
-                                            self.error_msg = Some(e);
-                                        }
-                                        self.assoc_registered = winassoc::is_registered();
-                                    }
-                                } else if ui::text_button(ui, "注册到「打开方式」", button_width, pal)
-                                    .on_hover_text("写入 HKCU，无需管理员权限")
-                                    .clicked()
-                                {
-                                    if let Err(e) = winassoc::register() {
-                                        self.error_msg = Some(e);
-                                    }
+                        if let Some(error) = &self.backdrop_restore_error {
+                            ui.label(RichText::new(format!("截图状态异常：{error}")).small().color(pal.err_text));
+                        }
+                        if self.backdrop {
+                            if self.backdrop_restore_error.is_none() {
+                                if let Some(error) = &self.backdrop_capture_error {
+                                    ui.label(RichText::new(format!("桌面磨砂不可用：{error}")).small().color(pal.err_text));
+                                }
+                            }
+                            // 仅开启时展开参数，保留原有范围、持久化键和即时更新语义。
+                            ui::compact_slider_row(ui, pal, "不透明度", &mut self.backdrop_opacity, 0.05..=0.95);
+                            if ui::compact_slider_row(ui, pal, "模糊强度", &mut self.backdrop_blur, 0.0..=1.0) {
+                                self.last_capture = Instant::now() - Duration::from_secs(10);
+                            }
+                            ui::compact_slider_row(ui, pal, "背景亮度", &mut self.backdrop_brightness, 0.6..=1.4);
+                        }
+                        ui::setting_row(ui, pal, "打开方式", "将查看器添加到或移出 Windows 的打开方式列表", |ui| {
+                            let label = if self.assoc_registered { "解除注册" } else { "注册" };
+                            if ui::text_button(ui, label, 112.0, pal)
+                                .on_hover_text("仅在点击后修改当前用户的打开方式注册")
+                                .clicked()
+                            {
+                                let result = if self.assoc_registered { winassoc::unregister() } else { winassoc::register() };
+                                if let Err(e) = result { self.error_msg = Some(e); }
+                                self.assoc_registered = winassoc::is_registered();
+                            }
+                        });
+                        ui::setting_row(ui, pal, "默认看图软件", "在 Windows 默认应用设置中确认，不会自动改为默认应用", |ui| {
+                            if ui::text_button(ui, "系统设置…", 112.0, pal).clicked() {
+                                if !self.assoc_registered {
+                                    if let Err(e) = winassoc::register() { self.error_msg = Some(e); }
                                     self.assoc_registered = winassoc::is_registered();
                                 }
-                                if ui::text_button(ui, "设为默认看图软件…", button_width, pal)
-                                    .on_hover_text("打开系统「默认应用」设置页")
-                                    .clicked()
-                                {
-                                    // 未注册时先补注册，否则系统默认应用页里找不到本应用
-                                    if !self.assoc_registered {
-                                        if let Err(e) = winassoc::register() {
-                                            self.error_msg = Some(e);
-                                        }
-                                        self.assoc_registered = winassoc::is_registered();
-                                    }
-                                    winassoc::open_default_apps_settings();
-                                }
-                            });
-                            ui.add_space(4.0);
-                            ui.label(
-                                RichText::new(
-                                    "Win10/11 的默认关联需在系统设置页确认，程序无法代为设置",
-                                )
-                                .small()
-                                .color(pal.faint),
-                            );
+                                winassoc::open_default_apps_settings();
+                            }
                         });
-
-                        // —— 关于（页脚小字） ——
-                        ui.add_space(2.0);
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(winassoc::APP_NAME).color(pal.text).strong());
-                            ui.label(
-                                RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
-                                    .small()
-                                    .color(pal.faint),
-                            );
-                        });
-                        ui.label(
-                            RichText::new(
-                                "轻量级游戏美术看图工具 · DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG",
-                            )
-                            .small()
-                            .color(pal.faint),
-                        );
                     });
-            })
-            .map(|r| r.response.rect);
-        self.show_settings = open;
-        if let Some(r) = win_rect {
-            if pal.overlay.a() < 255 {
-                self.glass_regions.push((r, 1.0, 16.0));
-            }
+                ui.add_space(8.0);
+                ui.label(RichText::new(format!("{} · v{}", winassoc::APP_NAME, env!("CARGO_PKG_VERSION")))
+                    .size(11.5).color(pal.faint));
+            });
+        if close {
+            self.show_settings = false;
         }
     }
+
 }
 
 impl eframe::App for App {

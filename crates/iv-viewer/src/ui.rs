@@ -507,30 +507,34 @@ pub fn menu_item(
 
 /* ============================= 设置页组件 ============================= */
 
-/// 同色材质分组卡片，以柔影而非边框建立层级。
-pub fn settings_card(
-    ui: &mut egui::Ui,
-    pal: &Palette,
-    title: &str,
-    add: impl FnOnce(&mut egui::Ui),
-) {
-    NeuFrame {
-        frame: egui::Frame::default()
-            .inner_margin(egui::Margin::symmetric(14.0, 12.0))
-            .outer_margin(egui::Margin::symmetric(4.0, 5.0)),
-        pal: *pal,
-        radius: CARD_RADIUS,
-        elevation: 0.9,
-    }
-    .show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.label(RichText::new(title).color(pal.text).strong().size(14.5));
-        ui.add_space(9.0);
-        add(ui);
-    });
+/// 设置页只保留操作列表，不再嵌套分类卡片。
+pub const SETTINGS_CONTENT_WIDTH: f32 = 360.0;
+pub const SETTINGS_ROW_HEIGHT: f32 = 40.0;
+pub const SETTINGS_HEADER_HEIGHT: f32 = 40.0;
+
+/// 标题拖动区与关闭按钮严格分开，二者之间保留8点安全间隔。
+pub fn settings_header_rects(row: Rect) -> [Rect; 2] {
+    let close = Rect::from_center_size(
+        Pos2::new(row.right() - 16.0, row.center().y), Vec2::splat(32.0));
+    let drag = Rect::from_min_max(row.min, Pos2::new(close.left() - 8.0, row.bottom()));
+    [drag, close]
 }
 
-/// 设置行：左侧标签（+ 可选灰色描述），右侧控件右对齐。
+pub fn settings_header(ui: &mut egui::Ui, pal: &Palette) -> (egui::Response, bool) {
+    let (row, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), SETTINGS_HEADER_HEIGHT), Sense::hover());
+    let [drag, close] = settings_header_rects(row);
+    let response = ui.interact(drag, ui.id().with("settings-title-drag"), Sense::click_and_drag())
+        .on_hover_cursor(egui::CursorIcon::Grab)
+        .on_hover_text("按住左键或右键拖动窗口");
+    ui.painter().text(drag.left_center(), Align2::LEFT_CENTER, "设置",
+        FontId::new(18.0, FontFamily::Proportional), pal.text_bright);
+    let closed = ui.allocate_ui_at_rect(close, |ui| {
+        icon_btn(ui, Icon::Close, false, pal).on_hover_text("关闭设置 (Esc)").clicked()
+    }).inner;
+    (response, closed)
+}
+
+/// 紧凑设置行：固定行高，说明改成悬停提示，操作区统一右对齐。
 pub fn setting_row(
     ui: &mut egui::Ui,
     pal: &Palette,
@@ -538,16 +542,28 @@ pub fn setting_row(
     desc: &str,
     widget: impl FnOnce(&mut egui::Ui),
 ) {
-    ui.horizontal(|ui| {
-        ui.vertical(|ui| {
-            ui.add_space(2.0);
-            ui.label(RichText::new(label).color(pal.text).size(13.5));
-            if !desc.is_empty() {
-                ui.label(RichText::new(desc).small().color(pal.faint));
-            }
-        });
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), widget);
-    });
+    ui.allocate_ui_with_layout(
+        Vec2::new(ui.available_width(), SETTINGS_ROW_HEIGHT),
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| {
+            ui.label(RichText::new(label).color(pal.text).size(13.5)).on_hover_text(desc);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), widget);
+        },
+    );
+}
+
+pub fn compact_slider_row(
+    ui: &mut egui::Ui,
+    pal: &Palette,
+    label: &str,
+    value: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+) -> bool {
+    ui.allocate_ui_with_layout(
+        Vec2::new(ui.available_width(), 32.0),
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| slider_row(ui, pal, label, value, range, true),
+    ).inner
 }
 
 /// 滑条设置行：标签（固定宽对齐）+ 滑条（占满中间）+ 右侧数值。
@@ -1467,5 +1483,32 @@ mod side_navigation_tests {
             }
             assert_eq!(pal.overlay.a(), 255); // new translucency must not leak into other panels
         }
+    }
+}
+
+#[cfg(test)]
+mod settings_layout_tests {
+    use super::*;
+
+    #[test]
+    fn title_drag_region_never_overlaps_close_button() {
+        for width in [280.0, 320.0, SETTINGS_CONTENT_WIDTH, 480.0] {
+            let row = Rect::from_min_size(Pos2::new(16.0, 20.0), Vec2::new(width, SETTINGS_HEADER_HEIGHT));
+            let [drag, close] = settings_header_rects(row);
+            assert!(row.contains_rect(drag) && row.contains_rect(close));
+            assert!(!drag.intersects(close));
+            assert_eq!(close.left() - drag.right(), 8.0);
+            assert_eq!(close.size(), Vec2::splat(32.0));
+            assert_eq!(drag.height(), SETTINGS_HEADER_HEIGHT);
+        }
+    }
+
+    #[test]
+    fn settings_controls_fit_the_minimum_viewport() {
+        let frame_margin = 32.0;
+        let fixed_height = SETTINGS_HEADER_HEIGHT + 4.0 + 8.0 + 20.0 + frame_margin;
+        let expanded_height = fixed_height + 6.0 * SETTINGS_ROW_HEIGHT + 3.0 * 32.0;
+        assert!(expanded_height < 560.0 - 48.0);
+        assert!(SETTINGS_CONTENT_WIDTH + frame_margin < 880.0 - 48.0);
     }
 }
