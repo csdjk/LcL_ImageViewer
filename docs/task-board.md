@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N04 | 左键平移图像、右键拖动窗口 | IN_PROGRESS | ChatGPT-AgentDock | 用户2026-09-14明确授权 / N03 DONE | `crates/iv-viewer/src/{app.rs,backdrop.rs}`, `tools/ui-qa/**`, `docs/ui-qa/鼠标拖拽验收.md`, `README.md` | 左键移图不移窗；右键移窗不移图且拖后不弹菜单；单击菜单/边缘缩放/导航保留；tests/check/release及实机双主题双尺寸验证 |
+| IV-P1-N04 | 左键平移图像、右键拖动窗口 | REVIEW | ChatGPT-AgentDock | 用户2026-09-14明确授权 / N03 DONE | `crates/iv-viewer/src/{app.rs,backdrop.rs}`, `tools/ui-qa/**`, `docs/ui-qa/鼠标拖拽验收.md`, `README.md` | 左键移图不移窗；右键移窗不移图且拖后不弹菜单；单击菜单/边缘缩放/导航保留；tests/check/release及实机双主题双尺寸验证 |
 | IV-P1-N03 | 窗口两侧半透明磨砂切图按钮 | DONE | ChatGPT-AgentDock | 用户追加需求；串行复用 N02 的1秒计时 | `crates/iv-viewer/src/{app.rs,ui.rs,main.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md` | 左右边缘垂直居中；顶栏移除重复箭头；半透明真实场景模糊；边界禁用；1秒隐藏恢复；tests/check/release及双主题双尺寸实机验收 |
 | IV-P1-N02 | 菜单栏 1 秒自动隐藏 | DONE | ChatGPT-AgentDock | 用户最新授权 / IV-P1-N01 DONE | `crates/iv-viewer/src/app.rs`, `tools/ui-qa/autohide-actions.json`, `docs/ui-qa/自动隐藏1秒验收.md` | 等待1秒；淡入120ms/淡出180ms不变；计时边界测试；实机双主题双尺寸隐藏恢复；tests/check/release PASS |
 | IV-P1-N01 | 浅色单色系新拟态 UI | DONE | ChatGPT-AgentDock | 用户最新授权 / P0 VALIDATED | `crates/iv-viewer/src/{ui.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `docs/新拟态UI规范.md`, `README.md` | 12–16pt 圆角；双主题单色系；多层双向柔影；凸起/凹陷、禁用/焦点；图片功能不变；真实双主题双尺寸/关键交互截图；tests/check/release build PASS |
@@ -92,3 +92,5 @@ N03 Worker HEAD `31947ea`，功能源码 `7611014`，串行包含N02提交。All
 ## N04 执行合同及领取记录
 
 用户明确要求左键拖拽图片、右键拖拽整个窗口。任务READY后由ChatGPT-AgentDock领取，独立分支 `codex/iv-p1-n04-mouse-gestures`，工作树 `Temp/worktrees/mouse-gestures`；基线 `0693288`。画布左键平移，保留中键兼容；右键单击菜单与拖动窗口互斥；原顶栏空白左键拖窗和左键边缘缩放保留。固定版本winit的StartDrag只发WM_NCLBUTTONDOWN，右键采用窗口/鼠标物理坐标差移动，避免虚假左键和位置反馈。只操作本次QA进程/隔离profile，不关闭已有查看器、不改关联。复验并集成后才DONE。
+
+N04分支复验：24tests/check/Debug及Release构建通过，48张双主题双尺寸真实拖拽截图的几何/像素检查通过。进入主线复验，完整范围8个文件。
