@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import time
@@ -57,6 +58,38 @@ bind(g, 'DeleteDC', [w.HDC], w.BOOL)
 bind(k, 'OpenProcess', [w.DWORD, w.BOOL, w.DWORD], w.HANDLE)
 bind(k, 'QueryFullProcessImageNameW', [w.HANDLE, w.DWORD, w.LPWSTR, c.POINTER(w.DWORD)], w.BOOL)
 bind(k, 'CloseHandle', [w.HANDLE], w.BOOL)
+
+class MouseInput(c.Structure):
+    _fields_ = [('dx', w.LONG), ('dy', w.LONG), ('data', w.DWORD),
+                ('flags', w.DWORD), ('time', w.DWORD), ('extra', c.c_size_t)]
+
+class InputUnion(c.Union):
+    _fields_ = [('mouse', MouseInput)]  # MouseInput is the largest INPUT variant.
+
+class NativeInput(c.Structure):
+    _fields_ = [('type', w.DWORD), ('value', InputUnion)]
+
+bind(u, 'SendInput', [w.UINT, c.POINTER(NativeInput), c.c_int], w.UINT)
+bind(u, 'GetSystemMetrics', [c.c_int], c.c_int)
+
+
+def atomic_click(hwnd, x, y, right=False):
+    """Queue absolute motion + down + up together so they cannot interleave."""
+    focus(hwnd)
+    _, _, origin, dpi = geometry(hwnd)
+    vx, vy = u.GetSystemMetrics(76), u.GetSystemMetrics(77)
+    vw, vh = u.GetSystemMetrics(78), u.GetSystemMetrics(79)
+    if vw <= 1 or vh <= 1:
+        raise RuntimeError('Invalid virtual desktop geometry')
+    px, py = origin.x + round(x * dpi / 96), origin.y + round(y * dpi / 96)
+    ax, ay = round((px-vx)*65535/(vw-1)), round((py-vy)*65535/(vh-1))
+    down, up = (8, 16) if right else (2, 4)
+    flags = [0xC001, down, up]  # MOVE | ABSOLUTE | VIRTUALDESK, then real buttons.
+    batch = (NativeInput * 3)(*[NativeInput(0, InputUnion(mouse=MouseInput(
+        ax if i==0 else 0, ay if i==0 else 0, 0, f, 0, 0))) for i,f in enumerate(flags)])
+    if u.SendInput(3, batch, c.sizeof(NativeInput)) != 3:
+        raise OSError(f'SendInput click failed: {c.get_last_error()}')
+
 
 class BMIHeader(c.Structure):
     _fields_ = [('size', w.DWORD), ('width', w.LONG), ('height', w.LONG),
@@ -294,19 +327,25 @@ def run(args):
             if kind == 'move':
                 move(hwnd, action['x'], action['y'])
             elif kind in ('click', 'right-click', 'down', 'up'):
-                if 'x' in action:
+                if kind in ('click', 'right-click') and 'x' in action:
+                    # Establish hover first; the absolute click batch reasserts its
+                    # position immediately at button-down instead of trusting a stale cursor.
                     move(hwnd, action['x'], action['y'])
-                focus(hwnd)
-                down, up = (8, 16) if kind == 'right-click' else (2, 4)
-                if kind != 'up':
-                    u.mouse_event(down, 0, 0, 0, 0)
-                    pressed_releases.add(up)
-                # Consecutive press/release avoids an unintended right-window drag
-                # if the physical mouse moves during a synthetic click.
-                if kind != 'down':
-                    u.mouse_event(up, 0, 0, 0, 0)
-                    pressed_releases.discard(up)
+                    atomic_click(hwnd, action['x'], action['y'], kind == 'right-click')
+                else:
+                    if 'x' in action:
+                        move(hwnd, action['x'], action['y'])
+                    focus(hwnd)
+                    down, up = (8, 16) if kind == 'right-click' else (2, 4)
+                    if kind != 'up':
+                        u.mouse_event(down, 0, 0, 0, 0)
+                        pressed_releases.add(up)
+                    if kind != 'down':
+                        u.mouse_event(up, 0, 0, 0, 0)
+                        pressed_releases.discard(up)
                 time.sleep(0.15)
+                if action.get('theme') in ('light', 'dark'):
+                    current_theme = action['theme']
             elif kind == 'drag':
                 # Client start, then absolute screen path: never chase the moving window.
                 button = action.get('button', 'left')
@@ -383,6 +422,10 @@ def run(args):
             except subprocess.TimeoutExpired:
                 proc.terminate()  # only the process created by this run
                 proc.wait(timeout=5)
+        # Export only known settings from an explicitly isolated test profile.
+        if profile and storage.is_file():
+            summary['qa_saved_settings'] = dict(re.findall(
+                r'"(iv-[^"\\]+)":\s*"([^"\\]*)"', storage.read_text(encoding='utf-8')))
         if previous_bytes is not None:
             storage.write_bytes(previous_bytes)
             restored = storage.read_bytes() == previous_bytes

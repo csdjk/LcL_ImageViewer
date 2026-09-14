@@ -552,6 +552,7 @@ pub fn setting_row(
     );
 }
 
+/// 固定32点滑条行；直接分配轨道宽度，避免嵌套水平布局挤掉轨道。
 pub fn compact_slider_row(
     ui: &mut egui::Ui,
     pal: &Palette,
@@ -559,51 +560,24 @@ pub fn compact_slider_row(
     value: &mut f32,
     range: std::ops::RangeInclusive<f32>,
 ) -> bool {
+    let width = ui.available_width();
     ui.allocate_ui_with_layout(
-        Vec2::new(ui.available_width(), 32.0),
+        Vec2::new(width, 32.0),
         egui::Layout::left_to_right(egui::Align::Center),
-        |ui| slider_row(ui, pal, label, value, range, true),
+        |ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            let (label_rect, _) = ui.allocate_exact_size(Vec2::new(76.0, 24.0), Sense::hover());
+            ui.painter().text(label_rect.left_center(), Align2::LEFT_CENTER, label,
+                FontId::new(13.0, FontFamily::Proportional), pal.dim);
+            ui.spacing_mut().slider_width = (width - 76.0 - 40.0 - 16.0).max(80.0);
+            let response = ui.add(egui::Slider::new(value, range).show_value(false).trailing_fill(true));
+            let (value_rect, _) = ui.allocate_exact_size(Vec2::new(40.0, 24.0), Sense::hover());
+            ui.painter().text(value_rect.right_center(), Align2::RIGHT_CENTER,
+                format!("{:.0}%", *value * 100.0),
+                FontId::new(12.0, FontFamily::Monospace), pal.dim);
+            response.changed()
+        },
     ).inner
-}
-
-/// 滑条设置行：标签（固定宽对齐）+ 滑条（占满中间）+ 右侧数值。
-/// `pct` 为 true 时按百分比显示。返回本帧是否被拖动改变。
-pub fn slider_row(
-    ui: &mut egui::Ui,
-    pal: &Palette,
-    label: &str,
-    val: &mut f32,
-    range: std::ops::RangeInclusive<f32>,
-    pct: bool,
-) -> bool {
-    let mut changed = false;
-    ui.horizontal(|ui| {
-        // 标签固定宽，多条滑条纵向对齐
-        let (lr, _) = ui.allocate_exact_size(Vec2::new(62.0, 20.0), Sense::hover());
-        ui.painter().text(
-            lr.left_center(),
-            Align2::LEFT_CENTER,
-            label,
-            FontId::new(13.0, FontFamily::Proportional),
-            pal.dim,
-        );
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let txt = if pct {
-                format!("{:.0}%", *val * 100.0)
-            } else {
-                format!("{val:.2}")
-            };
-            ui.label(RichText::new(txt).color(pal.dim).monospace().size(12.0));
-            ui.add_space(8.0);
-            let w = ui.available_width();
-            let r = ui.add_sized(
-                Vec2::new(w.max(80.0), 18.0),
-                egui::Slider::new(val, range).show_value(false),
-            );
-            changed = r.changed();
-        });
-    });
-    changed
 }
 
 /// 凹陷轨道 + 凸起滑块；状态同时通过位置和明暗表达。
