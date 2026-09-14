@@ -722,7 +722,7 @@ impl App {
     fn draw_delete_dialog(&mut self, ctx: &egui::Context, pal: &Palette) {
         if !self.delete_active() { return; }
         let screen = ctx.screen_rect();
-        ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("iv-delete-shield")))
+        ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::new("iv-delete-shield")))
             .rect_filled(screen, 0.0, Color32::from_black_alpha(80));
         let mut cancel = false;
         let mut confirm = false;
