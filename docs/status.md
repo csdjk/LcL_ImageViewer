@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。以磁盘、Git和可重复实机结果为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N09 -->
 
 ## 当前实现
 
@@ -26,7 +26,7 @@ N01新拟态、N02的1秒隐藏、N03两侧玻璃导航、N04鼠标手势、N05�
 
 ## NEXT
 
-NOW: IV-P1-01 READY — 完善通用验收入口。
+NOW: IV-P1-N09 IN_PROGRESS — 纠正为设置弹窗内部拖动，主窗口固定。
 
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 / IV-P1-N04 / IV-P1-N05 / IV-P1-N06 / IV-P1-N07 / IV-P1-N08 DONE。
 
