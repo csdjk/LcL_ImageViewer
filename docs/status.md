@@ -3,7 +3,7 @@
 > 更新时间：2026-09-14。以磁盘、Git和可重复实机结果为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-REL-030 -->
 
 ## 当前实现
 
@@ -25,7 +25,7 @@ P0 VALIDATED；P1 UI Stabilization ACTIVE；P2仍受P1门禁约束。N01至N09�
 
 ## NEXT
 
-NOW: IV-P1-01 READY — 完善通用验收入口。
+NOW: IV-REL-030 IN_PROGRESS — 用户明确授权v0.3.0文档、截图、打包发布；原P1验收继续保留。
 COMPLETED: IV-P1-N01 至 IV-P1-N09 DONE。
 
 ## 限制
