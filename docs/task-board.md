@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-INSTALL-02 | 新安装默认D盘目录 | IN_PROGRESS | ChatGPT-AgentDock | 用户要求 / INSTALL-01 DONE | `tools/setup.iss`, `tools/tests/**`, `README.md`, `docs/releases/default-install-directory.md` | D盘优先/无D回退/升级保留/目录可选；真实Inno测试与安装包构建；不安装、不改关联、不发布 |
+| IV-INSTALL-02 | 新安装默认D盘目录 | REVIEW | ChatGPT-AgentDock | 用户要求 / INSTALL-01 DONE | `tools/setup.iss`, `tools/tests/**`, `README.md`, `docs/releases/default-install-directory.md` | D盘优先/无D回退/升级保留/目录可选；真实Inno测试与安装包构建；不安装、不改关联、不发布 |
 | IV-INSTALL-01 | 修复安装器打开方式空注册键 | DONE | ChatGPT-AgentDock | 用户安装后打开方式缺失 / REL-030 DONE | `tools/setup.iss`, `tools/tests/**`, `docs/releases/openwith-installer-fix.md`, `README.md` | 显式ValueType、关联刷新；旧版复现/修正版隔离真实安装和卸载回归；本地修正版包，不改真实关联、不push或覆盖公开附件 |
 | IV-REL-030 | 更新README、实机配图并发布v0.3.0 | DONE | ChatGPT-AgentDock | 用户2026-09-15明确授权打包发布 / N09 DONE | `README.md`, `CHANGELOG.md`, `Cargo.toml`, `Cargo.lock`, `tools/**`, `docs/screenshots/**`, `docs/screenshot-*.jpg`, `docs/releases/**` | 文档准确；公开截图无隐私；tests/check/release workspace；包内容/hash/启动检查；推送main和新标签后GitHub Release附件核验 |
 | IV-P1-N09 | 设置弹窗独立拖动（纠正拖动对象） | DONE | ChatGPT-AgentDock | 用户明确纠正 / N08 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/设置弹窗独立拖动验收.md` | 标题只移动内部弹窗，主窗口固定；控件不误拖；边界可见；画布右键拖窗保留；tests/check/双构建与实机验证 |
@@ -42,7 +42,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-INSTALL-02 IN_PROGRESS
+NOW: IV-INSTALL-02 REVIEW
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -177,3 +177,5 @@ IV-INSTALL-01 完成：本地集成`6ce3ea621bf81de8105af033c8f1accd489c44f1`，
 ## IV-INSTALL-02 合同
 
 Base `42d3393662b5a07d80b5fe6c9b82dfdf50423c39`，独立branch `codex/install-default-d`，worktree `Temp/worktrees/install-default-d`。默认首次安装D:\Program Files\LcL ImageViewer，D盘不存在回退localappdata\Programs；升级沿用旧目录，目录选择页始终显示；保留INSTALL-01全部修复。只生成新的本地安装包，不覆盖已发布附件，不移动或重装用户当前程序，不修改实时关联。测试仅运行无负载/无注册动作的隔离目录选择探针，源码无GUI改动。
+
+IV-INSTALL-02 Review: 11 read-only installer checks pass; actual Inno initialization selected the D-drive directory and passed both branch assertions. Wizard screenshot not validated. Existing association fixes retained; no application code changes.
