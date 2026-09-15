@@ -12,7 +12,6 @@ use eframe::egui::{
     Sense, Slider, Stroke, Vec2, ViewportCommand,
 };
 use iv_core::decode::{DecodedImage, MipLevel, PixelData};
-use iv_core::format::has_supported_ext;
 
 use crate::loader::{Loader, Msg};
 use crate::render::{ChannelMode, Renderer, Uniforms, MAX_GLASS};
@@ -49,6 +48,7 @@ struct ImageCache {
     map: HashMap<PathBuf, Arc<DecodedImage>>,
     order: Vec<PathBuf>,
     bytes: usize,
+    stamps: HashMap<PathBuf, (u64, Option<std::time::SystemTime>)>,
 }
 
 impl ImageCache {
@@ -57,6 +57,7 @@ impl ImageCache {
             map: HashMap::new(),
             order: Vec::new(),
             bytes: 0,
+            stamps: HashMap::new(),
         }
     }
 
@@ -71,25 +72,39 @@ impl ImageCache {
         mip + frm
     }
 
-    fn get(&self, path: &Path) -> Option<Arc<DecodedImage>> {
+    fn stamp(path: &Path) -> Option<(u64, Option<std::time::SystemTime>)> {
+        let meta = std::fs::metadata(path).ok()?;
+        if !meta.is_file() { return None; }
+        Some((meta.len(), meta.modified().ok()))
+    }
+
+    fn get(&mut self, path: &Path) -> Option<Arc<DecodedImage>> {
+        if !self.map.contains_key(path) { return None; }
+        if Self::stamp(path).as_ref() != self.stamps.get(path) {
+            self.remove(path);
+            return None;
+        }
+        self.order.retain(|p| p != path);
+        self.order.push(path.to_path_buf());
         self.map.get(path).cloned()
     }
 
     fn remove(&mut self, path: &Path) {
+        self.stamps.remove(path);
         if let Some(img) = self.map.remove(path) {
             self.bytes = self.bytes.saturating_sub(Self::image_bytes(&img));
         }
         self.order.retain(|p| p != path);
     }
 
-    fn contains(&self, path: &Path) -> bool {
-        self.map.contains_key(path)
-    }
-
     fn put(&mut self, path: PathBuf, img: Arc<DecodedImage>, keep: &Path) {
         if self.map.contains_key(&path) {
             return;
         }
+        let Some(stamp) = Self::stamp(&path) else { return; };
+        // Oversized speculative entries must not evict all useful neighbours.
+        if Self::image_bytes(&img) > CACHE_BUDGET_BYTES && path != keep { return; }
+        self.stamps.insert(path.clone(), stamp);
         self.bytes += Self::image_bytes(&img);
         self.map.insert(path.clone(), img);
         self.order.push(path);
@@ -103,12 +118,15 @@ impl ImageCache {
                 self.bytes -= Self::image_bytes(&img);
             }
             self.order.remove(victim);
+            self.stamps.remove(&p);
         }
     }
 }
 
 pub struct App {
     loader: Loader,
+    scanner: crate::directory::Scanner,
+    directory_generation: u64,
     cache: ImageCache,
     current: Option<CurrentImage>,
     /// 正在异步加载的路径（显示"加载中"）
@@ -213,7 +231,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cc: &eframe::CreationContext, initial_path: Option<PathBuf>) -> Self {
+    pub fn new(cc: &eframe::CreationContext, initial_path: Option<PathBuf>, loader: Loader) -> Self {
         crate::perf::mark("app_new", None, 0.0);
         // 恢复已有显式主题；新用户默认使用浅色新拟态。
         // SetTheme 经 egui-winit → winit → DWM 沉浸式暗色模式同步系统标题栏
@@ -228,8 +246,12 @@ impl App {
             .map(crate::render::Renderer::new);
         crate::perf::mark("renderer_ready", None, 0.0);
         let (backdrop_capture_tx, backdrop_capture_rx) = mpsc::channel();
+        loader.set_waker(cc.egui_ctx.clone());
+        let scanner = crate::directory::Scanner::spawn(cc.egui_ctx.clone());
         let mut app = Self {
-            loader: Loader::spawn(),
+            loader,
+            scanner,
+            directory_generation: 0,
             cache: ImageCache::new(),
             current: None,
             pending: None,
@@ -314,52 +336,54 @@ impl App {
         app
     }
 
-    /// 打开一个文件：扫目录 → 缓存命中直接显示，否则异步加载。
-    fn open(&mut self, path: PathBuf) {
-        // Keep cache keys, directory entries and confirmed deletion paths consistent.
+    /// Explicit opens refresh the directory in the background; navigation reuses its snapshot.
+    fn open(&mut self, path: PathBuf) { self.open_impl(path, true); }
+
+    fn open_impl(&mut self, path: PathBuf, rescan: bool) {
         let path = std::path::absolute(&path).unwrap_or(path);
         crate::perf::mark("load_request", Some(&path), 0.0);
         self.error_msg = None;
-        self.refresh_directory(&path);
         self.mip_index = 0;
         self.auto_fit = true;
-        if let Some(img) = self.cache.get(&path) {
-            self.set_current(path, img);
-        } else {
+        let cached = self.cache.get(&path);
+        if cached.is_none() {
             self.pending = Some(path.clone());
             self.current = None;
-            self.loader.load(path);
+            // Enqueue before directory work; submitting cannot block behind the decoder.
+            self.loader.load(path.clone());
+        } else {
+            self.loader.cancel_queued();
         }
+        if let Some(index) = self.directory.as_ref().and_then(|d| d.files.iter().position(|p| p == &path)) {
+            self.directory.as_mut().unwrap().index = index;
+        } else {
+            self.directory = Some(Directory { files: vec![path.clone()], index: 0 });
+        }
+        if rescan {
+            self.directory_generation = self.directory_generation.wrapping_add(1);
+            self.scanner.request(self.directory_generation, path.clone());
+        }
+        if let Some(img) = cached { self.set_current(path, img); }
     }
 
-    /// 扫描同目录文件列表并定位 index。
+    /// Deletion needs an immediate post-delete list; ordinary opens never use this path.
     fn refresh_directory(&mut self, path: &Path) {
+        self.directory_generation = self.directory_generation.wrapping_add(1);
         let started = Instant::now();
-        if let Some(dir) = path.parent() {
-            let mut files: Vec<PathBuf> = match std::fs::read_dir(dir) {
-                Ok(rd) => rd
-                    .filter_map(|e| e.ok())
-                    .map(|e| e.path())
-                    .filter(|p| p.is_file() && has_supported_ext(p))
-                    .collect(),
-                Err(_) => Vec::new(),
-            };
-            files.sort_by(|a, b| {
-                let ka = a
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.to_lowercase())
-                    .unwrap_or_default();
-                let kb = b
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.to_lowercase())
-                    .unwrap_or_default();
-                ka.cmp(&kb)
-            });
-            let index = files.iter().position(|p| p == path).unwrap_or(0);
-            self.directory = Some(Directory { files, index });
-            crate::perf::mark("directory_ready", Some(path), started.elapsed().as_secs_f64()*1000.0);
+        let files = crate::directory::scan_files(path);
+        let index = files.iter().position(|p| p == path).unwrap_or(0);
+        self.directory = Some(Directory { files, index });
+        crate::perf::mark("directory_ready", Some(path), started.elapsed().as_secs_f64()*1000.0);
+    }
+
+    fn poll_directory(&mut self) {
+        while let Some(result) = self.scanner.poll() {
+            if result.id != self.directory_generation { continue; }
+            let path = self.pending.as_ref().or_else(|| self.current.as_ref().map(|c| &c.path));
+            let Some(path) = path else { continue; };
+            let index = result.files.iter().position(|p| p == path).unwrap_or(0);
+            self.directory = Some(Directory { files: result.files, index });
+            if self.pending.is_none() { self.schedule_prefetch(); }
         }
     }
 
@@ -447,25 +471,16 @@ impl App {
         self.upload_current_frame();
     }
 
-    /// 预读目录中相邻文件（前后各 2）。
+    /// Prefer immediate next/previous images, without copying the whole directory.
     fn schedule_prefetch(&mut self) {
-        let (files, index) = match &self.directory {
-            Some(d) => (d.files.clone(), d.index),
-            None => return,
-        };
-        for di in [
-            index as isize - 2,
-            index as isize - 1,
-            index as isize + 1,
-            index as isize + 2,
-        ] {
-            if di >= 0 && (di as usize) < files.len() {
-                let p = &files[di as usize];
-                if !self.cache.contains(p) {
-                    self.loader.prefetch(p.clone());
-                }
-            }
-        }
+        let Some(d) = &self.directory else { return; };
+        let candidates: Vec<_> = [1isize, -1, 2, -2].into_iter()
+            .filter_map(|offset| {
+                let i = d.index as isize + offset;
+                if i < 0 { None } else { d.files.get(i as usize).cloned() }
+            }).collect();
+        let paths = candidates.into_iter().filter(|p| self.cache.get(p).is_none()).collect::<Vec<_>>();
+        self.loader.prefetch(paths);
     }
 
     /// 相对当前文件移动 n 步。
@@ -479,7 +494,7 @@ impl App {
             }
         });
         if let Some(p) = target {
-            self.open(p);
+            self.open_impl(p, false);
         }
     }
 
@@ -489,7 +504,7 @@ impl App {
             .as_ref()
             .and_then(|d| d.files.get(index).cloned())
         {
-            self.open(p);
+            self.open_impl(p, false);
         }
     }
 
@@ -551,6 +566,10 @@ impl App {
                 Msg::Ready(Ok((path, img))) => {
                     if !path.is_file() {
                         self.cache.remove(&path);
+                        if self.pending.as_ref() == Some(&path) {
+                            self.pending = None;
+                            self.error_msg = Some("图片在加载期间已被移动或删除".into());
+                        }
                         continue;
                     }
                     if self.pending.as_ref() == Some(&path) {
@@ -2022,6 +2041,7 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_delete(ctx);
         self.handle_loader_messages();
+        self.poll_directory();
         self.update_window_title(ctx);
         let pal = ui::palette(ctx);
 
@@ -2550,9 +2570,9 @@ impl eframe::App for App {
             }
         }
 
-        // 加载中持续重绘
+        // Worker completion wakes egui immediately; a slow load only needs a low-rate fallback.
         if self.pending.is_some() {
-            ctx.request_repaint();
+            ctx.request_repaint_after(Duration::from_millis(100));
         }
     }
 }
@@ -2848,5 +2868,36 @@ mod menu_key_tests {
         assert_eq!(next_index_after_delete(1, 2), Some(1));
         assert_eq!(next_index_after_delete(2, 2), Some(1));
         assert_eq!(next_index_after_delete(0, 0), None);
+    }
+}
+
+#[cfg(test)]
+mod cache_validity_tests {
+    use super::*;
+    fn fixture() -> (PathBuf, Arc<DecodedImage>) {
+        let path = std::env::temp_dir().join(format!("iv-cache-{}-{}.png",std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::write(&path, [1]).unwrap();
+        let image = Arc::new(DecodedImage { width:1,height:1,
+            mips:vec![MipLevel {width:1,height:1,data:PixelData::Rgba8(vec![9,8,7,6])}],
+            kind:iv_core::decode::ImageKind::Png,compression:None,has_alpha:true,is_hdr:false,
+            extra_meta:None,frames:Vec::new() });
+        (path,image)
+    }
+    #[test]
+    fn edited_or_removed_files_do_not_hit_stale_cache() {
+        let (path,image)=fixture(); let mut cache=ImageCache::new();
+        cache.put(path.clone(),image.clone(),&path); assert!(cache.get(&path).is_some());
+        std::fs::write(&path,[1,2]).unwrap(); assert!(cache.get(&path).is_none()); assert_eq!(cache.bytes,0);
+        cache.put(path.clone(),image,&path); std::fs::remove_file(&path).unwrap();
+        assert!(cache.get(&path).is_none()); assert_eq!(cache.bytes,0);
+    }
+    #[test]
+    fn cache_hits_promote_real_lru_without_copying_pixels() {
+        let (a,image)=fixture(); let (b,second)=fixture(); let mut cache=ImageCache::new();
+        cache.put(a.clone(),image.clone(),&a); cache.put(b.clone(),second,&b);
+        assert!(Arc::ptr_eq(&cache.get(&a).unwrap(),&image));
+        assert_eq!(cache.order,vec![b.clone(),a.clone()]); assert_eq!(cache.bytes,8);
+        std::fs::remove_file(a).unwrap(); std::fs::remove_file(b).unwrap();
     }
 }

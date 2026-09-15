@@ -7,6 +7,7 @@
 mod app;
 mod backdrop;
 mod loader;
+mod directory;
 mod perf;
 mod render;
 mod recycle;
@@ -16,10 +17,14 @@ mod winassoc;
 fn main() -> eframe::Result<()> {
     perf::init();
     // 命令行参数：可选的初始文件路径（文件关联 / 拖到 exe 上打开）
-    let initial_path = std::env::args()
+    let initial_path = std::env::args_os()
         .skip(1)
         .map(std::path::PathBuf::from)
-        .find(|p| p.is_file());
+        .find(|p| p.is_file())
+        .map(|p| std::path::absolute(&p).unwrap_or(p));
+    // Read/decode the requested image while eframe initializes the GPU and window.
+    let loader = loader::Loader::spawn();
+    if let Some(path) = &initial_path { loader.load(path.clone()); }
 
     // 注：窗口保持不透明。wgpu flip-model swapchain 窗口上 DWM 磨砂材质
     // （Acrylic/Mica）均不生效，窗口磨砂背景由 backdrop.rs 自实现
@@ -47,7 +52,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "LcL ImageViewer",
         options,
-        Box::new(move |cc| Box::new(app::App::new(cc, initial_path))),
+        Box::new(move |cc| Box::new(app::App::new(cc, initial_path, loader))),
     )
 }
 
