@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-DOC-01 | README 当前功能与 RGBA 重点说明 | REVIEW | ChatGPT-AgentDock | 用户明确要求修改提交 / REL-031 DONE | `README.md` | 当前功能而非版本历史；通道/像素说明与代码一致；引用/Markdown/diff检查；本地提交合入，不push或发布 |
+| IV-DOC-01 | README 当前功能与 RGBA 重点说明 | DONE | ChatGPT-AgentDock | 用户明确要求修改提交 / REL-031 DONE | `README.md` | 当前功能而非版本历史；通道/像素说明与代码一致；引用/Markdown/diff检查；本地提交合入，不push或发布 |
 | IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
 | IV-PERF-01 | 图片加载与启动耗时优化 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / 当前main | `crates/iv-viewer/src/{main.rs,app.rs,loader.rs,render.rs,perf.rs,directory.rs}`, `crates/iv-core/src/decode.rs`, `crates/iv-core/tests/**`, `crates/iv-core/examples/**`, `tools/perf/**`, `docs/performance/**`, `README.md` | 同样本同Release基线；调度/扫描/拷贝优化；像素一致；tests/check/双构建及实际窗口验证；不改关联/安装/远端 |
 | IV-INSTALL-02 | 新安装默认D盘目录 | DONE | ChatGPT-AgentDock | 用户要求 / INSTALL-01 DONE | `tools/setup.iss`, `tools/tests/**`, `README.md`, `docs/releases/default-install-directory.md` | D盘优先/无D回退/升级保留/目录可选；真实Inno测试与安装包构建；不安装、不改关联、不发布 |
@@ -45,7 +45,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-DOC-01 IN_PROGRESS
+NOW: IV-P1-01 READY
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -213,3 +213,5 @@ IV-REL-031 DONE：v0.3.1于2026-09-15T13:44:36Z正式发布并置Latest，源码
 Base `1d5cb0b3da7213a6019687f2af5be7f6608b71ca`；branch `codex/readme-rgba`；worktree `Temp/worktrees/readme-rgba`。用户要求直接修改README并提交：只描述当前功能，突出RGBA单通道/Alpha/像素读取，去掉版本叙事。Worker仅改README，复用已有真实配图并准确标注为界面示例；不重绘图片、不改Rust/版本/安装器、不重建安装包。核对app.rs快捷键、image.wgsl通道语义和像素读取来源，校验引用/Markdown/范围；Integrator合入main再验证，同步协调记录。此轮仅本地提交，不push，既有发布不变。
 
 IV-DOC-01 Review：Worker `09a19d96af0686f065e8e475fa9e0868e459d735`，任务分支只改README。已核对快捷键、Shader单通道与像素读取来源；无版本更新段落，六张既有配图和文档/锚点引用及Markdown/HTML检查通过。允许本地主线集成，不push、不改代码或发布包。
+
+IV-DOC-01 DONE：README提交 `09a19d96af0686f065e8e475fa9e0868e459d735`，本地集成 `f873c642c75afcf01434b363921717e5c75b0731`。主页按当前功能组织，RGBA/Alpha/像素检查优先，无逐版本更新段落；说明O与5/C、键盘A与Alpha按钮区别。主线Markdown/HTML、10个本地引用、6张图片、锚点/通道映射及diff检查PASS；54项workspace测试通过。只改README及协调文档，Rust/图片/版本/安装器与Debug、Release二进制均未变；没有push或重新发布。证据位于忽略目录 `Temp/readme-rgba-review/`。NEXT恢复IV-P1-01。
