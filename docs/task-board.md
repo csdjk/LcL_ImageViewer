@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-INSTALL-01 | 修复安装器打开方式空注册键 | IN_PROGRESS | ChatGPT-AgentDock | 用户安装后打开方式缺失 / REL-030 DONE | `tools/setup.iss`, `tools/tests/**`, `docs/releases/openwith-installer-fix.md`, `README.md` | 显式ValueType、关联刷新；旧版复现/修正版隔离真实安装和卸载回归；本地修正版包，不改真实关联、不push或覆盖公开附件 |
 | IV-REL-030 | 更新README、实机配图并发布v0.3.0 | DONE | ChatGPT-AgentDock | 用户2026-09-15明确授权打包发布 / N09 DONE | `README.md`, `CHANGELOG.md`, `Cargo.toml`, `Cargo.lock`, `tools/**`, `docs/screenshots/**`, `docs/screenshot-*.jpg`, `docs/releases/**` | 文档准确；公开截图无隐私；tests/check/release workspace；包内容/hash/启动检查；推送main和新标签后GitHub Release附件核验 |
 | IV-P1-N09 | 设置弹窗独立拖动（纠正拖动对象） | DONE | ChatGPT-AgentDock | 用户明确纠正 / N08 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/设置弹窗独立拖动验收.md` | 标题只移动内部弹窗，主窗口固定；控件不误拖；边界可见；画布右键拖窗保留；tests/check/双构建与实机验证 |
 | IV-P1-N08 | 设置页紧凑列表与标题拖窗 | DONE | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
@@ -40,7 +41,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-01 READY
+NOW: IV-INSTALL-01 IN_PROGRESS
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -163,3 +164,7 @@ IV-REL-030 Review：Worker 0ef558d。40tests/check/release workspace、PE x64 GU
 ## IV-REL-030 完成
 
 v0.3.0正式发布：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.3.0；tag源码`c8ceef0e6bc4555020e4ea7b4fdbdce8a7c951c4`。main及新标签已推送，三附件上传且公开下载hash均一致，安装器和ZIP通过本地验证；README五张配图为实际v0.3.0。发布权限来自本轮用户明确要求，不强推，不覆盖旧版本。NEXT恢复IV-P1-01，P1整体门禁继续保留。
+
+## IV-INSTALL-01 执行合同
+
+Base `8fc0d51921cbcedce4aaf6827970409ef92ba6a9`；用户安装v0.3.0且已选thumbs,assoc，实机注册键为空，命令残留旧安装位置。本轮修正安装脚本遗漏ValueType和关联刷新，必要共享键只清除自有值；不重写GUI/图像/默认关联。独立分支`codex/install-openwith-fix`，工作树`Temp/worktrees/install-openwith-fix`；原发布工作树冻结。真实安装测试仅允许隔离的HKCU\Software\LcL\InstallerQA随机命名空间及项目Temp，禁止修改实时Software\Classes/UserChoice/RegisteredApplications、用户安装或快捷方式。沿用已发布0.3.0主程序生成单独标注修正版的本地安装包，不重新发布或覆盖公开0.3.0附件。
