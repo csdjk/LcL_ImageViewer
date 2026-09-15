@@ -4,182 +4,204 @@
 
 # LcL ImageViewer
 
-**轻量级 Windows 图片查看器，为游戏美术、贴图检查与日常看图设计。**
+**快速切换 R / G / B / Alpha，检查游戏贴图、透明边缘与像素数据。**
+
+面向游戏美术、技术美术与独立开发者的轻量级 Windows 图片查看器。
 
 [![Release](https://img.shields.io/github/v/release/csdjk/LcL_ImageViewer?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases/latest)
 [![Windows x64](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-blue?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases/latest)
 [![MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-orange?style=flat-square)](https://www.rust-lang.org/)
 
-[下载安装包](https://github.com/csdjk/LcL_ImageViewer/releases/latest) · [更新日志](CHANGELOG.md) · [反馈问题](https://github.com/csdjk/LcL_ImageViewer/issues)
+[下载使用](https://github.com/csdjk/LcL_ImageViewer/releases/latest) · [RGBA 通道检查](#rgba-通道检查) · [快捷键](#快捷键) · [反馈问题](https://github.com/csdjk/LcL_ImageViewer/issues)
 
 </div>
 
+## RGBA 通道检查
+
+不仅查看一张图的最终颜色，也能单独检查它的每个通道。支持 **RGB 完整显示、R / G / B / Alpha 单通道灰度显示，以及忽略 Alpha 的彩色显示**，适合 UI、特效、遮罩和通道打包贴图的日常检查。
+
+通过顶部工具栏的 **RGB / R / G / B / A** 按钮切换；窗口较窄时使用通道下拉菜单，也可以直接按数字键。
+
+| 显示模式 | 快捷键 | 显示内容与用途 |
+| --- | --- | --- |
+| **R 红通道** | `1` | 将 R 通道显示为灰度，检查该通道的数据分布 |
+| **G 绿通道** | `2` | 将 G 通道显示为灰度，检查该通道的数据分布 |
+| **B 蓝通道** | `3` | 将 B 通道显示为灰度，检查该通道的数据分布 |
+| **Alpha 透明度** | `4` | 将 Alpha 显示为灰度：黑色为全透明，白色为不透明，灰色为半透明 |
+| **RGB 完整显示** | `5` 或 `C` | 显示彩色图像，并保留原图透明度；工具栏中的名称为 RGB |
+| **RGB 忽略 Alpha** | `O` | 忽略透明度显示彩色内容，检查透明区域下仍然保存的 RGB 数据 |
+
+**`O` 是进入“忽略 Alpha”模式，不是开关：恢复透明显示请按 `5` 或 `C`。** 工具栏的 **A 按钮**代表 Alpha，键盘上的 **`A`** 用于上一张；查看 Alpha 的快捷键是 **`4`**。
+
+各模式一次显示一种通道视图，并非任意组合开关多个通道。切换只改变预览，不修改文件，也不重新编码图片。
+
+### Alpha 实机示例
+
+![Alpha 灰度视图：黑色为透明区域，白色为不透明主体](docs/screenshots/alpha-channel.jpg)
+
+### 贴图检查怎么用？
+
+| 检查对象 | 推荐操作 |
+| --- | --- |
+| **UI / 特效透明边缘** | `5` 看完整效果，`4` 看 Alpha 轮廓，结合棋盘格或纯色背景观察边缘与半透明过渡 |
+| **透明区域里的颜色** | 按 `O` 查看被 Alpha 隐藏的 RGB，再用像素检查器核对透明像素中的颜色值 |
+| **通道打包材质 / Mask** | 按 `1 → 2 → 3 → 4` 逐通道查看，检查各通道是否放入了预期的遮罩或材质数据 |
+| **像素风 / 细小杂点** | 按 `N` 使用最近邻采样，放大后配合单通道视图定位异常像素；按 `0` 回到实际大小 |
+
+例如，你的材质约定 R 存金属度、G 存粗糙度、B 存环境遮蔽、A 存遮罩，就可以逐个通道核对。**这只是通道用途的示例，并不是统一标准；查看器不会自动判断每个通道的材质含义。**
+
+## 像素读取与透明度排查
+
+把鼠标移到图片上，底部状态栏会显示**像素坐标与 `#RRGGBBAA`**。打开右键菜单中的 **“像素检查器…”**，可查看完整 RGBA 十进制和浮点读数；**“复制像素值”**可复制当前取到的颜色。动画读取当前帧，多 Mip 图片读取当前层级。
+
+例如，`(255, 255, 255, 0)` 和 `(0, 0, 0, 0)` 都是全透明像素，但隐藏的 RGB 数据不同。结合 **Alpha 灰度视图、忽略 Alpha 模式和像素数值**，可以分别检查透明度与颜色，而不是只凭最终合成画面判断。
+
+读数来自**解码后的图片像素**，不是屏幕截图，因此不会把界面的阴影、棋盘格或背景色混入结果。普通图片的内部数据为 RGBA8，浮点读数由其除以 255 得到，不额外做 sRGB 到线性的转换；HDR 保留浮点数据供读取，8 位读数会截到可表示范围。
+
 ## 界面预览
-
-以下为 **v0.3.0 实际运行截图**，v0.3.1 延用同一套界面样式。示例使用项目自身的图标素材，桌面磨砂关闭，避免显示桌面内容。
-
-### 深色主题
-
-![深色主题：侧边玻璃切图按钮、悬浮工具栏与像素状态栏](docs/screenshot-dark.jpg)
-
-### 浅色主题
-
-![浅色主题：雾蓝灰新拟态界面](docs/screenshot-light.jpg)
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/settings.png" alt="无分类紧凑设置弹窗，可单独拖动"></td>
-    <td width="50%"><img src="docs/screenshots/context-menu.png" alt="无分类右键菜单"></td>
+    <td width="50%"><img src="docs/screenshot-dark.jpg" alt="深色主题：悬浮工具栏与两侧切图按钮"></td>
+    <td width="50%"><img src="docs/screenshot-light.jpg" alt="浅色主题：雾蓝灰新拟态控件"></td>
   </tr>
   <tr>
-    <td align="center">紧凑设置 · 标题拖动只移动弹窗</td>
-    <td align="center">精简菜单 · 只保留常用文件操作</td>
+    <td align="center">深色主题</td>
+    <td align="center">浅色主题</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/settings.png" alt="紧凑设置弹窗，标题可独立拖动"></td>
+    <td><img src="docs/screenshots/context-menu.png" alt="精简右键菜单"></td>
+  </tr>
+  <tr>
+    <td align="center">设置弹窗 · 独立拖动</td>
+    <td align="center">右键菜单 · 常用文件操作</td>
   </tr>
 </table>
 
-## v0.3.1 更新
+配图为程序实机示例，截图中的版本号仅对应截图时的构建。
 
-本次整合**图片加载加速、安装器“打开方式”修复、默认 D 盘安装**。首图解码与窗口初始化并行；同目录导航不再每次同步扫描；预读去重并优先处理最新选择，减少整张图的重复复制。修复静态 WebP 可能被误判为无有效帧的动画。
+## 浏览与检查功能
 
-全新安装默认 `D:\Program Files\LcL ImageViewer`，没有 D 盘则回退当前用户目录；升级沿用原位置，可在安装向导中更改。安装时勾选“打开方式”后，会写入应用名称、支持格式和正确打开命令，并通知资源管理器刷新；不强制更改默认图片软件。
-
-### 延续的 v0.3.0 功能
-
-新拟态深浅主题、窗口两侧的半透明磨砂切图按钮，以及 **1 秒无操作后自动淡出**的悬浮工具栏。右键菜单与设置页去掉冗余分类；设置弹窗可以独立拖动。
-
-操作同步调整为 **左键拖图、画布右键拖主窗口、A / D 切图**。按 `Delete` 会先确认，再将当前图片移入回收站；“打开所在文件夹”直接打开当前图片的父目录。
-
-## 主要功能
-
-| 方向 | 能力 |
+| 功能 | 说明 |
 | --- | --- |
-| 游戏贴图 | DDS（BC1–BC7）、PSD、TGA、QOI、HDR、PNM，以及常见 PNG / JPG / BMP / TIFF / ICO 格式 |
-| RGBA 检查 | R、G、B、Alpha 单通道查看；保留透明度或忽略 Alpha；棋盘格 / 纯色衬底 |
-| Mipmap 与采样 | 多 Mip 图片切换层级；最近邻 / 双线性采样；HDR 曝光调节 |
-| 像素检查 | 光标处像素坐标、RGBA8 十六进制 / 十进制与浮点读数；复制像素值 |
-| 动画 | GIF / WebP / APNG 播放暂停、逐帧查看与帧进度控制 |
-| 日常看图 | 同目录导航、鼠标缩放和平移、适配窗口、实际大小、复制路径、打开所在文件夹 |
-| 外观 | 深浅主题、柔和新拟态控件、侧边磨砂导航、可选桌面磨砂背景、减少动效 |
-| Windows 集成 | 可选“打开方式”注册和资源管理器缩略图扩展，不自动替用户选择系统默认应用 |
+| **同目录浏览** | 左右悬浮按钮或快捷键切换图片；支持跳到第一张 / 最后一张，到达首尾不循环 |
+| **缩放与平移** | 滚轮围绕光标缩放，左键 / 中键拖图，适配窗口与实际大小 100% 切换 |
+| **采样方式** | 最近邻适合观察像素边界，双线性用于平滑缩放；可随时切换 |
+| **Mipmap 检查** | 对包含多个 Mip 的图片切换层级，查看不同分辨率下的贴图与像素数据 |
+| **HDR 曝光** | 保留 HDR 浮点数据，调节曝光辅助查看亮暗细节 |
+| **动画检查** | GIF / APNG / 动态 WebP 播放暂停、逐帧步进和帧进度控制 |
+| **图像属性** | 查看图像尺寸、格式及可用的压缩、Mip、动画等信息 |
+| **文件操作** | 复制路径、直接打开图片所在文件夹、确认后将图片移入回收站 |
+| **界面与背景** | 深浅主题、棋盘格 / 纯色透明衬底、可选桌面磨砂及其参数、减少动效；悬浮栏无操作 1 秒后开始淡出 |
+| **紧凑设置** | 无分类列表，设置标题左键 / 右键拖动只移动内部弹窗，主窗口保持不动 |
+| **加载与预读** | 首图解码与窗口初始化并行，目录后台扫描；有限相邻图片预读与缓存，优先处理最新的切图请求 |
+| **Windows 集成** | 可选注册到“打开方式”、成为默认应用候选，以及资源管理器缩略图扩展；不自动抢占默认看图软件 |
 
-<details>
-<summary>查看 Alpha 通道实机示例</summary>
+## 支持的图片格式
 
-![Alpha 单通道：透明度以灰度显示](docs/screenshots/alpha-channel.jpg)
+| 类型 | 格式与说明 |
+| --- | --- |
+| **常规图片** | PNG、JPG / JPEG、BMP、TIFF、ICO、静态 WebP |
+| **游戏贴图** | DDS、TGA、PSD、QOI |
+| **动画图片** | GIF、APNG、动态 WebP |
+| **高动态范围 / 数据图片** | Radiance HDR、PPM / PGM / PBM |
 
-</details>
+DDS 支持 BC1–BC7、部分未压缩 / 浮点格式和文件自带的 Mip 链；Cubemap / Texture Array 当前只读取第一个面或元素，并非完整的立方体或数组浏览器。PSD 读取已保存的**合成图**，支持 8 位 RGB / 灰度及 RAW / RLE，不解析图层、不支持 PSB，也不是图层编辑器。
 
-## 下载与使用
+## 下载与安装
 
-前往 [GitHub Releases](https://github.com/csdjk/LcL_ImageViewer/releases/latest)。
+在 [GitHub Releases](https://github.com/csdjk/LcL_ImageViewer/releases/latest) 下载最新版本：
 
 | 文件 | 用途 |
 | --- | --- |
-| `LcL-ImageViewer-Setup-v0.3.1-win64.exe` | 安装版：当前用户安装，提供开始菜单入口和卸载器；文件关联、缩略图注册可在安装时选择 |
-| `LcL-ImageViewer-v0.3.1-win64.zip` | 免安装包：解压后运行 `imageview.exe`；包含可选缩略图扩展、脚本、使用说明和更新日志 |
-| `SHA256SUMS.txt` | 安装包与免安装包的 SHA-256 校验值 |
+| `LcL-ImageViewer-Setup-v*-win64.exe` | **安装版**：安装向导、开始菜单入口、卸载器，可选“打开方式”和缩略图注册 |
+| `LcL-ImageViewer-v*-win64.zip` | **免安装版**：解压后直接运行 `imageview.exe`，普通看图无需注册 DLL |
+| `SHA256SUMS.txt` | 安装包与 ZIP 的 SHA-256 校验值 |
 
-发布包暂未配置代码签名；下载后可用 `Get-FileHash` 与 `SHA256SUMS.txt` 核对文件完整性。
+全新安装默认 **`D:\Program Files\LcL ImageViewer`**；没有 D 盘时回退到 `%LOCALAPPDATA%\Programs\LcL ImageViewer`。升级优先沿用原目录，安装向导始终允许手动选择位置，不会自动把已有安装迁移到 D 盘。
 
-首次打开可将图片拖进窗口，或使用 `Ctrl+O` 选择文件。图片打开后，`A / D` 或 `← / →` 浏览同目录图片；到达首尾时不循环。
+安装或替换程序前关闭旧查看器。界面偏好保存在 `%APPDATA%\LcL ImageViewer`，免安装版也使用此位置。发布包尚未配置代码签名，可用 `Get-FileHash` 与 `SHA256SUMS.txt` 核对完整性。
 
-v0.3.1 安装器的全新安装默认目录为 `D:\Program Files\LcL ImageViewer`；没有 D 盘时回退到 `%LOCALAPPDATA%\Programs\LcL ImageViewer`。升级安装优先沿用原安装目录，目录选择页始终显示，可以手动修改。v0.3.1 同时包含“打开方式”注册修复；旧版本附件保留，不会被替换。
-
-升级前关闭旧查看器。安装版使用安装向导升级；免安装版建议解压到新目录后启动，避免误开旧的 EXE。开发目录中的 Debug、Release 与其他安装副本是独立文件，不会同时自动更新。界面偏好保存在当前用户的 `%APPDATA%\LcL ImageViewer` 下，免安装并不代表配置也保存于 EXE 旁边。
-
-## 安装后未出现在“打开方式”中
-
-v0.3.0 首次发布的安装包有注册表值遗漏问题，已勾选“打开方式”也可能只生成空键。可先打开**实际安装目录**中的 `imageview.exe`，进入 **设置 → 打开方式 → 注册**，再重新打开资源管理器的“打开方式”菜单。不要从工程的 Debug/Release 副本启动后注册，以免登记到临时程序路径。
-
-v0.3.1 安装包已补齐显式值类型与关联刷新。升级时请勾选“打开方式”；旧 v0.3.0 附件仍保留，请使用最新版本。详见[安装器修复及验证记录](docs/releases/openwith-installer-fix.md)。
+**快速开始：** 把图片拖进窗口或按 `Ctrl+O` 打开，按 `1 / 2 / 3 / 4` 查看通道，按 `5` 恢复完整显示，再用 `A / D` 浏览同目录图片。
 
 ## 鼠标操作
 
-| 操作区域 / 手势 | 效果 |
+| 操作 | 效果 |
 | --- | --- |
-| 画布左键或中键拖拽 | 移动图片，主窗口不动 |
+| 画布左键 / 中键拖拽 | 移动图片，主窗口不动 |
 | 画布右键拖拽 | 移动整个查看器窗口 |
 | 画布右键单击 | 打开精简菜单；拖动结束不会误弹菜单 |
-| 设置标题或标题内空白处，左键 / 右键拖拽 | 只移动内部设置弹窗，主窗口不动；当前会话中保留位置 |
-| 滚轮 | 以光标所在位置为中心缩放图片 |
+| 滚轮 | 以光标位置为中心缩放图片 |
 | 窗口边缘左键拖拽 | 调整主窗口大小 |
+| 设置标题或标题内空白处，左键 / 右键拖拽 | 移动设置弹窗，主窗口不动；当前会话保留位置，弹窗限制在查看器内部 |
 
-设置中的按钮、开关、滑条不属于标题拖动区。设置弹窗限制在查看器内部，避免拖出可操作范围。
+开关、滑条、按钮和关闭按钮不属于设置弹窗的标题拖动区。
 
 ## 快捷键
 
 | 按键 | 功能 |
 | --- | --- |
+| **`1` / `2` / `3` / `4`** | **R / G / B / Alpha 单通道灰度显示** |
+| **`5` 或 `C`** | **恢复完整彩色显示，保留 Alpha** |
+| **`O`** | **进入忽略 Alpha 的彩色显示模式** |
 | `Ctrl+O` | 打开图片 |
 | `A` / `D`、`←` / `→`、`PgUp` / `PgDn` | 同目录上一张 / 下一张 |
 | `Home` / `End` | 同目录第一张 / 最后一张 |
-| `1` / `2` / `3` / `4` | R / G / B / Alpha 单通道 |
-| `5` 或 `C` | 恢复 RGB 色彩与原图透明度 |
-| `O` | 忽略 Alpha |
 | `F` | 适配窗口 |
 | `0` | 实际大小 100% |
 | `N` | 最近邻 / 双线性采样 |
-| `↑` / `↓` | Mip 索引增加 / 减少（图片须包含多个 Mip） |
+| `↑` / `↓` | Mip 索引增加 / 减少；图片须包含多个 Mip |
 | `Space` | 动画播放 / 暂停 |
-| `,` / `.` | 动画上一帧 / 下一帧 |
+| `,` / `.` | 动画上一帧 / 下一帧，并暂停播放 |
 | `T` | 深色 / 浅色主题 |
 | `Delete` | 确认后将当前图片移入回收站 |
-| `Esc` | 优先关闭菜单、确认框或设置等弹层；无弹层时退出 |
+| `Esc` | 优先关闭菜单或弹层；没有弹层时退出 |
 
-文字输入或相关弹层操作时，不会误触发 A/D 切图或删除。Delete 不响应组合键或长按连发，**没有 Shift+Delete 永久删除入口**。取消不改变文件；删除成功后优先显示下一张，末尾回退到上一张，全部删完则回到空白状态。
+输入或操作相关弹层时，不会误触发切图与删除。Delete 不响应组合键或长按连发，取消不改变文件；回收站不可用时不回退为永久删除。删除成功后优先显示下一张，末尾回退到上一张，全部删完回到空白状态。
 
-## 可选缩略图扩展
+## Windows 打开方式与缩略图
 
-`iv_shell.dll` 为 `.dds .tga .psd .qoi .hdr .ppm .pgm .pbm` 提供资源管理器缩略图。
+**打开方式：** 安装时勾选对应选项，或从**实际安装目录**运行程序，进入 **设置 → 打开方式 → 注册**。需要设为默认看图软件时，在 **设置 → 默认看图软件 → 系统设置** 中自行确认。不要从工程或临时解压副本注册后又移动 EXE，以免打开命令失效。
 
-安装版可勾选相应选项；免安装版可在保留 EXE/DLL 的固定目录中手动运行：
+**资源管理器缩略图：** 可选的 `iv_shell.dll` 为 `.dds .tga .psd .qoi .hdr .ppm .pgm .pbm` 提供预览。安装版可勾选注册；免安装版在固定目录中保留 DLL 和脚本后，按需执行：
 
 ```powershell
-# 在解压目录中运行；脚本优先使用旁边的 iv_shell.dll
+# 注册缩略图扩展
 powershell -NoProfile -ExecutionPolicy Bypass -File .\register_thumbnail.ps1
 
-# 移除本扩展的注册
+# 移动或删除免安装目录前，先注销本扩展
 powershell -NoProfile -ExecutionPolicy Bypass -File .\unregister_thumbnail.ps1
 ```
 
-注册只写入当前用户的 HKCU。缩略图扩展是可选项，普通看图不依赖注册；启用前注意与其他图片软件的缩略图处理器可能存在占用关系。移动或删除免安装目录前，应先解除缩略图注册。
+注册使用当前用户的 HKCU，无需管理员权限；文件夹本身仍需有写入权限。启用缩略图前留意其他图片软件可能已占用同一格式的处理器。普通看图与 RGBA 切换不依赖这些注册操作。
 
-## 从源码构建
+<details>
+<summary><strong>从源码构建</strong></summary>
 
-需要 Windows x64 Rust 工具链；MSVC 构建需对应的 C++ Build Tools / Windows SDK。制作安装包另需 Inno Setup 7。
+需要 Windows x64 Rust 工具链；MSVC 构建需 C++ Build Tools / Windows SDK。制作安装包另需 Python 3.11+ 和 Inno Setup 7。
 
 ```powershell
 cargo test --workspace --locked
 cargo build --release --workspace --locked
 
-# 主程序与可选扩展
-# target\release\imageview.exe
-# target\release\iv_shell.dll
+# 主程序：target\release\imageview.exe
+# 缩略图扩展：target\release\iv_shell.dll
 
-# 指定已安装或便携版 ISCC.exe，生成安装包、ZIP 和 SHA256SUMS.txt
 python tools/package_release.py --iscc "C:\Path\To\Inno Setup 7\ISCC.exe"
-# 输出：dist/v0.3.1/
+# 安装包、ZIP、SHA256SUMS.txt 输出到 dist 下的对应版本目录
 ```
 
-## 图片加载优化
-
-v0.3.1 已将首图解码与窗口初始化并行，同目录切图不再重复同步扫描文件夹；用户最新请求优先，预读去重且有界，并减少整张像素缓冲的复制。保持原始尺寸、Alpha 与现有图像显示规则。性能数据、缓存边界和验证范围见[加载优化实测](docs/performance/image-loading.md)。需要安装或运行 v0.3.1 才会使用这些优化；旧程序不自动更新。
-
-## 验证范围与限制
-
-本轮主要在 Windows、100% 缩放下验证深浅主题、两种窗口尺寸及文件/菜单/拖拽交互。其他 DPI、混合缩放、多显示器、全部 HDR/动画组合和桌面捕获性能仍需更多回归；不承诺覆盖所有环境。桌面磨砂为应用自身捕获与模糊实现，受系统捕获能力影响。回收站无法使用时应取消操作，不提供永久删除回退。
-
-发布说明见 [v0.3.1](docs/releases/v0.3.1.md)；历史更新见 [CHANGELOG](CHANGELOG.md)。
-
-<details>
-<summary>开发协作与验收文档</summary>
-
-- [AGENTS.md](AGENTS.md)：开发协作入口。
-- [当前状态](docs/status.md) · [任务板](docs/task-board.md) · [路线图](docs/roadmap.md)。
-- [新拟态规范](docs/新拟态UI规范.md) · [设置弹窗拖动验收](docs/ui-qa/设置弹窗独立拖动验收.md)。
-
 </details>
+
+## 使用边界
+
+这是查看与检查工具，不是图片编辑器：通道切换、缩放与曝光不会写回原图，**显式确认删除**则会把文件移入回收站。普通图片统一为 RGBA8，不适合用来核验 16 位源文件的全部原始精度；HDR 显示经过曝光与色调映射，不能把显示亮度等同于原始浮点值。
+
+超大图片、复杂贴图和长动画首次打开仍可能需要解码时间；进程内缓存不等于跨进程秒开。同目录导航使用快照，外部新增或重命名图片后重新打开文件可刷新列表。桌面磨砂依赖系统捕获能力，其他 DPI、多显示器和全部格式变体仍需更多验证。
+
+开发与验证资料：[协作入口](AGENTS.md) · [加载性能实测](docs/performance/image-loading.md) · [历史更新日志](CHANGELOG.md)。
 
 ## License
 
