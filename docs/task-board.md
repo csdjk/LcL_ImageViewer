@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-INSTALL-01 | 修复安装器打开方式空注册键 | REVIEW | ChatGPT-AgentDock | 用户安装后打开方式缺失 / REL-030 DONE | `tools/setup.iss`, `tools/tests/**`, `docs/releases/openwith-installer-fix.md`, `README.md` | 显式ValueType、关联刷新；旧版复现/修正版隔离真实安装和卸载回归；本地修正版包，不改真实关联、不push或覆盖公开附件 |
+| IV-INSTALL-01 | 修复安装器打开方式空注册键 | DONE | ChatGPT-AgentDock | 用户安装后打开方式缺失 / REL-030 DONE | `tools/setup.iss`, `tools/tests/**`, `docs/releases/openwith-installer-fix.md`, `README.md` | 显式ValueType、关联刷新；旧版复现/修正版隔离真实安装和卸载回归；本地修正版包，不改真实关联、不push或覆盖公开附件 |
 | IV-REL-030 | 更新README、实机配图并发布v0.3.0 | DONE | ChatGPT-AgentDock | 用户2026-09-15明确授权打包发布 / N09 DONE | `README.md`, `CHANGELOG.md`, `Cargo.toml`, `Cargo.lock`, `tools/**`, `docs/screenshots/**`, `docs/screenshot-*.jpg`, `docs/releases/**` | 文档准确；公开截图无隐私；tests/check/release workspace；包内容/hash/启动检查；推送main和新标签后GitHub Release附件核验 |
 | IV-P1-N09 | 设置弹窗独立拖动（纠正拖动对象） | DONE | ChatGPT-AgentDock | 用户明确纠正 / N08 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/设置弹窗独立拖动验收.md` | 标题只移动内部弹窗，主窗口固定；控件不误拖；边界可见；画布右键拖窗保留；tests/check/双构建与实机验证 |
 | IV-P1-N08 | 设置页紧凑列表与标题拖窗 | DONE | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
@@ -41,7 +41,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-INSTALL-01 REVIEW
+NOW: IV-P1-01 READY
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -170,3 +170,5 @@ v0.3.0正式发布：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.3.
 Base `8fc0d51921cbcedce4aaf6827970409ef92ba6a9`；用户安装v0.3.0且已选thumbs,assoc，实机注册键为空，命令残留旧安装位置。本轮修正安装脚本遗漏ValueType和关联刷新，必要共享键只清除自有值；不重写GUI/图像/默认关联。独立分支`codex/install-openwith-fix`，工作树`Temp/worktrees/install-openwith-fix`；原发布工作树冻结。真实安装测试仅允许隔离的HKCU\Software\LcL\InstallerQA随机命名空间及项目Temp，禁止修改实时Software\Classes/UserChoice/RegisteredApplications、用户安装或快捷方式。沿用已发布0.3.0主程序生成单独标注修正版的本地安装包，不重新发布或覆盖公开0.3.0附件。
 
 IV-INSTALL-01 Review：6项契约测试通过，真实Inno隔离复现旧脚本缺值和失效命令，修正版71个值与共享值卸载保护通过；用户真实关联快照不变。GUI/解码代码无改动，准予本地主线集成，不发布。
+
+IV-INSTALL-01 完成：本地集成`6ce3ea621bf81de8105af033c8f1accd489c44f1`，40+6测试及真实隔离注册回归通过；本地openwith-fix安装包已编译及校验，未修改实时关联、安装目录或公开Release。用户可从实际安装程序的设置页手动注册；记录见`docs/releases/openwith-installer-fix.md`。

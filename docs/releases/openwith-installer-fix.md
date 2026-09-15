@@ -36,4 +36,6 @@ python -B tools/tests/installer_registry_smoke.py --iscc <ISCC.exe> --baseline 8
 
 ## 本地主线交付
 
-合入后记录实际主线复验和安装包位置/校验结果。
+本地集成 `6ce3ea621bf81de8105af033c8f1accd489c44f1`。main的40项Rust测试及6项安装器契约测试通过；主线真实隔离安装/升级/卸载回归PASS（`Temp/installer-openwith-regression-main/report.json`），71个值逐项核验。修正版编译成功并核对资源版本0.3.0，主体EXE保持公开版hash不变。
+
+安装包：`dist/openwith-fix/LcL-ImageViewer-Setup-v0.3.0-openwith-fix-win64.exe`，5968283字节。SHA256：`d3e989db872a13cab0f38409130df1bffa1daff87eaef9161f23a300f973a69f`。未执行用户真实安装，也未推送或覆盖线上附件。
