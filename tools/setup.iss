@@ -1,9 +1,14 @@
-; LcL ImageViewer 安装包脚本（Inno Setup 7）
-; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageViewer-Setup-v0.2.0-win64.exe
+﻿; LcL ImageViewer 安装包脚本（Inno Setup 7）
+; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageViewer-Setup-v0.3.0-win64.exe
 ; 免管理员：装到 {localappdata}\Programs，注册表全走 HKCU
 
 #define MyAppName "LcL ImageViewer"
-#define MyAppVersion "0.2.0"
+#ifndef MyAppVersion
+#define MyAppVersion "0.3.0"
+#endif
+#ifndef BuildDir
+#define BuildDir "..\target\release"
+#endif
 #define MyAppExe "imageview.exe"
 #define MyProgId "LcL.ImageViewer.Image"
 #define ThumbClsid "7A3E9B21-4C5D-4E8F-9A6B-1D2C3E4F5A6B"
@@ -13,6 +18,10 @@ AppId={{B8F2C1A0-3E4D-4F5A-9B6C-7D8E9F0A1B2C}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=LcL
+AppPublisherURL=https://github.com/csdjk/LcL_ImageViewer
+AppSupportURL=https://github.com/csdjk/LcL_ImageViewer/issues
+AppUpdatesURL=https://github.com/csdjk/LcL_ImageViewer/releases/latest
+SetupIconFile=..\crates\iv-viewer\assets\icon.ico
 AppComments=Lightweight game-art image viewer (DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG)
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
@@ -28,8 +37,11 @@ UninstallDisplayName={#MyAppName}
 CloseApplications=yes
 
 [Files]
-Source: "..\target\release\imageview.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\target\release\iv_shell.dll"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "{#BuildDir}\imageview.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BuildDir}\iv_shell.dll"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"

@@ -1,9 +1,10 @@
-# register_thumbnail.ps1 - register iv_shell.dll as Explorer thumbnail provider (HKCU, no admin)
+﻿# register_thumbnail.ps1 - register iv_shell.dll as Explorer thumbnail provider (HKCU, no admin)
 # Covers: .dds .tga .psd .qoi .hdr .ppm .pgm .pbm (formats without a system handler)
 $ErrorActionPreference = 'Stop'
 
 $clsid = '{7A3E9B21-4C5D-4E8F-9A6B-1D2C3E4F5A6B}'
-$dll = Join-Path $PSScriptRoot '..\target\release\iv_shell.dll'
+$dll = Join-Path $PSScriptRoot 'iv_shell.dll'
+if (-not (Test-Path -LiteralPath $dll)) { $dll = Join-Path $PSScriptRoot '..\target\release\iv_shell.dll' }
 if (-not (Test-Path $dll)) { throw "iv_shell.dll not found: $dll (build with: cargo build -p iv-shell --release)" }
 $dll = (Resolve-Path $dll).Path
 
