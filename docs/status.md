@@ -3,7 +3,7 @@
 > 更新时间：2026-09-15。以磁盘、Git、实际构建和GitHub回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-PERF-01 -->
 
 ## 最新发布
 
@@ -27,7 +27,7 @@ N01–N09已合入：新拟态深浅主题、两侧磨砂导航、1秒自动隐�
 
 ## NEXT及限制
 
-NOW: IV-P1-01 READY — 完善通用验收入口。
+NOW: IV-PERF-01 IN_PROGRESS — 图片解码、加载与启动优化。
 COMPLETED: IV-P1-N01至IV-P1-N09、IV-REL-030 DONE。
 
 此次明确授权的版本发布不代表所有长期门禁完成。P1仍ACTIVE；其他DPI、混合缩放/跨屏、全部HDR/动画/回收站设备、桌面捕获性能、完整安装卸载系统集成未逐项覆盖。安装包和主程序未配置代码签名；iv-shell保留LNK4104导出可见性警告。详细记录见`docs/releases/v0.3.0-validation.md`。

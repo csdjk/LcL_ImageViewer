@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-PERF-01 | 图片加载与启动耗时优化 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮明确要求 / 当前main | `crates/iv-viewer/src/{main.rs,app.rs,loader.rs,render.rs,perf.rs,directory.rs}`, `crates/iv-core/src/decode.rs`, `crates/iv-core/tests/**`, `crates/iv-core/examples/**`, `tools/perf/**`, `docs/performance/**`, `README.md` | 同样本同Release基线；调度/扫描/拷贝优化；像素一致；tests/check/双构建及实际窗口验证；不改关联/安装/远端 |
 | IV-INSTALL-02 | 新安装默认D盘目录 | DONE | ChatGPT-AgentDock | 用户要求 / INSTALL-01 DONE | `tools/setup.iss`, `tools/tests/**`, `README.md`, `docs/releases/default-install-directory.md` | D盘优先/无D回退/升级保留/目录可选；真实Inno测试与安装包构建；不安装、不改关联、不发布 |
 | IV-INSTALL-01 | 修复安装器打开方式空注册键 | DONE | ChatGPT-AgentDock | 用户安装后打开方式缺失 / REL-030 DONE | `tools/setup.iss`, `tools/tests/**`, `docs/releases/openwith-installer-fix.md`, `README.md` | 显式ValueType、关联刷新；旧版复现/修正版隔离真实安装和卸载回归；本地修正版包，不改真实关联、不push或覆盖公开附件 |
 | IV-REL-030 | 更新README、实机配图并发布v0.3.0 | DONE | ChatGPT-AgentDock | 用户2026-09-15明确授权打包发布 / N09 DONE | `README.md`, `CHANGELOG.md`, `Cargo.toml`, `Cargo.lock`, `tools/**`, `docs/screenshots/**`, `docs/screenshot-*.jpg`, `docs/releases/**` | 文档准确；公开截图无隐私；tests/check/release workspace；包内容/hash/启动检查；推送main和新标签后GitHub Release附件核验 |
@@ -42,7 +43,7 @@
 ## Coordinator NEXT
 
 ```text
-NOW: IV-P1-01 READY
+NOW: IV-PERF-01 IN_PROGRESS
 COMPLETED: IV-P1-N01 / IV-P1-N02 / IV-P1-N03 DONE
 BLOCKED BY DEPENDENCY: IV-P1-02, IV-P1-03, IV-P1-04
 ```
@@ -181,3 +182,7 @@ Base `42d3393662b5a07d80b5fe6c9b82dfdf50423c39`，独立branch `codex/install-de
 IV-INSTALL-02 Review: 11 read-only installer checks pass; actual Inno initialization selected the D-drive directory and passed both branch assertions. Wizard screenshot not validated. Existing association fixes retained; no application code changes.
 
 IV-INSTALL-02 completed: integration `d084227f9f1b44b22586689c17e8e0bb504cefa4`, 11 checks and production compilation/version checks passed. Resolver evidence and screenshot limitation documented. Artifact `dist/default-d/LcL-ImageViewer-Setup-v0.3.0-d-drive-win64.exe` includes prior Open With fixes. User install and public release unchanged.
+
+## IV-PERF-01 执行合同
+
+Base `83fb9e7002e6f33b82db732895644cccd1220f58`；独立分支 `codex/perf-image-load`，工作树 `Temp/worktrees/perf-image-load`。先加入可选分阶段计时并保留同构建优化前基线，然后在同一实现上优化最新请求优先、有界预读、异步目录、启动并行与无损像素复制。禁止降低图片分辨率/画质、丢Alpha/HDR/Mip/帧；保持旧用户设置与所有安装器修复。不改变默认关联、当前安装，不push/发布。只使用项目测试素材和新建输入，性能区分进程启动/请求/解码/上传与提交绘制，不冒充屏幕实际呈现时间。
