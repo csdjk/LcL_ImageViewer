@@ -16,6 +16,30 @@ def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def assert_binary_version(path: Path, expected: str) -> None:
+    import ctypes as c
+    from ctypes import wintypes as w
+    api = c.WinDLL('version', use_last_error=True)
+    api.GetFileVersionInfoSizeW.argtypes = [w.LPCWSTR, c.POINTER(w.DWORD)]
+    api.GetFileVersionInfoSizeW.restype = w.DWORD
+    api.GetFileVersionInfoW.argtypes = [w.LPCWSTR, w.DWORD, w.DWORD, c.c_void_p]
+    api.GetFileVersionInfoW.restype = w.BOOL
+    api.VerQueryValueW.argtypes = [c.c_void_p, w.LPCWSTR, c.POINTER(c.c_void_p), c.POINTER(w.UINT)]
+    api.VerQueryValueW.restype = w.BOOL
+    size = api.GetFileVersionInfoSizeW(str(path.resolve()), None)
+    if not size:
+        raise RuntimeError(f'No version resource: {path}')
+    data = c.create_string_buffer(size)
+    assert api.GetFileVersionInfoW(str(path.resolve()), 0, size, data)
+    pointer, length = c.c_void_p(), w.UINT()
+    assert api.VerQueryValueW(data, '\\', c.byref(pointer), c.byref(length))
+    fields = c.cast(pointer, c.POINTER(w.DWORD))
+    actual = [fields[2] >> 16, fields[2] & 65535, fields[3] >> 16, fields[3] & 65535]
+    wanted = [int(n) for n in expected.split('.')]
+    wanted += [0] * (4 - len(wanted))
+    assert actual == wanted, f'{path.name}: version {actual}, expected {wanted}'
+
+
 def run(args: argparse.Namespace) -> None:
     root = Path(__file__).resolve().parent.parent
     version = tomllib.loads((root / 'Cargo.toml').read_text(encoding='utf-8'))['workspace']['package']['version']
@@ -25,6 +49,7 @@ def run(args: argparse.Namespace) -> None:
     for p in (compiler, binary_dir / 'imageview.exe', binary_dir / 'iv_shell.dll'):
         if not p.is_file():
             raise FileNotFoundError(p)
+    assert_binary_version(binary_dir / 'imageview.exe', version)
     if output.exists() and any(output.iterdir()):
         raise FileExistsError(f'Refusing nonempty output: {output}')
     output.mkdir(parents=True, exist_ok=True)
@@ -80,6 +105,7 @@ def run(args: argparse.Namespace) -> None:
     installer = output / f'LcL-ImageViewer-Setup-v{version}-win64.exe'
     if not installer.is_file():
         raise FileNotFoundError(installer)
+    assert_binary_version(installer, version)
     assets = [installer, archive]
     (output / 'SHA256SUMS.txt').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in assets), encoding='ascii')
     print(json.dumps({'version': version, 'commit': commit, 'assets': [

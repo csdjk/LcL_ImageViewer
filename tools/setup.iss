@@ -17,6 +17,9 @@
 AppId={{B8F2C1A0-3E4D-4F5A-9B6C-7D8E9F0A1B2C}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductName={#MyAppName}
 AppPublisher=LcL
 AppPublisherURL=https://github.com/csdjk/LcL_ImageViewer
 AppSupportURL=https://github.com/csdjk/LcL_ImageViewer/issues
