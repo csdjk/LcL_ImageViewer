@@ -199,3 +199,6 @@ Base `dfb45debaf33409c17677395d2eba9d7cd73edc5`；branch `codex/release-v0.3.1`�
 
 
 IV-REL-031 Review：Worker `22bf57c`；54项Rust测试/check、11项安装器检查通过；真实Inno旧空键复现/修正版71值/共享值卸载及默认D目录解析通过，实时关联未改动。范围7文件符合合同，无GUI或解码行为新增修改。主线重建0.3.1后补齐载荷安装hash、实际窗口及最终包验证。
+
+
+IV-REL-031 主线构建验收：aa70310；54+11检查/双构建、Inno隔离71值及EXE/DLL安装hash/卸载、实际D盘解析、双主题26状态通过，等待正式包和远端附件回读。
