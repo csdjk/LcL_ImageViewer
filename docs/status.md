@@ -3,7 +3,7 @@
 > 更新时间：2026-09-15。以磁盘、Git、实际构建和GitHub回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-PERF-01 -->
+<!-- project-next: IV-P1-01 -->
 
 ## 最新发布
 
@@ -27,7 +27,7 @@ N01–N09已合入：新拟态深浅主题、两侧磨砂导航、1秒自动隐�
 
 ## NEXT及限制
 
-NOW: IV-PERF-01 IN_PROGRESS — 图片解码、加载与启动优化。
+NOW: IV-P1-01 READY — 完善通用验收入口。
 COMPLETED: IV-P1-N01至IV-P1-N09、IV-REL-030 DONE。
 
 此次明确授权的版本发布不代表所有长期门禁完成。P1仍ACTIVE；其他DPI、混合缩放/跨屏、全部HDR/动画/回收站设备、桌面捕获性能、完整安装卸载系统集成未逐项覆盖。安装包和主程序未配置代码签名；iv-shell保留LNK4104导出可见性警告。详细记录见`docs/releases/v0.3.0-validation.md`。
@@ -41,3 +41,13 @@ COMPLETED: IV-P1-N01至IV-P1-N09、IV-REL-030 DONE。
 ## D-drive default installer (local only)
 
 IV-INSTALL-02 DONE. Integration `d084227f9f1b44b22586689c17e8e0bb504cefa4`. Fresh installs default to `D:\Program Files\LcL ImageViewer`; absent D drive falls back to localappdata. Existing installs keep their chosen directory; directory page remains editable. Includes INSTALL-01 Open With fixes. 11 installer tests PASS; original inert Inno initialization selected D and passed both branch assertions, but wizard capture was not validated. Production installer compiled, version0.3.0 verified, SHA256 `36e6e3e90f5c7961d6b4e57bf3df33f4b147d3edfba08ea74c61ceff0a73cbc2`. New package: `dist/default-d/LcL-ImageViewer-Setup-v0.3.0-d-drive-win64.exe`. No live install, registry, relocation, GitHub update or push. Details: `docs/releases/default-install-directory.md`.
+
+## 图片加载与启动优化（仅本地开发版）
+
+IV-PERF-01 DONE；最新功能集成 `9eaae72e950831f524d582183aafdb3425b677fc`。首图解码与GPU/窗口初始化并行、目录后台扫描/导航复用、最新请求优先且去重、有限预读、PNG解码器复用、RGBA/动画缓冲所有权转移及上传借用。保留原图尺寸、Alpha、Shader和DDS/HDR/Mip路径；静态WebP旧分支错误一并修正。当前一张解码不强制抢占；没有常驻程序或跨进程缓存。
+
+同一组测试图，前后各20次新进程（4场景每种5次，暖文件缓存）测到CPU首次绘制提交：1024PNG444→388ms，4096PNG491→403ms，4096JPEG552→417ms。JPEG纯解码未变快，主要为阶段重叠。40次已预读导航32.433→0.744ms，不代表显示器呈现时间或所有新图耗时。详细边界及P95见`docs/performance/image-loading.md`。
+
+54项Rust测试+11项安装器检查、check/Debug/Release workspace通过；10组真实通道ROI逐像素一致，分支41状态及主线16状态实际交互通过。主线8次新进程再测与输入hash检查通过。
+
+当前Release SHA256 `89f86af7424c5bb9e1cfc732911549381aa89866fc9e8058fe20d6e5838026b5`；Debug `bd80b9ce4cf337d02e5f78081b5a6093f2bc5b1750a5262479fabd9b1ca7ca26`，路径仍为`target/release/imageview.exe`和`target/debug/imageview.exe`。该记录覆盖上方历史发布中提到的工程二进制哈希；旧公开v0.3.0附件哈希不变。现有D盘默认和Open With修复保留。本轮未push/发布/打包、未修改用户安装或关联。

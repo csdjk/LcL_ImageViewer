@@ -60,7 +60,10 @@ python -B tools/perf/load_benchmark.py --fixtures Temp/perf-load-fixtures --bina
 
 任务分支实际回归：`perf-menu-light-1280` 25状态通过，使用本任务新建图片确认回收并核对回收站原文件哈希；`perf-popup-dark-880` 16状态通过，弹窗位置/主窗口固定/控件/边界/导航与画布右键拖窗保留。已查看当前菜单及RGB截图，未改用户原图或普通偏好。
 
-主线集成后的构建及实际交互复验在完成后追加记录。
+主线集成 `9eaae72e950831f524d582183aafdb3425b677fc`：54项Rust测试、11项安装器只读检查、workspace check、Debug和Release workspace构建通过。主线Release每场景2次新进程复测（共8次），输入与原20次基线完全相同；两次仅做回归检查，不替换上表的五次基线。主线16状态实际弹窗/导航/画布拖动回归通过，DPI96。证据：`Temp/perf-load-main/report.json` 与 `ui-verify-shots/perf-main-popup-light-1280`。
+
+本地主程序：`target/release/imageview.exe`，SHA256 `89f86af7424c5bb9e1cfc732911549381aa89866fc9e8058fe20d6e5838026b5`；Debug：`target/debug/imageview.exe`，SHA256 `bd80b9ce4cf337d02e5f78081b5a6093f2bc5b1750a5262479fabd9b1ca7ca26`。仍是0.3.0的本地优化开发构建，不是新的公开发布版本。已有安装包和用户安装目录未替换。
+
 
 ## 明确保留的限制
 
