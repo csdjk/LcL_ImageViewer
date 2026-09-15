@@ -2,7 +2,8 @@
 
 All source registry keys are prefixed with Software\\LcL\\InstallerQA\\<UUID>.
 No live Software\\Classes, default associations, application installs, shortcuts,
-COM registration, or Explorer settings are modified. The generated test installers
+COM registration, or Explorer settings are modified. Optional EXE/DLL payload is
+installed only below the new output directory, hash-checked and uninstalled. The generated test installers
 have no Run/Icons entries and do not register an uninstall entry. Logs are retained.
 """
 from __future__ import annotations
@@ -13,6 +14,7 @@ from pathlib import Path
 import re
 import subprocess
 import uuid
+import tomllib
 import winreg as reg
 from test_installer_associations import ROOT, registry_rows
 
@@ -64,6 +66,14 @@ def run(args):
     out.mkdir(parents=True, exist_ok=False)
     prefix = 'Software\\LcL\\InstallerQA\\' + uuid.uuid4().hex
     install = out / '安装 path & spaces'
+    version = tomllib.loads((ROOT / 'Cargo.toml').read_text(encoding='utf-8'))['workspace']['package']['version']
+    payload = {}
+    if args.payload_dir:
+        for filename in ('imageview.exe', 'iv_shell.dll'):
+            path = args.payload_dir.resolve() / filename
+            if not path.is_file():
+                raise FileNotFoundError(path)
+            payload[filename] = hashlib.sha256(path.read_bytes()).hexdigest()
     rows = registry_rows(fixed)
     assert len(rows) == 71 and all(row['Root'] == 'HKCU' for row in rows)
     actual_keys = sorted({expand(row['Subkey'], install) for row in rows})
@@ -90,7 +100,7 @@ def run(args):
 [Setup]
 AppId=LcL-Registry-QA-{prefix.rsplit(chr(92), 1)[1]}
 AppName=LcL Registry QA (isolated)
-AppVersion=0.3.0
+AppVersion={version}
 DefaultDirName={install}
 UsePreviousAppDir=no
 UsePreviousTasks=no
@@ -111,6 +121,12 @@ Name: "assoc"; Description: "Isolated associations"
 Name: "thumbs"; Description: "Isolated thumbnail values"
 [Registry]
 ''' + registry
+        if payload and name == 'corrected':
+            script += '\n[Files]\n'
+            for filename in payload:
+                source_file = str(args.payload_dir.resolve() / filename)
+                assert '"' not in source_file
+                script += f'Source: "{source_file}"; DestDir: "{{app}}"; Flags: ignoreversion\n'
         path = out / (name + '.iss')
         path.write_text(script.lstrip('\ufeff'), encoding='utf-8-sig')
         with (out / (name + '-compile.log')).open('wb') as log:
@@ -135,6 +151,8 @@ Name: "thumbs"; Description: "Isolated thumbnail values"
             name = expand(row.get('ValueName', ''), install)
             expected = (expand(row.get('ValueData', ''), install), reg.REG_SZ)
             assert read(key, name) == expected, (key, name, read(key, name), expected)
+        for filename, digest in payload.items():
+            assert hashlib.sha256((install / filename).read_bytes()).hexdigest() == digest, filename
         uninstaller = install / 'unins000.exe'
         subprocess.run([str(uninstaller), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
                         '/LOG=' + str(out / 'uninstall.log')], check=True, timeout=45)
@@ -143,7 +161,11 @@ Name: "thumbs"; Description: "Isolated thumbnail values"
         assert read(prefix + '\\Software\\Classes\\.png\\OpenWithProgids', 'LcL.ImageViewer.Image') is None
         assert read(prefix + '\\Software\\RegisteredApplications', 'LcL ImageViewer') is None
         assert tree(prefix + '\\Software\\Classes\\Applications\\imageview.exe') is None
+        for filename in payload:
+            assert not (install / filename).exists(), 'Payload survived uninstall: ' + filename
         report = {'result': 'PASS', 'baseline': args.baseline, 'test_namespace': prefix,
+                  'package_version': version, 'payload_install_hashes': payload,
+                  'payload_uninstall_verified': bool(payload),
                   'legacy_empty_values_reproduced': True, 'stale_path_upgrade_fixed': True,
                   'verified_typed_values': len(rows), 'shared_value_uninstall_preserves_other_app': True,
                   'real_registry_snapshot_sha256': fingerprint,
@@ -161,4 +183,5 @@ if __name__ == '__main__':
     p.add_argument('--iscc', required=True, type=Path)
     p.add_argument('--output', required=True, type=Path)
     p.add_argument('--baseline', required=True)
+    p.add_argument('--payload-dir', type=Path, help='Optional built EXE/DLL copied only into the isolated test install')
     run(p.parse_args())
