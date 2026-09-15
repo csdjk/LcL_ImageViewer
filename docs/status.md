@@ -25,7 +25,7 @@ P0 VALIDATED；P1 UI Stabilization ACTIVE；P2仍受P1门禁约束。N01至N09�
 
 ## NEXT
 
-NOW: IV-REL-030 IN_PROGRESS — 用户明确授权v0.3.0文档、截图、打包发布；原P1验收继续保留。
+NOW: IV-REL-030 REVIEW — v0.3.0文档、配图、构建和实机回归完成，正在生成正式发布包。
 COMPLETED: IV-P1-N01 至 IV-P1-N09 DONE。
 
 ## 限制
