@@ -1,33 +1,33 @@
 # LcL ImageViewer — 当前状态
 
-> 更新时间：2026-09-14。以磁盘、Git和可重复实机结果为准。
+> 更新时间：2026-09-15。以磁盘、Git、实际构建和GitHub回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-REL-030 -->
+<!-- project-next: IV-P1-01 -->
 
-## 当前实现
+## 最新发布
 
-P0 VALIDATED；P1 UI Stabilization ACTIVE；P2仍受P1门禁约束。N01至N09已在独立工作树提交、串行合入main并复验。最新功能集成 `7d333f665eac9fbba3ac1beac72e7a58e13cfe0c`；最终文档HEAD通过Git读取。
+**v0.3.0 已按用户明确授权发布到原GitHub仓库，标记为Latest，非草稿、非预发布。**
 
-用户已澄清设置标题应移动内部设置弹窗，N09覆盖N08对“拖动窗口”的错误理解：按住设置标题/标题内空白处的左键或右键，只移动查看器客户区中的设置弹窗，主窗口不动。首次居中、当前会话关闭重开保留位置；边界8点约束；正文、开关和关闭按钮不拖动。画布右键仍移动整个主窗口。
+- Release：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.3.0
+- 标签源码提交：`c8ceef0e6bc4555020e4ea7b4fdbdce8a7c951c4`；发布于 `2026-09-15T02:01:35Z`。
+- README已更新：5张v0.3.0实际配图（深/浅主题、Alpha、设置与右键菜单），完整鼠标/快捷键、下载升级与构建说明。
+- 安装包、免安装ZIP、SHA256SUMS.txt均已上传；重新通过公开地址下载并逐个核对SHA256通过。
+- 本地产物：`dist/v0.3.0/`。当前主程序为`target/release/imageview.exe`，版本0.3.0，SHA256 `802d3ab8c6a18621b01056d156fe311b6f232d6db2b207da7df145f98bd0f1ec`；Debug亦已更新到0.3.0。
 
-保留精简设置（六项设置、开启磨砂后展开三个参数）、无分类右键菜单、左键移图、A/D导航、Delete确认后回收站删除、打开所在文件夹、侧边磨砂导航与1秒隐藏。未修改原图解码、Shader、像素取样或文件关联语义。
+## 当前功能
 
-## 最新验证与运行入口
+N01–N09已合入：新拟态深浅主题、两侧磨砂导航、1秒自动隐藏、精简无分类菜单和设置、A/D切图、Delete确认后回收站删除、打开图片父目录。设置标题左/右键**只拖动设置弹窗**，主窗口不动；画布右键仍拖动主窗口。
 
-- main40项测试/0失败，workspace check、Debug及Release构建通过。
-- N09分支四组双主题/双尺寸实机64张截图；main当前Release深色880×560与浅色1280×860两组32张截图和几何/像素校验通过，均DPI96/100%。
-- 弹窗累计位移72×36、24×60、-12×36时，原生窗口外框保持不变；边界约束、关闭重开位置、控件点击与正文无误拖、A/D通过。关闭设置后的画布右键拖窗40×24仍正常。
-- Release：`target/release/imageview.exe`，SHA256 `f7c70b47984e98bbeb5732737fa5c24c15fc0212391011af0d6b848eb5870dc9`。
-- Debug：`target/debug/imageview.exe`，SHA256 `4f5720cd5ef6296a35842d36fb9f6899d18508cceec80c75e3603281e4459a54`。
-- 使用隔离QA配置与新建测试图，测试前后图片hash不变；不确认删除，不点击系统集成，不关闭用户窗口，不修改关联/安装目录/快捷方式，没有push或发布。
-- 当前证据：`docs/ui-qa/设置弹窗独立拖动验收.md`、`ui-verify-shots/popup-drag-verified-*`、`popup-drag-main-*`。N08原生标题拖窗为被纠正的历史语义，不是当前行为。
+## 发布验证
 
-## NEXT
+40项workspace测试、check及Debug/Release workspace构建通过；当前版本设置弹窗16状态与菜单/回收站25状态实机回归通过，100%缩放。正式ZIP解压后程序启动通过；exe与安装器资源版本均为0.3.0，ZIP CRC/包内hash/公开下载hash通过。DLL可加载且入口导出可用。
 
-NOW: IV-REL-030 REVIEW — v0.3.0文档、配图、构建和实机回归完成，正在生成正式发布包。
-COMPLETED: IV-P1-N01 至 IV-P1-N09 DONE。
+只使用新建测试图片和隔离QA配置，不在用户当前安装上执行安装/卸载或注册。发布包不包含私密桌面、用户偏好、Temp、源码工作树或Debug符号。现有main历史保留，未强推或改写旧版本。
 
-## 限制
+## NEXT及限制
 
-其他DPI、混合缩放、跨屏及全部最大化/全屏手势未实机遍历。桌面捕获性能/恢复、全部回收站设备和辅助功能矩阵仍未完成。系统集成按钮保留但本轮不执行系统写入；不改变既有阶段门禁，P1保持ACTIVE。旧程序窗口不会热更新，其他安装目录/folder-fix副本不自动更新；历史全仓格式差异仍保留。
+NOW: IV-P1-01 READY — 完善通用验收入口。
+COMPLETED: IV-P1-N01至IV-P1-N09、IV-REL-030 DONE。
+
+此次明确授权的版本发布不代表所有长期门禁完成。P1仍ACTIVE；其他DPI、混合缩放/跨屏、全部HDR/动画/回收站设备、桌面捕获性能、完整安装卸载系统集成未逐项覆盖。安装包和主程序未配置代码签名；iv-shell保留LNK4104导出可见性警告。详细记录见`docs/releases/v0.3.0-validation.md`。
