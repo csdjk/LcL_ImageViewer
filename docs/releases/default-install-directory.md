@@ -1,5 +1,7 @@
 # 安装默认目录：D 盘（IV-INSTALL-02）
 
+> 发布状态更新：本记录中的改进已统一纳入 v0.3.1 正式安装包和便携包；下文“仅本地/未发布”描述的是当时验证阶段，原始测试证据保留。
+
 ## 当前策略
 
 全新安装时，D 盘存在则建议 `D:\Program Files\LcL ImageViewer`；不存在则回退到 `{localappdata}\Programs\LcL ImageViewer`。目录选择页始终显示，用户可手动修改。保留同一 AppId 和 `UsePreviousAppDir=yes`，升级优先使用原安装目录，不自动迁移当前安装，不提高权限或修改目录权限。

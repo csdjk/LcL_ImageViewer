@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | REVIEW | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
+| IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
 | IV-PERF-01 | 图片加载与启动耗时优化 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / 当前main | `crates/iv-viewer/src/{main.rs,app.rs,loader.rs,render.rs,perf.rs,directory.rs}`, `crates/iv-core/src/decode.rs`, `crates/iv-core/tests/**`, `crates/iv-core/examples/**`, `tools/perf/**`, `docs/performance/**`, `README.md` | 同样本同Release基线；调度/扫描/拷贝优化；像素一致；tests/check/双构建及实际窗口验证；不改关联/安装/远端 |
 | IV-INSTALL-02 | 新安装默认D盘目录 | DONE | ChatGPT-AgentDock | 用户要求 / INSTALL-01 DONE | `tools/setup.iss`, `tools/tests/**`, `README.md`, `docs/releases/default-install-directory.md` | D盘优先/无D回退/升级保留/目录可选；真实Inno测试与安装包构建；不安装、不改关联、不发布 |
 | IV-INSTALL-01 | 修复安装器打开方式空注册键 | DONE | ChatGPT-AgentDock | 用户安装后打开方式缺失 / REL-030 DONE | `tools/setup.iss`, `tools/tests/**`, `docs/releases/openwith-installer-fix.md`, `README.md` | 显式ValueType、关联刷新；旧版复现/修正版隔离真实安装和卸载回归；本地修正版包，不改真实关联、不push或覆盖公开附件 |
@@ -202,3 +202,6 @@ IV-REL-031 Review：Worker `22bf57c`；54项Rust测试/check、11项安装器检
 
 
 IV-REL-031 主线构建验收：aa70310；54+11检查/双构建、Inno隔离71值及EXE/DLL安装hash/卸载、实际D盘解析、双主题26状态通过，等待正式包和远端附件回读。
+
+
+IV-REL-031 DONE：v0.3.1于2026-09-15T13:44:36Z正式发布并置Latest，源码tag `97fcf8e4309d8fe3d2e17c5c47cd216729735e34`，main和新标签均推送；三附件公开下载SHA256一致。54+11检查、隔离Inno安装hash/注册卸载、D盘解析和26状态GUI及ZIP启动通过。未修改用户当前安装。详见v0.3.1-validation.md。NEXT恢复IV-P1-01。

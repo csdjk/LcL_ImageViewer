@@ -1,53 +1,35 @@
 # LcL ImageViewer — 当前状态
 
-> 更新时间：2026-09-15。以磁盘、Git、实际构建和GitHub回读为准。
+> 更新时间：2026-09-15。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-REL-031 -->
+<!-- project-next: IV-P1-01 -->
 
-## 最新发布
+## 最新正式版本
 
-**v0.3.0 已按用户明确授权发布到原GitHub仓库，标记为Latest，非草稿、非预发布。**
+**v0.3.1 已按本轮用户明确要求发布，Latest、非草稿/预发布。**
 
-- Release：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.3.0
-- 标签源码提交：`c8ceef0e6bc4555020e4ea7b4fdbdce8a7c951c4`；发布于 `2026-09-15T02:01:35Z`。
-- README已更新：5张v0.3.0实际配图（深/浅主题、Alpha、设置与右键菜单），完整鼠标/快捷键、下载升级与构建说明。
-- 安装包、免安装ZIP、SHA256SUMS.txt均已上传；重新通过公开地址下载并逐个核对SHA256通过。
-- 本地产物：`dist/v0.3.0/`。当前主程序为`target/release/imageview.exe`，版本0.3.0，SHA256 `802d3ab8c6a18621b01056d156fe311b6f232d6db2b207da7df145f98bd0f1ec`；Debug亦已更新到0.3.0。
+发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.3.1；ID `389181525`，发布时间 `2026-09-15T13:44:36Z`。
+源码标签：`97fcf8e4309d8fe3d2e17c5c47cd216729735e34`；最终文档HEAD见Git。原v0.3.0文件保留，不覆盖旧附件。
 
-## 当前功能
+## 已纳入安装包的改进
 
-N01–N09已合入：新拟态深浅主题、两侧磨砂导航、1秒自动隐藏、精简无分类菜单和设置、A/D切图、Delete确认后回收站删除、打开图片父目录。设置标题左/右键**只拖动设置弹窗**，主窗口不动；画布右键仍拖动主窗口。
+- 图片加载加速：首图解码与窗口/GPU初始化并行；目录后台扫描、导航复用；最新请求优先、有限去重预读；减少像素拷贝。静态WebP分支错误已修复。性能仅承诺已记录测试范围，不降低分辨率或Alpha。
+- 打开方式安装修复：明确写入71个字符串值，通知Explorer刷新；对应安装任务需勾选。不抢占系统默认应用。
+- 默认D盘：全新安装建议D:\Program Files\LcL ImageViewer，无D盘回退localappdata\Programs；升级沿用原位置且目录页可更改，不自动迁移。
+- 保留新拟态主题、两侧磨砂导航、1秒隐藏、精简菜单/设置、A/D、Delete确认回收站、左键移图、画布右键拖主窗口及设置弹窗独立拖动。
 
-## 发布验证
+## 发布与验证
 
-40项workspace测试、check及Debug/Release workspace构建通过；当前版本设置弹窗16状态与菜单/回收站25状态实机回归通过，100%缩放。正式ZIP解压后程序启动通过；exe与安装器资源版本均为0.3.0，ZIP CRC/包内hash/公开下载hash通过。DLL可加载且入口导出可用。
+主线54项Rust测试+11项安装器检查、check/Debug及Release workspace构建通过。真实Inno隔离71值写入、旧失效路径升级、其他应用哨兵保留、EXE/DLL载荷hash和卸载通过；默认目录解析通过。深色880×560设置16状态、浅色1280×860菜单10状态实机通过；ZIP解压启动通过。所有GUI验证DPI96/100%。
 
-只使用新建测试图片和隔离QA配置，不在用户当前安装上执行安装/卸载或注册。发布包不包含私密桌面、用户偏好、Temp、源码工作树或Debug符号。现有main历史保留，未强推或改写旧版本。
+安装包5983996字节，ZIP5427566字节，另附SHA256SUMS.txt；已上传并公开下载逐项核对hash。完整记录见 `docs/releases/v0.3.1-validation.md`。本地统一入口 `dist/v0.3.1/LcL-ImageViewer-Setup-v0.3.1-win64.exe`，不再需要旧openwith-fix/default-d分散安装包。
 
-## NEXT及限制
+Release程序 `0b6ce0d06bac1927a7a5475eafef3fe8bb22e63d9ac9eb7e56a1877157fc5bf1`；Debug程序 `ea28d50cc4ff22f4b0de21e98b88992aa82cfaf0507d20859359d61fd2a8353d`。两者均0.3.1，位于target/release和target/debug。未自动升级用户现有安装。
 
-NOW: IV-REL-031 IN_PROGRESS — 更新安装包并发布v0.3.1。
-COMPLETED: IV-P1-N01至IV-P1-N09、IV-REL-030 DONE。
+## NEXT与限制
 
-此次明确授权的版本发布不代表所有长期门禁完成。P1仍ACTIVE；其他DPI、混合缩放/跨屏、全部HDR/动画/回收站设备、桌面捕获性能、完整安装卸载系统集成未逐项覆盖。安装包和主程序未配置代码签名；iv-shell保留LNK4104导出可见性警告。详细记录见`docs/releases/v0.3.0-validation.md`。
+NOW: IV-P1-01 READY — 完善通用验收入口。
+COMPLETED: N01–N09、INSTALL-01/02、PERF-01、REL-030、REL-031 DONE。
 
-## 安装器打开方式修复（仅本地，尚未发布）
-
-发现已发布v0.3.0安装器遗漏ValueType，创建空注册键而未更新旧命令。用户已选assoc，非漏勾选问题。本地修复显式REG_SZ、ChangesAssociations与自身命名值卸载，集成`6ce3ea621bf81de8105af033c8f1accd489c44f1`；40项Rust测试+6项新测试与隔离真实安装回归PASS。修正版`dist/openwith-fix/LcL-ImageViewer-Setup-v0.3.0-openwith-fix-win64.exe`已生成，SHA256 `d3e989db872a13cab0f38409130df1bffa1daff87eaef9161f23a300f973a69f`；EXE仍为已发布0.3.0。
-
-未更新GitHub附件、未push、未修改用户实时关联和当前安装，不能宣称用户当前打开方式菜单已恢复。临时办法：运行实际安装目录的imageview.exe，在设置→打开方式→注册；不从工程副本注册。详见安装器修复记录。
-
-## D-drive default installer (local only)
-
-IV-INSTALL-02 DONE. Integration `d084227f9f1b44b22586689c17e8e0bb504cefa4`. Fresh installs default to `D:\Program Files\LcL ImageViewer`; absent D drive falls back to localappdata. Existing installs keep their chosen directory; directory page remains editable. Includes INSTALL-01 Open With fixes. 11 installer tests PASS; original inert Inno initialization selected D and passed both branch assertions, but wizard capture was not validated. Production installer compiled, version0.3.0 verified, SHA256 `36e6e3e90f5c7961d6b4e57bf3df33f4b147d3edfba08ea74c61ceff0a73cbc2`. New package: `dist/default-d/LcL-ImageViewer-Setup-v0.3.0-d-drive-win64.exe`. No live install, registry, relocation, GitHub update or push. Details: `docs/releases/default-install-directory.md`.
-
-## 图片加载与启动优化（仅本地开发版）
-
-IV-PERF-01 DONE；最新功能集成 `9eaae72e950831f524d582183aafdb3425b677fc`。首图解码与GPU/窗口初始化并行、目录后台扫描/导航复用、最新请求优先且去重、有限预读、PNG解码器复用、RGBA/动画缓冲所有权转移及上传借用。保留原图尺寸、Alpha、Shader和DDS/HDR/Mip路径；静态WebP旧分支错误一并修正。当前一张解码不强制抢占；没有常驻程序或跨进程缓存。
-
-同一组测试图，前后各20次新进程（4场景每种5次，暖文件缓存）测到CPU首次绘制提交：1024PNG444→388ms，4096PNG491→403ms，4096JPEG552→417ms。JPEG纯解码未变快，主要为阶段重叠。40次已预读导航32.433→0.744ms，不代表显示器呈现时间或所有新图耗时。详细边界及P95见`docs/performance/image-loading.md`。
-
-54项Rust测试+11项安装器检查、check/Debug/Release workspace通过；10组真实通道ROI逐像素一致，分支41状态及主线16状态实际交互通过。主线8次新进程再测与输入hash检查通过。
-
-当前Release SHA256 `89f86af7424c5bb9e1cfc732911549381aa89866fc9e8058fe20d6e5838026b5`；Debug `bd80b9ce4cf337d02e5f78081b5a6093f2bc5b1750a5262479fabd9b1ca7ca26`，路径仍为`target/release/imageview.exe`和`target/debug/imageview.exe`。该记录覆盖上方历史发布中提到的工程二进制哈希；旧公开v0.3.0附件哈希不变。现有D盘默认和Open With修复保留。本轮未push/发布/打包、未修改用户安装或关联。
+P1保持ACTIVE，不将此次授权发布当作所有长期门禁完成。未配置代码签名；原iv-shell LNK4104警告保留。多DPI/混合缩放/跨屏、冷盘及全部格式/权限、生产环境完整安装卸载矩阵未全覆盖。注册及载荷测试在隔离命名空间执行，不等于修改当前用户的真实打开方式菜单；没有更改现有安装、UserChoice或其他应用的关联。
