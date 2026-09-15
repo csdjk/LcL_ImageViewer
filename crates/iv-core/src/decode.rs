@@ -255,10 +255,14 @@ fn decode_image_crate(bytes: &[u8], fmt: ImageFormat) -> Result<DecodedImage, De
     };
     let img = image::load_from_memory_with_format(bytes, img_fmt)
         .map_err(|e| DecodeError::Decode(e.to_string()))?;
+    Ok(static_image(img, kind))
+}
+
+fn static_image(img: image::DynamicImage, kind: ImageKind) -> DecodedImage {
     let (w, h) = (img.width(), img.height());
     let has_alpha = img.color().has_alpha();
-    let rgba = img.to_rgba8().into_raw();
-    Ok(DecodedImage {
+    let rgba = img.into_rgba8().into_raw();
+    DecodedImage {
         width: w,
         height: h,
         mips: vec![MipLevel {
@@ -272,7 +276,7 @@ fn decode_image_crate(bytes: &[u8], fmt: ImageFormat) -> Result<DecodedImage, De
         is_hdr: false,
         extra_meta: None,
         frames: Vec::new(),
-    })
+    }
 }
 
 /// 收集 image crate 的动画帧（GIF / WebP / APNG 统一走这里）。
@@ -306,7 +310,7 @@ fn collect_animation(
         // 浏览器惯例：过短延时（GIF 里常见 0）按 100ms
         let delay_ms = if ms < 10 { 100 } else { ms };
         list.push(AnimatedFrame {
-            data: PixelData::Rgba8(buf.clone().into_raw()),
+            data: PixelData::Rgba8(fr.into_buffer().into_raw()),
             delay_ms,
         });
         if list.len() >= MAX_FRAMES {
@@ -353,13 +357,17 @@ fn decode_gif(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     collect_animation(dec.into_frames(), ImageKind::Gif)
 }
 
-/// WebP：统一走动画收集（image-webp 0.2 对静态图也返回单帧）。
+/// WebP：静态图直接解码；仅动画进入帧收集。
 fn decode_webp(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     use image::codecs::webp::WebPDecoder;
     use image::AnimationDecoder;
     let dec = WebPDecoder::new(std::io::Cursor::new(bytes))
         .map_err(|e| DecodeError::Decode(e.to_string()))?;
-    collect_animation(dec.into_frames(), ImageKind::WebP)
+    if dec.has_animation() {
+        collect_animation(dec.into_frames(), ImageKind::WebP)
+    } else {
+        static_decoder(dec, ImageKind::WebP)
+    }
 }
 
 /// PNG：静态走常规路径；APNG 转 ApngDecoder 收帧。
@@ -372,7 +380,16 @@ fn decode_png(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         let apng = dec.apng().map_err(|e| DecodeError::Decode(e.to_string()))?;
         return collect_animation(apng.into_frames(), ImageKind::Png);
     }
-    decode_image_crate(bytes, ImageFormat::Png)
+    static_decoder(dec, ImageKind::Png)
+}
+
+fn static_decoder(mut decoder: impl image::ImageDecoder, kind: ImageKind) -> Result<DecodedImage, DecodeError> {
+    // Reuse the parsed decoder; preserve ImageReader's default allocation checks.
+    let mut limits = image::Limits::default();
+    limits.reserve(decoder.total_bytes()).map_err(|e| DecodeError::Decode(e.to_string()))?;
+    decoder.set_limits(limits).map_err(|e| DecodeError::Decode(e.to_string()))?;
+    let image = image::DynamicImage::from_decoder(decoder).map_err(|e| DecodeError::Decode(e.to_string()))?;
+    Ok(static_image(image, kind))
 }
 
 /// Radiance HDR：保留 f32 线性数据（查看器做曝光/tonemap）。

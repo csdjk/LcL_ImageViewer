@@ -326,15 +326,15 @@ impl Renderer {
         let device = self.rs.device.clone();
         let queue = self.rs.queue.clone();
 
-        let (format, bytes, bytes_per_pixel): (wgpu::TextureFormat, Vec<u8>, u32) = match data {
-            PixelData::Rgba8(v) => (wgpu::TextureFormat::Rgba8Unorm, v.clone(), 4),
+        let (format, bytes, bytes_per_pixel): (wgpu::TextureFormat, std::borrow::Cow<'_, [u8]>, u32) = match data {
+            PixelData::Rgba8(v) => (wgpu::TextureFormat::Rgba8Unorm, std::borrow::Cow::Borrowed(v.as_slice()), 4),
             PixelData::RgbaF32(v) => {
                 // Rgba16Float 纹理：f32 → f16
                 let mut out = Vec::with_capacity(v.len() * 2);
                 for f in v {
                     out.extend_from_slice(&f32_to_f16(*f).to_le_bytes());
                 }
-                (wgpu::TextureFormat::Rgba16Float, out, 8)
+                (wgpu::TextureFormat::Rgba16Float, std::borrow::Cow::Owned(out), 8)
             }
         };
 
