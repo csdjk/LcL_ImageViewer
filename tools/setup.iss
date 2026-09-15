@@ -1,6 +1,6 @@
 ﻿; LcL ImageViewer 安装包脚本（Inno Setup 7）
 ; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageViewer-Setup-v0.3.0-win64.exe
-; 免管理员：装到 {localappdata}\Programs，注册表全走 HKCU
+; Per-user installation; prefer D:, fall back to local app data. Registry: HKCU.
 
 #define MyAppName "LcL ImageViewer"
 #ifndef MyAppVersion
@@ -26,7 +26,11 @@ AppSupportURL=https://github.com/csdjk/LcL_ImageViewer/issues
 AppUpdatesURL=https://github.com/csdjk/LcL_ImageViewer/releases/latest
 SetupIconFile=..\crates\iv-viewer\assets\icon.ico
 AppComments=Lightweight game-art image viewer (DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG)
-DefaultDirName={localappdata}\Programs\{#MyAppName}
+; New installations prefer D:; upgrades keep their existing location.
+DefaultDirName={code:GetDefaultInstallDir}
+UsePreviousAppDir=yes
+; Always allow the user to inspect and change the destination.
+DisableDirPage=no
 DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 OutputDir=..\dist
@@ -142,3 +146,19 @@ Filename: "{app}\{#MyAppExe}"; Description: "启动 {#MyAppName}"; Flags: nowait
 [UninstallRun]
 ; 卸载后刷新 shell 图标/缩略图缓存
 Filename: "ie4uinit.exe"; Parameters: "-show"; Flags: runhidden skipifdoesntexist; RunOnceId: "RefreshIconCache"
+
+[Code]
+{ Only choose a proposed directory; do not create folders or change permissions. }
+function SelectDefaultInstallDir(HasDDrive: Boolean; const UserDir: String): String;
+begin
+  if HasDDrive then
+    Result := 'D:\Program Files\{#MyAppName}'
+  else
+    Result := UserDir;
+end;
+
+function GetDefaultInstallDir(Param: String): String;
+begin
+  Result := SelectDefaultInstallDir(DirExists('D:\'),
+    ExpandConstant('{localappdata}\Programs\{#MyAppName}'));
+end;
