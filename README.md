@@ -1,119 +1,167 @@
 <div align="center">
 
-<img src="docs/icon.png" width="96" alt="LcL ImageViewer">
+<img src="docs/icon.png" width="96" alt="LcL ImageViewer 图标">
 
 # LcL ImageViewer
 
-**轻量级 Windows 看图工具，为游戏美术与贴图工作者设计**
+**轻量级 Windows 图片查看器，为游戏美术、贴图检查与日常看图设计。**
 
-[![Release](https://img.shields.io/github/v/release/csdjk/LcL_ImageViewer?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
-[![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange?style=flat-square)](https://www.rust-lang.org/)
+[![Release](https://img.shields.io/github/v/release/csdjk/LcL_ImageViewer?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases/latest)
+[![Windows x64](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-blue?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases/latest)
+[![MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Rust](https://img.shields.io/badge/built%20with-Rust-orange?style=flat-square)](https://www.rust-lang.org/)
+
+[下载安装包](https://github.com/csdjk/LcL_ImageViewer/releases/latest) · [更新日志](CHANGELOG.md) · [反馈问题](https://github.com/csdjk/LcL_ImageViewer/issues)
 
 </div>
 
----
-
 ## 界面预览
+
+以下均为 **v0.3.0 实际运行截图**。示例使用项目自身的图标素材，桌面磨砂关闭，避免显示桌面内容。
+
+### 深色主题
+
+![深色主题：侧边玻璃切图按钮、悬浮工具栏与像素状态栏](docs/screenshot-dark.jpg)
+
+### 浅色主题
+
+![浅色主题：雾蓝灰新拟态界面](docs/screenshot-light.jpg)
 
 <table>
   <tr>
-    <td><img src="docs/screenshot-light.jpg" alt="浅色主题"></td>
-    <td><img src="docs/screenshot-dark.jpg" alt="深色主题"></td>
+    <td width="50%"><img src="docs/screenshots/settings.png" alt="无分类紧凑设置弹窗，可单独拖动"></td>
+    <td width="50%"><img src="docs/screenshots/context-menu.png" alt="无分类右键菜单"></td>
   </tr>
   <tr>
-    <td align="center">浅色 · 雾感苔绿</td>
-    <td align="center">深色 · 深绿灰</td>
+    <td align="center">紧凑设置 · 标题拖动只移动弹窗</td>
+    <td align="center">精简菜单 · 只保留常用文件操作</td>
   </tr>
 </table>
 
-悬浮式沉浸布局：工具栏与状态栏使用雾蓝灰新拟态表面，12–16 点圆角、多层柔影与凸起/凹陷操作反馈。指针静止时自动隐藏，让图像占据全部视野。新用户默认浅色，深/浅双主题一键切换（`T`），已有主题偏好继续保留。设计规范见 [新拟态 UI 规范](docs/新拟态UI规范.md)。上方预览图为历史版本；本轮实际截图与验收记录见 [新拟态验收](docs/ui-qa/新拟态验收.md)。
+## v0.3.0 更新
 
-## 功能特性
+新拟态深浅主题、窗口两侧的半透明磨砂切图按钮，以及 **1 秒无操作后自动淡出**的悬浮工具栏。右键菜单与设置页去掉冗余分类；设置弹窗可以独立拖动。
 
-- **广泛格式支持**：DDS (BC1–BC7) / PSD / TGA / QOI / HDR / PNM / GIF / WebP / APNG，以及 PNG / JPG / BMP / TIFF 等常规格式
-- **动画播放**：GIF / WebP / APNG 播放暂停、逐帧步进、帧进度条
-- **贴图检查**：R / G / B / A 单通道查看、Mipmap 层级切换、HDR 曝光调节、最近邻/双线性采样切换
-- **像素检查器**：光标处像素坐标 + RGBA8 十六进制/十进制 + 浮点值实时读数
-- **图像导航**：同目录图片上一张/下一张快速切换
-- **视图操作**：画布左键/中键拖拽平移图像、右键拖拽移动窗口（单击右键打开菜单）、滚轮以光标为中心缩放、适配窗口 / 实际大小、全屏
-- **资源管理器缩略图**：可选注册 `.dds .tga .psd .qoi .hdr .ppm .pgm .pbm` 缩略图预览（仅当前用户，不影响系统已有处理器）
+操作同步调整为 **左键拖图、画布右键拖主窗口、A / D 切图**。按 `Delete` 会先确认，再将当前图片移入回收站；“打开所在文件夹”直接打开当前图片的父目录。
 
-## 下载
+## 主要功能
 
-前往 [Releases](https://github.com/csdjk/LcL_ImageViewer/releases) 页面下载最新版本：
-
-| 文件 | 说明 |
+| 方向 | 能力 |
 | --- | --- |
-| `LcL-ImageViewer-Setup-vX.Y.Z-win64.exe` | 安装程序（推荐）：免管理员，含开始菜单快捷方式、文件关联、缩略图注册（可选）、卸载器 |
-| `LcL-ImageViewer-vX.Y.Z-win64.zip` | 绿色便携包：解压即用，`imageview.exe` 单文件可运行 |
+| 游戏贴图 | DDS（BC1–BC7）、PSD、TGA、QOI、HDR、PNM，以及常见 PNG / JPG / BMP / TIFF / ICO 格式 |
+| RGBA 检查 | R、G、B、Alpha 单通道查看；保留透明度或忽略 Alpha；棋盘格 / 纯色衬底 |
+| Mipmap 与采样 | 多 Mip 图片切换层级；最近邻 / 双线性采样；HDR 曝光调节 |
+| 像素检查 | 光标处像素坐标、RGBA8 十六进制 / 十进制与浮点读数；复制像素值 |
+| 动画 | GIF / WebP / APNG 播放暂停、逐帧查看与帧进度控制 |
+| 日常看图 | 同目录导航、鼠标缩放和平移、适配窗口、实际大小、复制路径、打开所在文件夹 |
+| 外观 | 深浅主题、柔和新拟态控件、侧边磨砂导航、可选桌面磨砂背景、减少动效 |
+| Windows 集成 | 可选“打开方式”注册和资源管理器缩略图扩展，不自动替用户选择系统默认应用 |
+
+<details>
+<summary>查看 Alpha 通道实机示例</summary>
+
+![Alpha 单通道：透明度以灰度显示](docs/screenshots/alpha-channel.jpg)
+
+</details>
+
+## 下载与使用
+
+前往 [GitHub Releases](https://github.com/csdjk/LcL_ImageViewer/releases/latest)。
+
+| 文件 | 用途 |
+| --- | --- |
+| `LcL-ImageViewer-Setup-v0.3.0-win64.exe` | 安装版：当前用户安装，提供开始菜单入口和卸载器；文件关联、缩略图注册可在安装时选择 |
+| `LcL-ImageViewer-v0.3.0-win64.zip` | 免安装包：解压后运行 `imageview.exe`；包含可选缩略图扩展、脚本、使用说明和更新日志 |
+| `SHA256SUMS.txt` | 安装包与免安装包的 SHA-256 校验值 |
+
+发布包暂未配置代码签名；下载后可用 `Get-FileHash` 与 `SHA256SUMS.txt` 核对文件完整性。
+
+首次打开可将图片拖进窗口，或使用 `Ctrl+O` 选择文件。图片打开后，`A / D` 或 `← / →` 浏览同目录图片；到达首尾时不循环。
+
+升级前关闭旧查看器。安装版使用安装向导升级；免安装版建议解压到新目录后启动，避免误开旧的 EXE。开发目录中的 Debug、Release 与其他安装副本是独立文件，不会同时自动更新。界面偏好保存在当前用户的 `%APPDATA%\LcL ImageViewer` 下，免安装并不代表配置也保存于 EXE 旁边。
+
+## 鼠标操作
+
+| 操作区域 / 手势 | 效果 |
+| --- | --- |
+| 画布左键或中键拖拽 | 移动图片，主窗口不动 |
+| 画布右键拖拽 | 移动整个查看器窗口 |
+| 画布右键单击 | 打开精简菜单；拖动结束不会误弹菜单 |
+| 设置标题或标题内空白处，左键 / 右键拖拽 | 只移动内部设置弹窗，主窗口不动；当前会话中保留位置 |
+| 滚轮 | 以光标所在位置为中心缩放图片 |
+| 窗口边缘左键拖拽 | 调整主窗口大小 |
+
+设置中的按钮、开关、滑条不属于标题拖动区。设置弹窗限制在查看器内部，避免拖出可操作范围。
 
 ## 快捷键
 
-| 按键 | 功能 | 按键 | 功能 |
-| --- | --- | --- | --- |
-| `A` / `D` 或 `←` / `→` | 同目录上一张 / 下一张 | `1` `2` `3` `4` | 查看 R / G / B / A 单通道 |
-| 滚轮 | 缩放（以光标为中心） | `5` 或 `C` | 恢复完整 RGBA |
-| 画布左键拖拽 | 平移图像 | `O` | 忽略 Alpha |
-| 中键拖拽 | 平移图像 | `F` | 适配窗口 |
-| `0` | 实际大小 100% | `N` | 最近邻 / 双线性采样 |
-| `PgUp` / `PgDn` | 切换 Mipmap 层级 | `Space` | 动画播放 / 暂停 |
-| `,` `.` | 逐帧步进 | `T` | 深色 / 浅色主题切换 |
-| `F11` | 全屏 | `Esc` | 关闭弹层 / 退出程序 |
-| 右键单击 / 拖拽 | 精简文件菜单 / 移动窗口 | `Delete` | 确认后将当前图片移入回收站 |
+| 按键 | 功能 |
+| --- | --- |
+| `Ctrl+O` | 打开图片 |
+| `A` / `D`、`←` / `→`、`PgUp` / `PgDn` | 同目录上一张 / 下一张 |
+| `Home` / `End` | 同目录第一张 / 最后一张 |
+| `1` / `2` / `3` / `4` | R / G / B / Alpha 单通道 |
+| `5` 或 `C` | 恢复 RGB 色彩与原图透明度 |
+| `O` | 忽略 Alpha |
+| `F` | 适配窗口 |
+| `0` | 实际大小 100% |
+| `N` | 最近邻 / 双线性采样 |
+| `↑` / `↓` | Mip 索引增加 / 减少（图片须包含多个 Mip） |
+| `Space` | 动画播放 / 暂停 |
+| `,` / `.` | 动画上一帧 / 下一帧 |
+| `T` | 深色 / 浅色主题 |
+| `Delete` | 确认后将当前图片移入回收站 |
+| `Esc` | 优先关闭菜单、确认框或设置等弹层；无弹层时退出 |
 
-右键菜单保留复制像素/路径、打开所在文件夹、删除图片、图像属性、像素检查器、打开文件与设置；移除重复的导航、缩放、通道、主题和格式工具，相关功能仍在顶部工具栏及快捷键中。A/D在输入框或弹层中不切图；Delete不会响应组合键或长按连发，取消不改变文件，无法回收时不永久删除。删除成功后显示下一张，末尾回退到上一张，最后一张删除后回到空态。
+文字输入或相关弹层操作时，不会误触发 A/D 切图或删除。Delete 不响应组合键或长按连发，**没有 Shift+Delete 永久删除入口**。取消不改变文件；删除成功后优先显示下一张，末尾回退到上一张，全部删完则回到空白状态。
 
-设置页为紧凑无分类列表。按住“设置”标题或标题内空白处，用左键或右键拖动设置弹窗，主窗口保持不动；控件和关闭按钮不会误拖。弹窗位置在当前会话保留并限制在查看器客户区内，画布右键仍移动主窗口。
+## 可选缩略图扩展
 
-## 资源管理器缩略图
+`iv_shell.dll` 为 `.dds .tga .psd .qoi .hdr .ppm .pgm .pbm` 提供资源管理器缩略图。
 
-安装版可在安装时勾选自动注册；便携版手动注册：
-
-```powershell
-# 注册（右键 → 使用 PowerShell 运行）
-register_thumbnail.ps1
-# 卸载
-unregister_thumbnail.ps1
-```
-
-仅写入当前用户注册表（HKCU），无需管理员权限，不覆盖系统已有图片处理器。
-
-## 自行构建
-
-环境要求：Rust 工具链（Windows x64）、Inno Setup 7（仅打安装包需要）。
+安装版可勾选相应选项；免安装版可在保留 EXE/DLL 的固定目录中手动运行：
 
 ```powershell
-# 构建（release 启用 LTO 全量优化）
-cargo build --release --workspace
+# 在解压目录中运行；脚本优先使用旁边的 iv_shell.dll
+powershell -NoProfile -ExecutionPolicy Bypass -File .\register_thumbnail.ps1
 
-# 产物
-#   target\release\imageview.exe   主程序（单文件可运行）
-#   target\release\iv_shell.dll    Explorer 缩略图扩展
-
-# 打安装包（可选）
-& "$env:LOCALAPPDATA\Programs\Inno Setup 7\ISCC.exe" tools\setup.iss
-# 输出 dist\LcL-ImageViewer-Setup-vX.Y.Z-win64.exe
+# 移除本扩展的注册
+powershell -NoProfile -ExecutionPolicy Bypass -File .\unregister_thumbnail.ps1
 ```
 
-## 开发协作
+注册只写入当前用户的 HKCU。缩略图扩展是可选项，普通看图不依赖注册；启用前注意与其他图片软件的缩略图处理器可能存在占用关系。移动或删除免安装目录前，应先解除缩略图注册。
 
-- [当前状态](docs/status.md)：当前阶段、已验证事实和唯一 NEXT。
-- [路线图](docs/roadmap.md)：阶段顺序与 Stage Gate。
-- [任务板](docs/task-board.md)：Task、Owner、依赖、修改范围和验收。
-- [当前开发计划](docs/development-plan.md)：复杂 Task 的完整执行合同。
-- [待决策事项](docs/needs-decision.md)：必须由用户决定的问题与恢复条件。
-- [玻璃磨砂 UI 优化方案](docs/玻璃磨砂UI优化方案.md)：视觉、渲染与验收规范。
+## 从源码构建
 
-所有开发 Agent 先阅读根目录 [`AGENTS.md`](AGENTS.md)。定时开发只在人工跑通一个完整 Task 闭环后启用，Prompt 见 [`docs/scheduled-developer-prompt.md`](docs/scheduled-developer-prompt.md)。
+需要 Windows x64 Rust 工具链；MSVC 构建需对应的 C++ Build Tools / Windows SDK。制作安装包另需 Inno Setup 7。
 
-## 技术栈
+```powershell
+cargo test --workspace --locked
+cargo build --release --workspace --locked
 
-- **Rust** workspace：`iv-viewer`（主程序）/ `iv-core`（格式解码）/ `iv-shell`（Explorer 缩略图扩展）
-- **egui 0.27 + eframe**：即时模式 GUI，悬浮层、自绘右键菜单、新拟态主题均基于 egui 绘制
-- **wgpu**：GPU 渲染（WGSL shader 实现通道分离 / Mip 采样 / HDR 曝光）
-- **Windows 集成**：DWM 沉浸式标题栏、HKCU 文件关联、IThumbnailProvider 缩略图
+# 主程序与可选扩展
+# target\release\imageview.exe
+# target\release\iv_shell.dll
+
+# 指定已安装或便携版 ISCC.exe，生成安装包、ZIP 和 SHA256SUMS.txt
+python tools/package_release.py --iscc "C:\Path\To\Inno Setup 7\ISCC.exe"
+# 输出：dist/v0.3.0/
+```
+
+## 验证范围与限制
+
+本轮主要在 Windows、100% 缩放下验证深浅主题、两种窗口尺寸及文件/菜单/拖拽交互。其他 DPI、混合缩放、多显示器、全部 HDR/动画组合和桌面捕获性能仍需更多回归；不承诺覆盖所有环境。桌面磨砂为应用自身捕获与模糊实现，受系统捕获能力影响。回收站无法使用时应取消操作，不提供永久删除回退。
+
+发布说明见 [v0.3.0](docs/releases/v0.3.0.md)。
+
+<details>
+<summary>开发协作与验收文档</summary>
+
+- [AGENTS.md](AGENTS.md)：开发协作入口。
+- [当前状态](docs/status.md) · [任务板](docs/task-board.md) · [路线图](docs/roadmap.md)。
+- [新拟态规范](docs/新拟态UI规范.md) · [设置弹窗拖动验收](docs/ui-qa/设置弹窗独立拖动验收.md)。
+
+</details>
 
 ## License
 
