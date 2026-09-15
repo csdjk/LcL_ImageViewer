@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
+| IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | REVIEW | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
 | IV-PERF-01 | 图片加载与启动耗时优化 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / 当前main | `crates/iv-viewer/src/{main.rs,app.rs,loader.rs,render.rs,perf.rs,directory.rs}`, `crates/iv-core/src/decode.rs`, `crates/iv-core/tests/**`, `crates/iv-core/examples/**`, `tools/perf/**`, `docs/performance/**`, `README.md` | 同样本同Release基线；调度/扫描/拷贝优化；像素一致；tests/check/双构建及实际窗口验证；不改关联/安装/远端 |
 | IV-INSTALL-02 | 新安装默认D盘目录 | DONE | ChatGPT-AgentDock | 用户要求 / INSTALL-01 DONE | `tools/setup.iss`, `tools/tests/**`, `README.md`, `docs/releases/default-install-directory.md` | D盘优先/无D回退/升级保留/目录可选；真实Inno测试与安装包构建；不安装、不改关联、不发布 |
 | IV-INSTALL-01 | 修复安装器打开方式空注册键 | DONE | ChatGPT-AgentDock | 用户安装后打开方式缺失 / REL-030 DONE | `tools/setup.iss`, `tools/tests/**`, `docs/releases/openwith-installer-fix.md`, `README.md` | 显式ValueType、关联刷新；旧版复现/修正版隔离真实安装和卸载回归；本地修正版包，不改真实关联、不push或覆盖公开附件 |
@@ -196,3 +196,6 @@ IV-PERF-01 完成：集成`9eaae72e950831f524d582183aafdb3425b677fc`，54+11测�
 ## IV-REL-031 发布合同
 
 Base `dfb45debaf33409c17677395d2eba9d7cd73edc5`；branch `codex/release-v0.3.1`；worktree `Temp/worktrees/release-v0.3.1`。用户明确要求更新安装包并发布；原GitHub远端最新v0.3.0，本次使用v0.3.1，不覆盖旧tag/附件。允许将已有19个未推送提交与本次版本文档推送main、新标签及Release。整合加载优化、静态WebP修复、D盘默认与打开方式注册修复。不迁移当前安装、不操作实时关联、不强推、不发布私密文件。验证使用新建图片/隔离profile，注册测试仅在独立HKCU InstallerQA命名空间，目录探针不执行安装。P1长期门禁不改为通过。
+
+
+IV-REL-031 Review：Worker `22bf57c`；54项Rust测试/check、11项安装器检查通过；真实Inno旧空键复现/修正版71值/共享值卸载及默认D目录解析通过，实时关联未改动。范围7文件符合合同，无GUI或解码行为新增修改。主线重建0.3.1后补齐载荷安装hash、实际窗口及最终包验证。
