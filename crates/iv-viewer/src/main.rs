@@ -7,12 +7,14 @@
 mod app;
 mod backdrop;
 mod loader;
+mod perf;
 mod render;
 mod recycle;
 mod ui;
 mod winassoc;
 
 fn main() -> eframe::Result<()> {
+    perf::init();
     // 命令行参数：可选的初始文件路径（文件关联 / 拖到 exe 上打开）
     let initial_path = std::env::args()
         .skip(1)

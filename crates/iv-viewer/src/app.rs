@@ -113,6 +113,7 @@ pub struct App {
     current: Option<CurrentImage>,
     /// 正在异步加载的路径（显示"加载中"）
     pending: Option<PathBuf>,
+    perf_paint_pending: bool,
     directory: Option<Directory>,
     view: ViewTransform,
     auto_fit: bool,
@@ -213,6 +214,7 @@ pub struct App {
 
 impl App {
     pub fn new(cc: &eframe::CreationContext, initial_path: Option<PathBuf>) -> Self {
+        crate::perf::mark("app_new", None, 0.0);
         // 恢复已有显式主题；新用户默认使用浅色新拟态。
         // SetTheme 经 egui-winit → winit → DWM 沉浸式暗色模式同步系统标题栏
         let theme = match cc.storage.and_then(|s| s.get_string("iv-theme")).as_deref() {
@@ -224,12 +226,14 @@ impl App {
             .wgpu_render_state
             .as_ref()
             .map(crate::render::Renderer::new);
+        crate::perf::mark("renderer_ready", None, 0.0);
         let (backdrop_capture_tx, backdrop_capture_rx) = mpsc::channel();
         let mut app = Self {
             loader: Loader::spawn(),
             cache: ImageCache::new(),
             current: None,
             pending: None,
+            perf_paint_pending: false,
             directory: None,
             view: ViewTransform {
                 offset: Vec2::ZERO,
@@ -314,6 +318,7 @@ impl App {
     fn open(&mut self, path: PathBuf) {
         // Keep cache keys, directory entries and confirmed deletion paths consistent.
         let path = std::path::absolute(&path).unwrap_or(path);
+        crate::perf::mark("load_request", Some(&path), 0.0);
         self.error_msg = None;
         self.refresh_directory(&path);
         self.mip_index = 0;
@@ -329,6 +334,7 @@ impl App {
 
     /// 扫描同目录文件列表并定位 index。
     fn refresh_directory(&mut self, path: &Path) {
+        let started = Instant::now();
         if let Some(dir) = path.parent() {
             let mut files: Vec<PathBuf> = match std::fs::read_dir(dir) {
                 Ok(rd) => rd
@@ -353,6 +359,7 @@ impl App {
             });
             let index = files.iter().position(|p| p == path).unwrap_or(0);
             self.directory = Some(Directory { files, index });
+            crate::perf::mark("directory_ready", Some(path), started.elapsed().as_secs_f64()*1000.0);
         }
     }
 
@@ -369,7 +376,10 @@ impl App {
         self.cache.put(path.clone(), img.clone(), &path);
         self.current = Some(CurrentImage { path, img });
         self.pending = None;
+        let upload_started = Instant::now();
         self.upload_current_mip();
+        crate::perf::mark("image_ready", self.current.as_ref().map(|c| c.path.as_path()), upload_started.elapsed().as_secs_f64()*1000.0);
+        self.perf_paint_pending = true;
         self.auto_fit = true;
         // 主动安排一次适配：auto_fit 只在窗口尺寸变化时触发 fit，
         // 切图时窗口尺寸通常没变，必须走 pending_fit 才能立即居中适配
@@ -2498,6 +2508,10 @@ impl eframe::App for App {
                         canvas_rect,
                     );
                     canvas_painter.add(crate::render::new_paint_callback(canvas_rect));
+                    if self.perf_paint_pending {
+                        crate::perf::mark("image_paint_queued", self.current.as_ref().map(|c| c.path.as_path()), 0.0);
+                        self.perf_paint_pending = false;
+                    }
                 }
             }
         }

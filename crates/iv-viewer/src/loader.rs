@@ -41,7 +41,10 @@ impl Loader {
                         Cmd::Load(p) => p,
                         Cmd::Prefetch(p) => p,
                     };
+                    let started = std::time::Instant::now();
+                    crate::perf::mark("decode_start", Some(&path), 0.0);
                     let result = decode_path(&path).map_err(|e| (path.clone(), e.to_string()));
+                    crate::perf::mark("decode_ready", Some(&path), started.elapsed().as_secs_f64()*1000.0);
                     let msg = Msg::Ready(result.map(|img| (path, Arc::new(img))));
                     if tx_msg.send(msg).is_err() {
                         break; // 主线程已退出
