@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-030 | 更新README、实机配图并发布v0.3.0 | IN_PROGRESS | ChatGPT-AgentDock | 用户2026-09-15明确授权打包发布 / N09 DONE | `README.md`, `CHANGELOG.md`, `Cargo.toml`, `Cargo.lock`, `tools/**`, `docs/screenshots/**`, `docs/screenshot-*.jpg`, `docs/releases/**` | 文档准确；公开截图无隐私；tests/check/release workspace；包内容/hash/启动检查；推送main和新标签后GitHub Release附件核验 |
+| IV-REL-030 | 更新README、实机配图并发布v0.3.0 | REVIEW | ChatGPT-AgentDock | 用户2026-09-15明确授权打包发布 / N09 DONE | `README.md`, `CHANGELOG.md`, `Cargo.toml`, `Cargo.lock`, `tools/**`, `docs/screenshots/**`, `docs/screenshot-*.jpg`, `docs/releases/**` | 文档准确；公开截图无隐私；tests/check/release workspace；包内容/hash/启动检查；推送main和新标签后GitHub Release附件核验 |
 | IV-P1-N09 | 设置弹窗独立拖动（纠正拖动对象） | DONE | ChatGPT-AgentDock | 用户明确纠正 / N08 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/设置弹窗独立拖动验收.md` | 标题只移动内部弹窗，主窗口固定；控件不误拖；边界可见；画布右键拖窗保留；tests/check/双构建与实机验证 |
 | IV-P1-N08 | 设置页紧凑列表与标题拖窗 | DONE | ChatGPT-AgentDock | 用户最新授权；N07已集成待串行复验 | `crates/iv-viewer/src/{app.rs,ui.rs,backdrop.rs}`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 无分类无大卡片；保留所有实际设置；标题左右键移整窗、控件不误拖；tests/check/双构建/双主题双尺寸实机及main复验 |
 | IV-P1-N07 | 右键菜单去掉分类与分组空白 | DONE | ChatGPT-AgentDock | 用户最新需求 / N06 DONE | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/无分类菜单验收.md` | 连续单列无分类；功能/快捷键保留；tests/check/构建及双主题双尺寸实机验证 |
@@ -157,3 +157,5 @@ N09 Review：40tests/check/Debug及四组64张实机验证通过；标题仅改�
 ## IV-REL-030 发布合同
 
 用户明确要求更新README、配图、打包并发布新版本。当前远端最新v0.2.0，发布v0.3.0。Base `5de7a66f465afb700fa52810a809c301bbda43d2`；独立branch `codex/release-v0.3.0`，worktree `Temp/worktrees/release-v0.3.0`。允许此次推送main与新标签及创建GitHub Release，不强推、不改写旧版本。只发布构建产物、文档和已审查源码；不上传Temp、用户偏好、私密桌面或机器文件。仅发布前必要验证，不把未完成的P1全DPI/性能门禁标为通过；发布说明如实列明覆盖范围。保持现有窗口和安装目录不变，不执行注册/卸载系统集成。
+
+IV-REL-030 Review：Worker 0ef558d。40tests/check/release workspace、PE x64 GUI及DLL加载导出、Inno编译与ZIP内容hash通过；README本地链接/图片已核对，5张为本版本实际窗口截图，范围审查通过。开始main复验与正式打包；发布授权仅本轮。
