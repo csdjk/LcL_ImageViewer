@@ -3,7 +3,7 @@
 > 更新时间：2026-09-15。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N11 -->
 
 ## 最新正式版本
 
@@ -49,3 +49,8 @@ IV-DOC-02 DONE：用户版README已提交 `8e458797f6460f9f6d0883f4cbc481f95fc19
 IV-P1-N10 DONE，集成 `9aea77d3596a8e3dc962573c03aa81f38c42ec87`。WebP缩略图注册补齐；修复PSD等槽GUID多余右花括号及PSD额外通道RLE；缩略图只取动画首帧并按Alpha正确缩小。透明图棋盘格铺满画布，保留纯色；顶部图片边界开关/B快捷键，包含透明留白、跟随缩放平移、默认关且持久化。
 
 62项Rust+12项安装器检查/check/双构建、分支80张及main21状态真实GUI、12个COM缩略图与像素检查、72值隔离注册验证通过。常规target/release与target/debug均更新；Release SHA256 `2fb2f900abaa036541afb68fbbe7ae847695eb84a9a194af2df17d8c5f7ad739`。无push/打包/实际安装与关联修改；公开v0.3.1包仍是旧包，Explorer实际启用需要后续更新安装和注册，不是运行新EXE就完成。PSD ZIP/CMYK/PSB及其他DPI等边界见验收文档。
+
+
+## 当前任务
+
+IV-P1-N11 IN_PROGRESS：固定根目录向下浏览子文件夹图片，并记录中文提交约定。此前本地提交全部保留。
