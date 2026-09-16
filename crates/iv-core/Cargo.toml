@@ -21,3 +21,6 @@ image = { version = "0.25", default-features = false, features = [
     "pnm",
 ] }
 texture2ddecoder = "0.1"
+
+# Bundled AVIF decoder: static linking, no system codec or runtime DLL required.
+libavif-sys = { version = "0.17", default-features = false, features = ["codec-aom"] }

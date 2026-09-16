@@ -303,6 +303,20 @@ mod tests {
         assert!(!scope.contains(&scope.root.join("../parent.png")));
     }
     #[test]
+    fn avif_files_are_included_in_flat_and_recursive_navigation() {
+        let f = Fixture::new();
+        let flat = f.0.join("selected/02.AVIF");
+        let nested = f.0.join("selected/child/03.avif");
+        std::fs::write(&flat, []).unwrap();
+        std::fs::write(&nested, []).unwrap();
+        let (files, _) = result(&f.scope(false), Limits::default());
+        assert!(files.contains(&flat));
+        assert!(!files.contains(&nested));
+        let (files, _) = result(&f.scope(true), Limits::default());
+        assert!(files.contains(&flat) && files.contains(&nested));
+    }
+
+    #[test]
     fn inaccessible_directory_is_reported() {
         let scope = Scope { root: PathBuf::from("__iv_missing_directory__"), recursive: true };
         let (files, stats) = result(&scope, Limits::default()); assert!(files.is_empty()); assert!(stats.partial());

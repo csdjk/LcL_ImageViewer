@@ -8,6 +8,7 @@ pub enum ImageFormat {
     Bmp,
     Gif,
     WebP,
+    Avif,
     Ico,
     Tiff,
     /// Radiance RGBE (.hdr)
@@ -41,6 +42,9 @@ pub fn detect_format(bytes: &[u8]) -> ImageFormat {
     }
     if bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
         return ImageFormat::WebP;
+    }
+    if crate::avif::is_avif(bytes) {
+        return ImageFormat::Avif;
     }
     if bytes.starts_with(&[0x00, 0x00, 0x01, 0x00]) {
         return ImageFormat::Ico;
@@ -92,6 +96,7 @@ pub fn supported_ext_of(path: &std::path::Path) -> Option<&'static str> {
         "bmp" | "dib" => "BMP",
         "gif" => "GIF",
         "webp" => "WebP",
+        "avif" => "AVIF",
         "ico" => "ICO",
         "tif" | "tiff" => "TIFF",
         "hdr" => "Radiance HDR",

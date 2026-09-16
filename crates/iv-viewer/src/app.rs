@@ -927,7 +927,7 @@ impl App {
             .add_filter(
                 "所有支持的图像",
                 &[
-                    "png", "jpg", "jpeg", "bmp", "gif", "webp", "ico", "tif", "tiff", "hdr", "dds",
+                    "png", "jpg", "jpeg", "bmp", "gif", "webp", "avif", "ico", "tif", "tiff", "hdr", "dds",
                     "psd", "qoi", "tga", "ppm", "pgm", "pbm",
                 ],
             )
