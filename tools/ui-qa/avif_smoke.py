@@ -34,7 +34,7 @@ def run(args):
     key('4'); shot('alpha-png'); key('5')
     key('D'); actions.append({'kind':'wait','seconds':0.6}); key('0'); shot('opaque-avif')
     key('S'); actions.append({'kind':'wait','seconds':0.7}); key('D')
-    actions.append({'kind':'wait','seconds':0.6}); key('0'); shot('animated-first-frame')
+    actions.append({'kind':'wait','seconds':0.6}); key('0'); shot('animated-preview')
     key('A'); actions.append({'kind':'wait','seconds':0.6}); shot('back-to-opaque')
     actions.extend([{'kind':'wait','seconds':1.5},{'kind':'shot','name':'hidden'}]); shot('restored')
     script=out/'actions.json';script.write_text(json.dumps(actions,ensure_ascii=False,indent=2),'utf-8')
@@ -45,7 +45,7 @@ def run(args):
     assert meta['preferences_restored'] and meta['isolated_profile']
     assert hashes=={n:qa.sha(root/n) for n in copies}
     for state,name in [('rgba-avif','01-透明.avif'),('rgba-png','02-参考.png'),
-                       ('opaque-avif','03-不透明.AVIF'),('animated-first-frame','04-动态.avif'),
+                       ('opaque-avif','03-不透明.AVIF'),('animated-preview','04-动态.avif'),
                        ('back-to-opaque','03-不透明.AVIF')]:
         info=json.loads((out/'viewer'/f'{state}.json').read_text('utf-8'))
         assert info['window_title'].startswith(name), (state,info['window_title'])
@@ -66,7 +66,7 @@ def run(args):
             'theme':args.theme,'logical_client':[args.width,args.height],
             'avif_reference_png_peak_channel_difference':differences,
             'mixed_format_and_recursive_navigation':True,'source_files_unchanged':True,
-            'preferences_restored':True,'animation':'first frame only'}
+            'preferences_restored':True,'animation':'playback covered by animated_avif_smoke.py'}
     (out/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf-8')
     print(json.dumps(report,ensure_ascii=False),flush=True)
 

@@ -20,7 +20,7 @@ pub struct DecodedImage {
     pub is_hdr: bool,
     /// 附加说明（如 cubemap、PSB 降级信息等）。
     pub extra_meta: Option<String>,
-    /// 动画帧序列（GIF / WebP / APNG；静态图为空，>1 帧即为动画）。
+    /// 动画帧序列（GIF / WebP / APNG / AVIF；静态图为空，>1 帧即为动画）。
     /// 帧均为合成后的完整帧，尺寸与 width/height 一致；mips[0] 与 frames[0] 内容相同。
     pub frames: Vec<AnimatedFrame>,
 }
@@ -29,7 +29,7 @@ pub struct DecodedImage {
 #[derive(Debug, Clone)]
 pub struct AnimatedFrame {
     pub data: PixelData,
-    /// 显示时长（毫秒；解码层已把过短延时修正为 100ms）
+    /// 显示时长（毫秒；GIF/WebP/APNG 的过短延时修正为 100ms，AVIF 最小 1ms）
     pub delay_ms: u32,
 }
 
@@ -211,6 +211,7 @@ pub fn decode_preview_bytes(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     use std::io::Cursor;
     let err = |e: image::ImageError| DecodeError::Decode(e.to_string());
     match detect_format(bytes) {
+        ImageFormat::Avif => crate::avif::decode_avif_preview(bytes),
         ImageFormat::WebP => {
             let decoder = image::codecs::webp::WebPDecoder::new(Cursor::new(bytes)).map_err(err)?;
             if decoder.has_animation() { first_preview_frame(decoder.into_frames(), ImageKind::WebP) }

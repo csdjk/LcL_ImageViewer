@@ -2458,10 +2458,14 @@ impl eframe::App for App {
                 .unwrap_or(0);
             if anim > 1 {
                 let now = Instant::now();
-                if now >= self.next_frame_at {
-                    self.frame_index = (self.frame_index + 1) % anim;
-                    self.upload_current_frame();
-                    self.next_frame_at = now + self.current_frame_delay();
+                if let Some((index, deadline)) = self.current.as_ref().and_then(|cur| {
+                    advance_animation(&cur.img.frames, self.frame_index, self.next_frame_at, now)
+                }) {
+                    self.next_frame_at = deadline;
+                    if index != self.frame_index {
+                        self.frame_index = index;
+                        self.upload_current_frame();
+                    }
                 }
                 let wait = self
                     .next_frame_at
@@ -3008,5 +3012,106 @@ mod cache_validity_tests {
         assert!(Arc::ptr_eq(&cache.get(&a).unwrap(),&image));
         assert_eq!(cache.order,vec![b.clone(),a.clone()]); assert_eq!(cache.bytes,8);
         std::fs::remove_file(a).unwrap(); std::fs::remove_file(b).unwrap();
+    }
+}
+
+
+/// Advance on the original timeline, not `now + delay`, to avoid cumulative slow-down.
+/// Skip whole missed cycles arithmetically, then inspect at most one cycle. A suspended
+/// window therefore cannot cause an unbounded loop or upload every missed frame.
+fn advance_animation(
+    frames: &[iv_core::AnimatedFrame],
+    index: usize,
+    deadline: Instant,
+    now: Instant,
+) -> Option<(usize, Instant)> {
+    if frames.len() < 2 || index >= frames.len() || now < deadline {
+        return None;
+    }
+    let delay = |i: usize| Duration::from_millis(u64::from(frames[i].delay_ms.max(1)));
+    let cycle: Duration = (0..frames.len()).map(delay).sum();
+    let remainder = now.duration_since(deadline).as_nanos() % cycle.as_nanos();
+    let remainder = Duration::new(
+        (remainder / 1_000_000_000) as u64,
+        (remainder % 1_000_000_000) as u32,
+    );
+    let mut next = now - remainder;
+    let mut frame = index;
+    for _ in 0..frames.len() {
+        frame = (frame + 1) % frames.len();
+        next += delay(frame);
+        if next > now {
+            return Some((frame, next));
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod animation_timing_tests {
+    use super::*;
+
+    fn frames(delays: &[u32]) -> Vec<iv_core::AnimatedFrame> {
+        delays
+            .iter()
+            .map(|&delay_ms| iv_core::AnimatedFrame {
+                data: PixelData::Rgba8(vec![0, 0, 0, 255]),
+                delay_ms,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn variable_frame_delays_do_not_accumulate_render_latency() {
+        let start = Instant::now();
+        let result = advance_animation(
+            &frames(&[10, 30, 60]),
+            0,
+            start + Duration::from_millis(10),
+            start + Duration::from_millis(75),
+        );
+        assert_eq!(result, Some((2, start + Duration::from_millis(100))));
+    }
+
+    #[test]
+    fn long_suspend_skips_cycles_and_only_returns_the_current_frame() {
+        let start = Instant::now();
+        let result = advance_animation(
+            &frames(&[10, 30, 60]),
+            0,
+            start + Duration::from_millis(10),
+            start + Duration::from_millis(86_400_250),
+        );
+        assert_eq!(result, Some((2, start + Duration::from_millis(86_400_300))));
+    }
+
+    #[test]
+    fn frame_boundary_wraps_without_resetting_the_timeline() {
+        let start = Instant::now();
+        let data = frames(&[10, 30, 60]);
+        assert_eq!(
+            advance_animation(&data, 2, start, start),
+            Some((0, start + Duration::from_millis(10)))
+        );
+        assert_eq!(
+            advance_animation(&data, 1, start, start + Duration::from_millis(60)),
+            Some((0, start + Duration::from_millis(70)))
+        );
+    }
+
+    #[test]
+    fn invalid_static_and_not_yet_due_inputs_do_not_advance() {
+        let start = Instant::now();
+        assert!(advance_animation(&[], 0, start, start).is_none());
+        assert!(advance_animation(&frames(&[0]), 0, start, start).is_none());
+        assert!(advance_animation(&frames(&[1, 1]), 2, start, start).is_none());
+        assert!(
+            advance_animation(&frames(&[1, 1]), 0, start + Duration::from_millis(1), start)
+                .is_none()
+        );
+        assert_eq!(
+            advance_animation(&frames(&[0, 0]), 0, start, start),
+            Some((1, start + Duration::from_millis(1)))
+        );
     }
 }

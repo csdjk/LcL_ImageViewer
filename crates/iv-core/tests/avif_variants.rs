@@ -33,6 +33,16 @@ fn original() -> image::RgbaImage {
     })
 }
 fn encoded(depth: u32, rotation: u8, mirror: Option<u8>, crop: bool) -> Vec<u8> {
+    encoded_sequence(depth, rotation, mirror, crop, false)
+}
+
+fn encoded_sequence(
+    depth: u32,
+    rotation: u8,
+    mirror: Option<u8>,
+    crop: bool,
+    animated: bool,
+) -> Vec<u8> {
     // All FFI pointers below refer to these owned objects or the live input pixel Vec.
     unsafe {
         let image = NativeImage(
@@ -92,10 +102,24 @@ fn encoded(depth: u32, rotation: u8, mirror: Option<u8>, crop: bool) -> Vec<u8> 
             data: std::ptr::null_mut(),
             size: 0,
         });
-        assert_eq!(
-            ffi::avifEncoderWrite(e, p, &mut output.0),
-            ffi::AVIF_RESULT_OK
-        );
+        if animated {
+            (*e).timescale = 1000;
+            for duration in [5, 17, 29] {
+                assert_eq!(
+                    ffi::avifEncoderAddImage(e, p, duration, 0),
+                    ffi::AVIF_RESULT_OK
+                );
+            }
+            assert_eq!(
+                ffi::avifEncoderFinish(e, &mut output.0),
+                ffi::AVIF_RESULT_OK
+            );
+        } else {
+            assert_eq!(
+                ffi::avifEncoderWrite(e, p, &mut output.0),
+                ffi::AVIF_RESULT_OK
+            );
+        }
         assert!(!output.0.data.is_null());
         std::slice::from_raw_parts(output.0.data, output.0.size).to_vec()
     }
@@ -152,6 +176,58 @@ fn container_crop_rotation_and_mirroring_match_reference_pixels() {
                     expected.as_raw(),
                     "crop={crop}, rotation={rotation}, mirror={mirror:?}"
                 );
+            }
+        }
+    }
+}
+
+#[test]
+fn animated_high_depth_frames_preserve_pixels_and_short_delays() {
+    for depth in [8, 10, 12] {
+        let decoded = decode_bytes(&encoded_sequence(depth, 0, None, false, true)).unwrap();
+        assert_eq!(
+            decoded
+                .frames
+                .iter()
+                .map(|f| f.delay_ms)
+                .collect::<Vec<_>>(),
+            [5, 17, 29]
+        );
+        for frame in &decoded.frames {
+            let PixelData::Rgba8(data) = &frame.data else {
+                panic!("RGBA8 expected");
+            };
+            assert_eq!(data.len(), original().as_raw().len());
+            for (a, b) in data.iter().zip(original().as_raw()) {
+                assert!(a.abs_diff(*b) <= 1, "depth {depth}: {a} vs {b}");
+            }
+        }
+    }
+}
+
+#[test]
+fn every_animated_frame_applies_the_same_container_transform() {
+    for crop in [false, true] {
+        for rotation in 0..4 {
+            for mirror in [None, Some(0), Some(1)] {
+                let expected = decode_bytes(&encoded(8, rotation, mirror, crop)).unwrap();
+                let decoded =
+                    decode_bytes(&encoded_sequence(8, rotation, mirror, crop, true)).unwrap();
+                assert_eq!(
+                    (decoded.width, decoded.height),
+                    (expected.width, expected.height)
+                );
+                assert_eq!(decoded.frames.len(), 3);
+                for frame in &decoded.frames {
+                    let PixelData::Rgba8(data) = &frame.data else {
+                        panic!("RGBA8 expected");
+                    };
+                    assert_eq!(
+                        data.as_slice(),
+                        pixels(&expected),
+                        "crop={crop}, rotation={rotation}, mirror={mirror:?}"
+                    );
+                }
             }
         }
     }
