@@ -53,3 +53,12 @@ GUI 与缩略图输出目录必须是新目录。GUI 只控制本次启动的程
 动态解码沿用固定libavif/libaom版本，无依赖升级。播放器按原时间轴推进并合并掉队帧，避免每次重绘延迟累计导致越播越慢；长时间挂起通过跳过整轮定位，不逐帧追赶。暂停/逐帧/拖条保持现有操作语义。
 
 新增可复现入口：`python tools/ui-qa/animated_avif_smoke.py --binary target/release/imageview.exe --output ui-verify-shots/animated-avif-new --commit <当前提交> --theme dark --width 1280 --height 860`。本轮测试与实际窗口结果完成后填写，不将旧截图作为新验收。
+
+
+FMT-02 分支验证：101项Rust回归、13项安装契约检查及workspace check通过，Debug构建通过。Release源码编译和链接完成，但Cargo向默认EXE复制时因用户运行中的旧程序（PID 32036）报Access Denied；没有关闭、移动或覆盖旧程序，已从本次 `target/release/deps/imageview.exe` 复制到 `target/animated-avif/release/imageview.exe`，随附当前缩略图DLL与原生依赖许可文件。默认Release路径不能宣称已更新。
+
+分支Release双主题/两尺寸共79张实际窗口截图，验证自动播放/暂停稳定/前后逐帧/完整循环、宽窗口真实拖拽帧条和点击播放、RGBA/Alpha/R与独立PNG参考、菜单及隐藏恢复；DPI96，源文件哈希与用户偏好保持。窄窗口沿用第二行播放/帧数控制和快捷键，帧条仍只在宽窗口展示。首次原子点击滑块探针失败后改为持续按住拖拽验收，未绕过断言；修正后复验全部通过。已人工查看深色末帧和浅色动画控件/Alpha合成画面。
+
+证据：`ui-verify-shots/animated-avif-worker-final-dark-1280`、`ui-verify-shots/animated-avif-worker-final-light-880`；COM直接调用16个输出（4类AVIF及其PNG参考，各128/512两尺寸）透明度和可见RGB完全一致，见 `Temp/animated-avif-worker-thumbs/verification.json`。未注册或修改任何系统关联。
+
+分支Release EXE SHA256 `00eb1dc9f259aaffccbfcf1242b33009fe1a0e433dd214c52f21183624190080`。主线复验结果待填。
