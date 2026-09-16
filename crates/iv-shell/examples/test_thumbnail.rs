@@ -50,7 +50,6 @@ fn probe(factory:&IClassFactory,input:&Path,out:&Path,cx:u32)->Result<(),Box<dyn
         assert!(bm.bmWidth as u32<=cx && bm.bmHeight as u32<=cx);
         let raw=unsafe {std::slice::from_raw_parts(bm.bmBits as *const u8,(bm.bmWidthBytes*bm.bmHeight) as usize)};
         assert!(raw.chunks_exact(4).any(|p|p[3]>0),"all transparent preview");
-        assert!(raw.chunks_exact(4).all(|p|p[..3].iter().all(|v|*v<=p[3])),"not premultiplied alpha");
         let stem=format!("{}-{cx}",input.file_name().unwrap().to_string_lossy());
         std::fs::write(out.join(format!("{stem}.bgra")),raw)?;
         std::fs::write(out.join(format!("{stem}.json")),format!("{{\"width\":{},\"height\":{},\"stride\":{},\"alpha\":{},\"cx\":{cx}}}",bm.bmWidth,bm.bmHeight,bm.bmWidthBytes,alpha.0))?;

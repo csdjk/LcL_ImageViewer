@@ -27,6 +27,15 @@ def run(args):
                         {'kind':'down','x':args.button_x,'y':34},{'kind':'shot','name':'button-pressed'},{'kind':'up'}])
         shot('button-disabled-bounds')
         key('B')
+    actions.append({'kind':'wheel','x':w/2,'y':h/2,'delta':240})
+    shot('zoom-bounds-on'); key('B'); shot('zoom-bounds-off'); key('B'); key('0')
+    actions.extend([{'kind':'right-click','x':100,'y':100},{'kind':'click','x':200,'y':334}])
+    shot('settings-above-bounds'); key('B')  # B is blocked while settings are open.
+    actions.append({'kind':'click','x':w/2+153,'y':h/2-51})
+    key(0x1b); shot('solid-canvas')
+    actions.extend([{'kind':'right-click','x':100,'y':100},{'kind':'click','x':200,'y':334},
+                    {'kind':'click','x':w/2+113,'y':h/2-51}])
+    key(0x1b); shot('checker-restored')
     key('D'); key('0'); shot('static-webp')
     key('D'); key('0'); key(' '); shot('animated-webp')
     key('D'); key('0'); shot('raw-psd')
@@ -63,6 +72,13 @@ def run(args):
         assert ImageChops.difference(on.crop(inner),image(name).crop(inner)).getbbox() is None,(name,'pixel output mismatch')
     if args.button_x is not None:
         assert ImageChops.difference(off,image('button-disabled-bounds')).getbbox() is None,'toolbar button did not disable bounds'
+    zoom_box=ImageChops.difference(image('zoom-bounds-on'),image('zoom-bounds-off')).getbbox()
+    assert zoom_box and zoom_box[2]-zoom_box[0]>326 and zoom_box[3]-zoom_box[1]>198
+    zw,zh=zoom_box[2]-zoom_box[0]-4,zoom_box[3]-zoom_box[1]-4
+    assert abs(zw/zh-320/192)<0.05,('zoom AABB aspect ratio',zoom_box)
+    assert ImageChops.difference(image('checker-restored'),on).getbbox() is None,'grid or B state not restored after settings'
+    solid=image('solid-canvas')
+    assert solid.getpixel((24,104))==solid.getpixel((32,104)), 'solid background option failed'
     # Opaque JPEG must not force a checker background.
     opaque=image('opaque-jpeg')
     assert opaque.getpixel((24,104))==opaque.getpixel((32,104)),'opaque JPEG still has checker cells'
@@ -72,7 +88,7 @@ def run(args):
     result={'result':'PASS; visual review required','commit':args.commit,'binary_sha256':sha(args.binary),
             'captures':len(saved['captures']),'theme':args.theme,'logical_client':[w,h],
             'grid_colors':list(set(vals)),'bounds_delta_rect':changed,'full_rectangle':True,
-            'image_pixels_unchanged':True,'pan_follows_image':True,'bounds_persisted':True,
+            'image_pixels_unchanged':True,'pan_follows_image':True,'zoom_bounds':zoom_box,'solid_toggle_restores_grid':True,'bounds_persisted':True,
             'toolbar_click_tested':args.button_x is not None,'files_unchanged':True,'preferences_restored':saved['preferences_restored']}
     (out/'report.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     print(json.dumps(result),flush=True)

@@ -70,11 +70,6 @@ impl ThumbnailProvider {
             ]).collect(),
         };
 
-        // Shell's 32-bit alpha bitmap is premultiplied; do this BEFORE resampling
-        // to avoid fringe colours from fully transparent texels.
-        let mut rgba8 = rgba8;
-        premultiply(&mut rgba8);
-
         // 目标尺寸：等比缩到最长边 cx；小图不放大（Shell 会居中显示）
         let (sw, sh) = (img.width as usize, img.height as usize);
         let (dw, dh) = if sw.max(sh) as u32 <= cx {
@@ -252,25 +247,18 @@ fn build_hbitmap(bgra: &[u8], w: i32, h: i32) -> Result<HBITMAP> {
     Ok(hbmp)
 }
 
-fn premultiply(pixels: &mut [u8]) {
-    for pixel in pixels.chunks_exact_mut(4) {
-        let alpha = pixel[3] as u16;
-        for c in &mut pixel[..3] { *c = ((*c as u16 * alpha + 127) / 255) as u8; }
-    }
-}
-
 #[cfg(test)]
 mod alpha_tests {
     #[test]
-    fn thumbnail_alpha_has_no_hidden_color_fringe() {
-        let mut px = vec![255,128,64,0, 200,100,50,128, 20,40,60,255];
-        super::premultiply(&mut px);
-        assert_eq!(px, [0,0,0,0,100,50,25,128,20,40,60,255]);
+    fn thumbnail_resampling_does_not_mix_hidden_colors() {
+        // Straight RGBA -> alpha-weighted average -> straight RGBA, matching
+        // Microsoft's RecipeThumbnailProvider BGRA output convention.
+        let px = [255,0,0,255,0,255,0,0];
+        assert_eq!(super::resample::downscale_box(&px,2,1,1,1),[255,0,0,127]);
     }
     #[test]
-    fn thumbnail_resampling_preserves_premultiplied_alpha() {
-        let mut px = vec![255,0,0,255,0,255,0,0];
-        super::premultiply(&mut px);
-        assert_eq!(super::resample::downscale_box(&px,2,1,1,1),[127,0,0,127]);
+    fn thumbnail_resampling_keeps_partial_alpha_color() {
+        let px = [200,100,50,128,200,100,50,128];
+        assert_eq!(super::resample::downscale_box(&px,2,1,1,1),[200,100,50,128]);
     }
 }

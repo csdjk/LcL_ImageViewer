@@ -19,7 +19,7 @@ def make(folder: Path):
     second=Image.new('RGBA', im.size, (60, 100, 230, 128))
     im.save(folder / '03-animated.webp', lossless=True, exact=True, save_all=True,
             append_images=[second],duration=[80,120],loop=0)
-    planes=[bytes(channel.getdata()) for channel in im.split()]
+    planes=[channel.tobytes() for channel in im.split()]
     for name, rle, extra in [('04-raw.psd',False,False),('05-rle-extra.psd',True,True)]:
         ps=planes + ([bytes([110])* (320*192)] if extra else [])
         header=b'8BPS'+struct.pack('>H6sHIIHH',1,b'\0'*6,len(ps),192,320,8,3)+b'\0'*12

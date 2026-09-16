@@ -1,6 +1,6 @@
-//! 简单 box（面积平均）缩放 —— 缩略图质量足够，零依赖。
+//! Alpha-weighted box resampling. Input/output are straight RGBA8.
 
-/// RGBA8 缩放到 (dw, dh)。要求 src 长度 == sw*sh*4，且 dw<=sw、dh<=dh（放大调用方不做）。
+/// RGBA8 缩放到 (dw, dh)。要求 src 长度 == sw*sh*4，且 dw<=sw、dh<=sh（放大调用方不做）。
 pub fn downscale_box(src: &[u8], sw: usize, sh: usize, dw: usize, dh: usize) -> Vec<u8> {
     debug_assert_eq!(src.len(), sw * sh * 4);
     let mut dst = vec![0u8; dw * dh * 4];
@@ -17,17 +17,17 @@ pub fn downscale_box(src: &[u8], sw: usize, sh: usize, dw: usize, dh: usize) -> 
                 let row = sy * sw;
                 for sx in sx0..sx1 {
                     let i = (row + sx) * 4;
-                    acc[0] += src[i] as u64;
-                    acc[1] += src[i + 1] as u64;
-                    acc[2] += src[i + 2] as u64;
+                    acc[0] += src[i] as u64 * src[i + 3] as u64;
+                    acc[1] += src[i + 1] as u64 * src[i + 3] as u64;
+                    acc[2] += src[i + 2] as u64 * src[i + 3] as u64;
                     acc[3] += src[i + 3] as u64;
                     n += 1;
                 }
             }
             let o = (dy * dw + dx) * 4;
-            dst[o] = (acc[0] / n) as u8;
-            dst[o + 1] = (acc[1] / n) as u8;
-            dst[o + 2] = (acc[2] / n) as u8;
+            dst[o] = (acc[0] / acc[3].max(1)) as u8;
+            dst[o + 1] = (acc[1] / acc[3].max(1)) as u8;
+            dst[o + 2] = (acc[2] / acc[3].max(1)) as u8;
             dst[o + 3] = (acc[3] / n) as u8;
         }
     }
