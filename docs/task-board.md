@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-FMT-02 | 动态AVIF完整播放 | READY | — | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
 | IV-FMT-01 | AVIF图片查看与缩略图支持 | DONE | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
 | IV-P1-N12 | 顶部文件名显示浏览根目录相对路径 | DONE | ChatGPT-AgentDock | 用户要求 / N11 DONE | `crates/iv-viewer/src/{directory.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 根目录文件名/子目录相对路径；原省略和完整悬停；无额外IO；单元测试、双构建及实机；中文提交本地合入 |
 | IV-P1-N11 | 子文件夹浏览与中文提交规范 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / N10 DONE | `AGENTS.md`, `crates/iv-viewer/src/{directory.rs,app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 固定根只向下/跳过重解析点；后台取消/进度/资源上限；左右键与按钮共用；删除保留范围；中文提交；测试/双构建/实机/main复验，不发布 |
