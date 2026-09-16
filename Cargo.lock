@@ -1294,7 +1294,7 @@ dependencies = [
 
 [[package]]
 name = "iv-core"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "image 0.25.10",
  "libavif-sys",
@@ -1303,7 +1303,7 @@ dependencies = [
 
 [[package]]
 name = "iv-shell"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "iv-core",
  "windows 0.58.0",
@@ -1312,7 +1312,7 @@ dependencies = [
 
 [[package]]
 name = "iv-viewer"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "bytemuck",
  "crossbeam-channel",

@@ -53,7 +53,7 @@
 
 **常见图片：** PNG、JPG / JPEG、BMP、TIFF、ICO、GIF、WebP、APNG、AVIF。
 
-AVIF 支持透明通道与动态图片播放，可暂停、逐帧查看和拖动帧进度。
+AVIF 支持透明通道与动态图片循环播放，可暂停、逐帧查看；宽窗口下可拖动帧进度。10/12 位输入转换为 8 位显示，暂不支持 AVIF HDR / ICC 色彩管理。
 
 **游戏贴图与其他格式：** DDS（BC1–BC7）、TGA、PSD、QOI、HDR、PPM / PGM / PBM。
 
