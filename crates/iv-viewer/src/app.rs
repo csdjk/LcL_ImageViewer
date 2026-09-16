@@ -127,6 +127,12 @@ pub struct App {
     loader: Loader,
     scanner: crate::directory::Scanner,
     directory_generation: u64,
+    /// 当前浏览会话的固定搜索根；普通切图不修改它。
+    directory_scope: Option<crate::directory::Scope>,
+    include_subfolders: bool,
+    directory_scanning: bool,
+    directory_stats: crate::directory::ScanStats,
+    directory_recover_index: Option<usize>,
     cache: ImageCache,
     current: Option<CurrentImage>,
     /// 正在异步加载的路径（显示"加载中"）
@@ -254,6 +260,12 @@ impl App {
             loader,
             scanner,
             directory_generation: 0,
+            directory_scope: None,
+            // 避免新进程在用户不知情时递归扫描很大的目录。
+            include_subfolders: false,
+            directory_scanning: false,
+            directory_stats: crate::directory::ScanStats::default(),
+            directory_recover_index: None,
             cache: ImageCache::new(),
             current: None,
             pending: None,
@@ -357,35 +369,76 @@ impl App {
         } else {
             self.loader.cancel_queued();
         }
-        if let Some(index) = self.directory.as_ref().and_then(|d| d.files.iter().position(|p| p == &path)) {
-            self.directory.as_mut().unwrap().index = index;
-        } else {
-            self.directory = Some(Directory { files: vec![path.clone()], index: 0 });
-        }
         if rescan {
-            self.directory_generation = self.directory_generation.wrapping_add(1);
-            self.scanner.request(self.directory_generation, path.clone());
+            self.directory_scope = crate::directory::Scope::for_image(&path, self.include_subfolders);
+            self.directory = Some(Directory { files: vec![path.clone()], index: 0 });
+            self.directory_recover_index = None;
+            self.request_directory_scan(Some(path.clone()));
+        } else if let Some(index) = self.directory.as_ref().and_then(|d| d.files.iter().position(|p| p == &path)) {
+            self.directory.as_mut().unwrap().index = index;
         }
         if let Some(img) = cached { self.set_current(path, img); }
     }
 
-    /// Deletion needs an immediate post-delete list; ordinary opens never use this path.
-    fn refresh_directory(&mut self, path: &Path) {
+    fn request_directory_scan(&mut self, anchor: Option<PathBuf>) {
         self.directory_generation = self.directory_generation.wrapping_add(1);
-        let started = Instant::now();
-        let files = crate::directory::scan_files(path);
-        let index = files.iter().position(|p| p == path).unwrap_or(0);
-        self.directory = Some(Directory { files, index });
-        crate::perf::mark("directory_ready", Some(path), started.elapsed().as_secs_f64()*1000.0);
+        self.directory_stats = crate::directory::ScanStats::default();
+        if let Some(scope) = self.directory_scope.clone() {
+            self.directory_scanning = true;
+            self.scanner.request(self.directory_generation, scope, anchor);
+        } else {
+            self.directory_scanning = false;
+            self.scanner.cancel(self.directory_generation);
+        }
+    }
+
+    fn toggle_subfolders(&mut self) {
+        if self.delete_active() { return; }
+        let path = self.pending.clone().or_else(|| self.current.as_ref().map(|c| c.path.clone()));
+        let Some(path) = path else { return; };
+        self.include_subfolders = !self.include_subfolders;
+        self.directory_scope = crate::directory::Scope::for_image(&path, self.include_subfolders);
+        self.directory = Some(Directory { files: vec![path.clone()], index: 0 });
+        self.directory_recover_index = None;
+        // 删除过期预读，不取消用户真正等待的图片。
+        if self.pending.is_some() { self.loader.load(path.clone()); }
+        else { self.loader.cancel_queued(); }
+        self.request_directory_scan(Some(path));
+        self.last_move = Instant::now();
+    }
+
+    fn browse_description(&self) -> String {
+        let Some(scope) = &self.directory_scope else { return "先打开一张图片，再选择浏览范围。".into(); };
+        let mode = if scope.recursive { "当前目录及所有子文件夹（只向下）" } else { "仅当前图片所在目录" };
+        let current = self.pending.as_ref().or_else(|| self.current.as_ref().map(|c| &c.path));
+        let relative = current.and_then(|p| p.strip_prefix(&scope.root).ok())
+            .map(|p| p.display().to_string()).unwrap_or_default();
+        format!("范围：{mode}\n根目录：{}\n当前：{relative}\n{}{}", scope.root.display(),
+            if self.directory_scanning { "正在后台扫描；切换开关或打开其他图片可取消。\n" } else { "" },
+            self.directory_stats.description())
     }
 
     fn poll_directory(&mut self) {
         while let Some(result) = self.scanner.poll() {
             if result.id != self.directory_generation { continue; }
-            let path = self.pending.as_ref().or_else(|| self.current.as_ref().map(|c| &c.path));
-            let Some(path) = path else { continue; };
-            let index = result.files.iter().position(|p| p == path).unwrap_or(0);
-            self.directory = Some(Directory { files: result.files, index });
+            self.directory_stats = result.stats;
+            let Some(mut files) = result.files else { continue; };
+            self.directory_scanning = false;
+            let path = self.pending.clone().or_else(|| self.current.as_ref().map(|c| c.path.clone()));
+            let recovery = self.directory_recover_index.take();
+            // 扫描期间切换或外部修改文件，都不应使当前图片突然跳到列表首项。
+            if let Some(path) = &path {
+                if !files.contains(path) && self.directory_scope.as_ref().map_or(false, |scope| scope.contains(path)) {
+                    files.push(path.clone());
+                }
+            }
+            let index = path.as_ref().and_then(|p| files.iter().position(|f| f == p))
+                .unwrap_or_else(|| recovery.unwrap_or(0).min(files.len().saturating_sub(1)));
+            self.directory = Some(Directory { files, index });
+            if path.is_none() && recovery.is_some() {
+                let next = self.directory.as_ref().and_then(|d| d.files.get(d.index).cloned());
+                if let Some(next) = next { self.open_impl(next, false); }
+            }
             if self.pending.is_none() { self.schedule_prefetch(); }
         }
     }
@@ -583,6 +636,7 @@ impl App {
                         }
                         self.set_current(path, img);
                     } else {
+                        if !self.directory_scope.as_ref().map_or(false, |scope| scope.contains(&path)) { continue; }
                         // 预读结果：只进缓存
                         let keep = self
                             .current
@@ -713,6 +767,9 @@ impl App {
         if key(Key::B) {
             self.show_image_bounds = !self.show_image_bounds;
         }
+        if key(Key::S) {
+            self.toggle_subfolders();
+        }
         if key(Key::N) {
             self.nearest = !self.nearest;
         }
@@ -838,18 +895,27 @@ impl App {
                 self.show_props = false;
                 self.show_probe = false;
                 self.error_msg = None;
-                self.refresh_directory(&path);
+                // 从已有索引移除目标；不在 UI 上递归重扫，也不把范围缩成子目录。
+                if let Some(d) = &mut self.directory {
+                    d.files.retain(|p| p != &path);
+                    d.index = old_index.min(d.files.len().saturating_sub(1));
+                }
                 let next = self.directory.as_ref().and_then(|d| {
                     next_index_after_delete(old_index, d.files.len()).and_then(|i| d.files.get(i).cloned())
                 });
-                if let Some(next) = next { self.open(next); }
+                if let Some(next) = next {
+                    self.directory_recover_index = None;
+                    self.open_impl(next, false);
+                }
                 else {
-                    self.directory = None;
+                    self.directory_recover_index = Some(old_index);
                     self.pending_fit = false;
                     self.pending_actual = false;
                     self.zoom_flash = None;
                     self.view = ViewTransform { offset: Vec2::ZERO, scale: 1.0 };
                 }
+                let anchor = self.pending.clone().or_else(|| self.current.as_ref().map(|c| c.path.clone()));
+                self.request_directory_scan(anchor);
             }
         }
         self.last_move = Instant::now();
@@ -979,10 +1045,22 @@ impl App {
                             ui::bar_label(ui, "打开或拖入图片", 12.5, pal.dim);
                         }
 
-                        // 导航箭头移到窗口两侧；顶栏只保留目录位置。
-                        if let Some(d) = self.directory.as_ref().filter(|d| d.files.len() > 1) {
+                        // 文件夹树开关与原来的侧边箭头/快捷键共用同一导航索引。
+                        if self.current.is_some() || self.pending.is_some() {
+                            if ui::icon_btn(ui, Icon::Subfolders, self.include_subfolders, pal)
+                                .on_hover_text(format!("包含子文件夹 (S)\n{}", self.browse_description())).clicked() {
+                                self.toggle_subfolders();
+                            }
+                        }
+                        if let Some(d) = self.directory.as_ref().filter(|d| d.files.len() > 1 || self.include_subfolders || self.directory_scanning) {
                             ui::sep(ui, pal);
-                            ui::bar_label_mono(ui, format!("{}/{}", d.index + 1, d.files.len()), 11.5, pal.dim);
+                            let text = if self.directory_scanning {
+                                format!("扫描…{}", self.directory_stats.files)
+                            } else {
+                                format!("{}/{}{}", if d.files.is_empty() { 0 } else { d.index + 1 }, d.files.len(),
+                                    if self.directory_stats.partial() { "·部分" } else { "" })
+                            };
+                            ui::bar_label_mono(ui, text, 11.0, pal.dim).on_hover_text(self.browse_description());
                         }
 
                         // —— 文件信息 ——
@@ -995,11 +1073,11 @@ impl App {
                                 .unwrap_or_default();
                             let window_width = ctx.screen_rect().width();
                             let name_width = if window_width < 1000.0 {
-                                96.0
+                                72.0
                             } else if window_width < 1200.0 {
-                                144.0
+                                116.0
                             } else {
-                                204.0
+                                168.0
                             };
                             ui::filename_label(ui, raw, name_width, pal.text_bright)
                                 .on_hover_text(raw);

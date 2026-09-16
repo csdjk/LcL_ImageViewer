@@ -640,6 +640,7 @@ pub fn toggle(ui: &mut egui::Ui, on: &mut bool, pal: &Palette) -> egui::Response
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Icon {
     Open,
+    Subfolders,
     Prev,
     Next,
     Fit,
@@ -682,6 +683,15 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
                 Pos2::new(r, b),
             ];
             p.add(egui::Shape::closed_line(pts, st));
+        }
+        Icon::Subfolders => {
+            // 分支目录图标：区别于打开文件的文件夹轮廓。
+            p.rect_stroke(Rect::from_center_size(c + Vec2::new(-3.0, -4.5) * u, Vec2::new(5.0, 4.0) * u), 0.7_f32, st);
+            p.line_segment([c + Vec2::new(-3.0, -2.5) * u, c + Vec2::new(-3.0, 5.0) * u], st);
+            for y in [0.0_f32, 5.0] {
+                p.line_segment([c + Vec2::new(-3.0, y) * u, c + Vec2::new(2.0, y) * u], st);
+                p.rect_stroke(Rect::from_center_size(c + Vec2::new(4.5, y) * u, Vec2::new(5.0, 3.5) * u), 0.7_f32, st);
+            }
         }
         Icon::Prev | Icon::Next => {
             // 尖括号
