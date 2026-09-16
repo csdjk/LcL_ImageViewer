@@ -24,7 +24,7 @@ def run(args):
     key('5'); shot('rgba-restored')
     if args.button_x is not None:
         actions.extend([{'kind':'move','x':args.button_x,'y':34},{'kind':'wait','seconds':0.8},{'kind':'shot','name':'button-hover'},
-                        {'kind':'down','x':args.button_x,'y':34},{'kind':'shot','name':'button-pressed'},{'kind':'up'}])
+                        {'kind':'click','x':args.button_x,'y':34}])
         shot('button-disabled-bounds')
         key('B')
     actions.append({'kind':'wheel','x':w/2,'y':h/2,'delta':240})
