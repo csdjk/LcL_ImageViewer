@@ -3,7 +3,7 @@
 > 更新时间：2026-09-15。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-FMT-02 -->
 
 ## 最新正式版本
 
@@ -67,3 +67,6 @@ IV-FMT-01 DONE：AVIF解码、透明通道、查看/切图及缩略图集成已�
 IV-FMT-01 已完成：静态/透明AVIF，8/10/12位转RGBA8，容器裁剪/旋转/镜像、动态首帧，文件对话框/目录导航/缩略图/关联脚本同步。动态播放和HDR/ICC色彩管理不在本轮支持范围。
 
 主线集成32775e2：87项Rust回归、13项安装契约检查、workspace check及Debug/Release构建通过；两主题实际窗口26张截图与12个直接COM缩略图输出复验通过，用户偏好和样例原文件未变。详情 docs/formats/AVIF支持说明.md。可运行 target/release/imageview.exe；当前安装、已发布版本和远端未更新。
+
+
+IV-FMT-02 IN_PROGRESS：按用户追加要求接入动态AVIF完整帧播放，静态支持与首帧缩略图保持。
