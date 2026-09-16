@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N10 | WebP/PSD缩略图、全画布棋盘格与图片AABB | REVIEW | ChatGPT-AgentDock | 用户本轮要求 / 当前main | `crates/iv-viewer/src/**`, `crates/iv-shell/**`, `crates/iv-core/src/{decode.rs,psd_composite.rs}`, `crates/iv-core/tests/**`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 标准缩略图GUID/WebP注册与COM图像验证；透明画布连续；边界高亮随图变换；tests/check/双构建及实机；不改实时注册/安装/远端 |
+| IV-P1-N10 | WebP/PSD缩略图、全画布棋盘格与图片AABB | DONE | ChatGPT-AgentDock | 用户本轮要求 / 当前main | `crates/iv-viewer/src/**`, `crates/iv-shell/**`, `crates/iv-core/src/{decode.rs,psd_composite.rs}`, `crates/iv-core/tests/**`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 标准缩略图GUID/WebP注册与COM图像验证；透明画布连续；边界高亮随图变换；tests/check/双构建及实机；不改实时注册/安装/远端 |
 | IV-DOC-02 | 面向用户精简 README | DONE | ChatGPT-AgentDock | 用户本轮要求 / DOC-01已推送 | `README.md` | RGBA简述不写教程；仅功能/配图/下载/操作；无开发/性能/版本过程；文档检查和本地合入，不push |
 | IV-DOC-01 | README 当前功能与 RGBA 重点说明 | DONE | ChatGPT-AgentDock | 用户明确要求修改提交 / REL-031 DONE | `README.md` | 当前功能而非版本历史；通道/像素说明与代码一致；引用/Markdown/diff检查；本地提交合入，不push或发布 |
 | IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
@@ -232,3 +232,6 @@ Base `f094a58b882dc8131794b977217828c973f486b2`；独立分支`codex/preview-can
 
 
 IV-P1-N10 Review：Worker `0dddb7437a42f64210c47d9cde2d9d8a2e969964`；62项Rust及12项安装器检查、直接COM12张预览/像素校验、Inno隔离72值与标准GUID、双主题双尺寸80张实际窗口截图通过。顶部按钮点击、缩放平移跟随、纯色恢复及关键截图已检查。未改变用户安装与实时关联；开始本地主线重建复验，不push/发布。
+
+
+IV-P1-N10 DONE：集成 `9aea77d3596a8e3dc962573c03aa81f38c42ec87`；主线62+12测试/check/双构建，21状态GUI及12个COM预览、Inno72值与标准GUID回归通过。工作分支四组80张实机截图通过，边界含透明留白且不影响像素；B与按钮可用、保存状态、纯色选项保留。用户实际安装/关联和公开版本未更新，无push/打包。详见透明画布与图片边界验收.md。NEXT恢复IV-P1-01。
