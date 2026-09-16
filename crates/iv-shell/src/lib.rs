@@ -11,7 +11,7 @@ mod resample;
 
 use std::sync::Mutex;
 
-use iv_core::{decode_bytes, PixelData};
+use iv_core::{decode::decode_preview_bytes, PixelData};
 use windows::core::{implement, Error, Interface, Result, GUID, HRESULT};
 use windows::Win32::Foundation::{
     CLASS_E_CLASSNOTAVAILABLE, CLASS_E_NOAGGREGATION, E_FAIL, E_INVALIDARG, E_POINTER,
@@ -56,7 +56,7 @@ impl ThumbnailProvider {
         if bytes.is_empty() {
             return Err(Error::from(E_INVALIDARG));
         }
-        let img = decode_bytes(&bytes).map_err(|_| Error::from(E_FAIL))?;
+        let img = decode_preview_bytes(&bytes).map_err(|_| Error::from(E_FAIL))?;
         let Some(mip) = img.mips.first() else {
             return Err(Error::from(E_FAIL));
         };
@@ -64,8 +64,16 @@ impl ThumbnailProvider {
         // 统一成 RGBA8（HDR 先 tonemap）
         let rgba8: Vec<u8> = match &mip.data {
             PixelData::Rgba8(v) => v.clone(),
-            PixelData::RgbaF32(v) => v.iter().map(|&f| tonemap_u8(f)).collect(),
+            PixelData::RgbaF32(v) => v.chunks_exact(4).flat_map(|p| [
+                tonemap_u8(p[0]), tonemap_u8(p[1]), tonemap_u8(p[2]),
+                (p[3].clamp(0.0, 1.0) * 255.0).round() as u8,
+            ]).collect(),
         };
+
+        // Shell's 32-bit alpha bitmap is premultiplied; do this BEFORE resampling
+        // to avoid fringe colours from fully transparent texels.
+        let mut rgba8 = rgba8;
+        premultiply(&mut rgba8);
 
         // 目标尺寸：等比缩到最长边 cx；小图不放大（Shell 会居中显示）
         let (sw, sh) = (img.width as usize, img.height as usize);
@@ -242,4 +250,27 @@ fn build_hbitmap(bgra: &[u8], w: i32, h: i32) -> Result<HBITMAP> {
         std::ptr::copy_nonoverlapping(bgra.as_ptr(), bits as *mut u8, bgra.len());
     }
     Ok(hbmp)
+}
+
+fn premultiply(pixels: &mut [u8]) {
+    for pixel in pixels.chunks_exact_mut(4) {
+        let alpha = pixel[3] as u16;
+        for c in &mut pixel[..3] { *c = ((*c as u16 * alpha + 127) / 255) as u8; }
+    }
+}
+
+#[cfg(test)]
+mod alpha_tests {
+    #[test]
+    fn thumbnail_alpha_has_no_hidden_color_fringe() {
+        let mut px = vec![255,128,64,0, 200,100,50,128, 20,40,60,255];
+        super::premultiply(&mut px);
+        assert_eq!(px, [0,0,0,0,100,50,25,128,20,40,60,255]);
+    }
+    #[test]
+    fn thumbnail_resampling_preserves_premultiplied_alpha() {
+        let mut px = vec![255,0,0,255,0,255,0,0];
+        super::premultiply(&mut px);
+        assert_eq!(super::resample::downscale_box(&px,2,1,1,1),[127,0,0,127]);
+    }
 }

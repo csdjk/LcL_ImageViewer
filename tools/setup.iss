@@ -57,7 +57,7 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
 Name: "{autoprograms}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Tasks]
-Name: "thumbs"; Description: "注册资源管理器缩略图（.dds .tga .psd .qoi .hdr .ppm .pgm .pbm）"
+Name: "thumbs"; Description: "注册资源管理器缩略图（.dds .tga .psd .webp .qoi .hdr .ppm .pgm .pbm）"
 Name: "assoc"; Description: "把支持的图片格式加入 LcL ImageViewer 的“打开方式”，并注册为默认应用候选"
 
 [Registry]
@@ -131,14 +131,15 @@ Root: HKCU; ValueType: string; Subkey: "Software\RegisteredApplications"; ValueN
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\CLSID\{{{#ThumbClsid}}"; ValueData: "LcL ImageViewer Thumbnail Provider"; Flags: uninsdeletekey; Tasks: thumbs
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\CLSID\{{{#ThumbClsid}}\InprocServer32"; ValueData: "{app}\iv_shell.dll"; Tasks: thumbs
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\CLSID\{{{#ThumbClsid}}\InprocServer32"; ValueName: "ThreadingModel"; ValueData: "Apartment"; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.dds\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.tga\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.psd\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.qoi\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.hdr\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.ppm\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.pgm\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
-Root: HKCU; ValueType: string; Subkey: "Software\Classes\.pbm\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.dds\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.tga\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.psd\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.webp\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.qoi\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.hdr\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.ppm\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.pgm\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.pbm\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
 
 [Run]
 Filename: "{app}\{#MyAppExe}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent unchecked

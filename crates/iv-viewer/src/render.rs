@@ -65,7 +65,7 @@ pub struct Uniforms {
     /// 玻璃区域数量（0..=MAX_GLASS）
     pub glass_count: u32,
     /// 对齐填充（uniform 结构需 16 字节对齐）
-    pub _pad: f32,
+    pub checker_cell: f32,
     /// 回退画布顶部/底部颜色（线性 RGBA）。
     pub canvas_top: [f32; 4],
     pub canvas_bottom: [f32; 4],

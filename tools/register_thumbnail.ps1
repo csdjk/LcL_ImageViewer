@@ -1,5 +1,5 @@
-﻿# register_thumbnail.ps1 - register iv_shell.dll as Explorer thumbnail provider (HKCU, no admin)
-# Covers: .dds .tga .psd .qoi .hdr .ppm .pgm .pbm (formats without a system handler)
+# register_thumbnail.ps1 - register iv_shell.dll as Explorer thumbnail provider (HKCU, no admin)
+# Covers: .dds .tga .psd .webp .qoi .hdr .ppm .pgm .pbm (formats without a system handler)
 $ErrorActionPreference = 'Stop'
 
 $clsid = '{7A3E9B21-4C5D-4E8F-9A6B-1D2C3E4F5A6B}'
@@ -16,7 +16,7 @@ Set-ItemProperty -Path "$base\InprocServer32" -Name '(Default)' -Value $dll
 Set-ItemProperty -Path "$base\InprocServer32" -Name 'ThreadingModel' -Value 'Apartment'
 
 # per-extension handler: shellex\{E357FCCD-...} is the thumbnail-provider slot
-foreach ($ext in @('.dds', '.tga', '.psd', '.qoi', '.hdr', '.ppm', '.pgm', '.pbm')) {
+foreach ($ext in @('.dds', '.tga', '.psd', '.webp', '.qoi', '.hdr', '.ppm', '.pgm', '.pbm')) {
     $key = "HKCU:\Software\Classes\$ext\shellex\{E357FCCD-A995-4576-B01F-234630154E96}"
     New-Item -Path $key -Force | Out-Null
     Set-ItemProperty -Path $key -Name '(Default)' -Value $clsid
