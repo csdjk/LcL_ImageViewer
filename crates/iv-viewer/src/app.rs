@@ -1072,7 +1072,10 @@ impl App {
                         if let Some(cur) = &self.current {
                             ui::sep(ui, pal);
                             let img = &cur.img;
-                            let raw = cur.path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+                            let label_path = self.directory_scope.as_ref()
+                                .map(|scope| scope.display_path(&cur.path))
+                                .unwrap_or_else(|| cur.path.file_name().map(Path::new).unwrap_or(&cur.path));
+                            let raw = label_path.to_string_lossy();
                             let file_size = std::fs::metadata(&cur.path)
                                 .map(|m| fmt_size(m.len()))
                                 .unwrap_or_default();
@@ -1084,8 +1087,11 @@ impl App {
                             } else {
                                 168.0
                             };
-                            ui::filename_label(ui, raw, name_width, pal.text_bright)
-                                .on_hover_text(raw);
+                            ui::filename_label(ui, raw.as_ref(), name_width, pal.text_bright)
+                                .on_hover_ui(|ui| {
+                                    ui.label(raw.as_ref());
+                                    ui.weak(cur.path.to_string_lossy().as_ref());
+                                });
                             ui::badge(ui, img.kind.label(), pal)
                                 .on_hover_text(format!("文件大小 {file_size}"));
                             if window_width >= 1200.0 {

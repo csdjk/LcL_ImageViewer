@@ -18,6 +18,17 @@ impl Scope {
         Some(Self { root: path.parent()?.to_path_buf(), recursive })
     }
 
+    /// 标签只格式化已有路径，不访问文件系统，也不改变固定浏览根。
+    pub fn display_path<'a>(&self, path: &'a Path) -> &'a Path {
+        if self.contains(path) {
+            if let Ok(relative) = path.strip_prefix(&self.root) {
+                return relative;
+            }
+        }
+        // 无效或范围外的旧路径不生成带 .. 的相对路径。
+        path.file_name().map(Path::new).unwrap_or(path)
+    }
+
     pub fn contains(&self, path: &Path) -> bool {
         path.starts_with(&self.root) && path != self.root
             && !path.components().any(|p| matches!(p, std::path::Component::ParentDir))
@@ -227,6 +238,43 @@ fn scan(scope: &Scope, anchor: Option<&Path>, limits: Limits,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn display_path_keeps_root_filename_and_nested_relative_path() {
+        let root = PathBuf::from("gallery");
+        let scope = Scope { root: root.clone(), recursive: true };
+        assert_eq!(scope.display_path(&root.join("billboard.gif")), Path::new("billboard.gif"));
+        assert_eq!(scope.display_path(&root.join("effects/smoke/billboard.gif")), Path::new("effects/smoke/billboard.gif"));
+        assert_eq!(scope.root, root);
+    }
+
+    #[test]
+    fn display_path_preserves_unicode_spaces_and_folder_dots() {
+        let root = PathBuf::from("图库 根目录");
+        let scope = Scope { root: root.clone(), recursive: true };
+        let relative = Path::new("特效 v2.1/烟雾 空间/billboard.gif");
+        assert_eq!(scope.display_path(&root.join(relative)), relative);
+    }
+
+    #[test]
+    fn display_path_rebases_after_subfolder_mode_is_closed() {
+        let image = Path::new("gallery/effects/smoke/billboard.gif");
+        let scope = Scope { root: PathBuf::from("gallery"), recursive: true };
+        assert_eq!(scope.display_path(image), Path::new("effects/smoke/billboard.gif"));
+        let local = Scope::for_image(image, false).unwrap();
+        assert_eq!(local.display_path(image), Path::new("billboard.gif"));
+        assert_eq!(scope.display_path(image), Path::new("effects/smoke/billboard.gif"));
+    }
+
+    #[test]
+    fn display_path_does_not_fabricate_relative_paths_for_outside_files() {
+        let scope = Scope { root: PathBuf::from("gallery"), recursive: true };
+        for path in ["gallery-other/billboard.gif", "other/billboard.gif", "gallery/../billboard.gif"] {
+            assert_eq!(scope.display_path(Path::new(path)), Path::new("billboard.gif"));
+        }
+        let flat = Scope { root: scope.root, recursive: false };
+        assert_eq!(flat.display_path(Path::new("gallery/child/billboard.gif")), Path::new("billboard.gif"));
+    }
+
     struct Fixture(PathBuf);
     impl Fixture {
         fn new() -> Self {
