@@ -51,7 +51,9 @@
 
 ## 支持格式
 
-**常见图片：** PNG、JPG / JPEG、BMP、TIFF、ICO、GIF、WebP、APNG。
+**常见图片：** PNG、JPG / JPEG、BMP、TIFF、ICO、GIF、WebP、APNG、AVIF。
+
+AVIF 支持透明通道；动态 AVIF 暂显示首帧，不播放动画。
 
 **游戏贴图与其他格式：** DDS（BC1–BC7）、TGA、PSD、QOI、HDR、PPM / PGM / PBM。
 
@@ -63,7 +65,7 @@ PSD 查看已保存的合成图，不支持图层编辑或 PSB 文件。
 
 | 文件 | 使用方式 |
 | --- | --- |
-| **安装版：带 `Setup` 的 `.exe`** | 双击安装，提供开始菜单入口，可选添加“打开方式”和 DDS、TGA、PSD、WebP 等格式的资源管理器缩略图 |
+| **安装版：带 `Setup` 的 `.exe`** | 双击安装，提供开始菜单入口，可选添加“打开方式”和 DDS、TGA、PSD、WebP、AVIF 等格式的资源管理器缩略图 |
 | **免安装版：`.zip`** | 解压后运行 `imageview.exe` |
 
 全新安装默认使用 `D:\Program Files\LcL ImageViewer`，没有 D 盘时使用当前用户目录。安装位置可以手动选择；升级时沿用原目录，安装前请先关闭旧版本。

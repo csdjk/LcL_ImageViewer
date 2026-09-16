@@ -17,7 +17,7 @@ pub const APP_NAME: &str = "LcL ImageViewer";
 pub const PROG_ID: &str = "LcL.ImageViewer.Image";
 /// 注册为可打开的扩展名（不含点）
 pub const EXTS: &[&str] = &[
-    "png", "jpg", "jpeg", "bmp", "gif", "webp", "ico", "tif", "tiff", "hdr", "dds", "psd",
+    "png", "jpg", "jpeg", "bmp", "gif", "webp", "avif", "ico", "tif", "tiff", "hdr", "dds", "psd",
     "qoi", "tga", "ppm", "pgm", "pbm",
 ];
 
@@ -101,7 +101,7 @@ pub fn register() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     cap.set_value(
         "ApplicationDescription",
-        &"轻量级游戏美术看图工具：DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG",
+        &"轻量级游戏美术看图工具：DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG/AVIF",
     )
     .map_err(|e| e.to_string())?;
     let (fa, _) = hkcu

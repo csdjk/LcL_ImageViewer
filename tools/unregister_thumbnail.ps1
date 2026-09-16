@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 
 $clsid = '{7A3E9B21-4C5D-4E8F-9A6B-1D2C3E4F5A6B}'
 
-foreach ($ext in @('.dds', '.tga', '.psd', '.webp', '.qoi', '.hdr', '.ppm', '.pgm', '.pbm')) {
+foreach ($ext in @('.dds', '.tga', '.psd', '.webp', '.avif', '.qoi', '.hdr', '.ppm', '.pgm', '.pbm')) {
     $key = "HKCU:\Software\Classes\$ext\shellex\{E357FCCD-A995-4576-B01F-234630154E96}"
     if ((Test-Path $key) -and ((Get-Item -LiteralPath $key).GetValue('') -eq $clsid)) {
         Remove-Item -Path $key -Recurse -Force

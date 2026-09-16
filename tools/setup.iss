@@ -1,4 +1,4 @@
-﻿; LcL ImageViewer 安装包脚本（Inno Setup 7）
+; LcL ImageViewer 安装包脚本（Inno Setup 7）
 ; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageViewer-Setup-v0.3.1-win64.exe
 ; Per-user installation; prefer D:, fall back to local app data. Registry: HKCU.
 
@@ -57,7 +57,7 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
 Name: "{autoprograms}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Tasks]
-Name: "thumbs"; Description: "注册资源管理器缩略图（.dds .tga .psd .webp .qoi .hdr .ppm .pgm .pbm）"
+Name: "thumbs"; Description: "注册资源管理器缩略图（.dds .tga .psd .webp .avif .qoi .hdr .ppm .pgm .pbm）"
 Name: "assoc"; Description: "把支持的图片格式加入 LcL ImageViewer 的“打开方式”，并注册为默认应用候选"
 
 [Registry]
@@ -74,6 +74,7 @@ Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.exe\SupportedTypes"; ValueName: ".bmp"; ValueData: ""; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.exe\SupportedTypes"; ValueName: ".gif"; ValueData: ""; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.exe\SupportedTypes"; ValueName: ".webp"; ValueData: ""; Tasks: assoc
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.exe\SupportedTypes"; ValueName: ".avif"; ValueData: ""; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.exe\SupportedTypes"; ValueName: ".ico"; ValueData: ""; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.exe\SupportedTypes"; ValueName: ".tif"; ValueData: ""; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\Applications\imageview.exe\SupportedTypes"; ValueName: ".tiff"; ValueData: ""; Tasks: assoc
@@ -95,6 +96,7 @@ Root: HKCU; ValueType: string; Subkey: "Software\Classes\.jpeg\OpenWithProgids";
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.bmp\OpenWithProgids"; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.gif\OpenWithProgids"; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.webp\OpenWithProgids"; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.avif\OpenWithProgids"; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.ico\OpenWithProgids"; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.tif\OpenWithProgids"; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.tiff\OpenWithProgids"; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc
@@ -115,6 +117,7 @@ Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\Fi
 Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\FileAssociations"; ValueName: ".bmp"; ValueData: "{#MyProgId}"; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\FileAssociations"; ValueName: ".gif"; ValueData: "{#MyProgId}"; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\FileAssociations"; ValueName: ".webp"; ValueData: "{#MyProgId}"; Tasks: assoc
+Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\FileAssociations"; ValueName: ".avif"; ValueData: "{#MyProgId}"; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\FileAssociations"; ValueName: ".ico"; ValueData: "{#MyProgId}"; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\FileAssociations"; ValueName: ".tif"; ValueData: "{#MyProgId}"; Tasks: assoc
 Root: HKCU; ValueType: string; Subkey: "Software\LcL\ImageViewer\Capabilities\FileAssociations"; ValueName: ".tiff"; ValueData: "{#MyProgId}"; Tasks: assoc
@@ -135,6 +138,7 @@ Root: HKCU; ValueType: string; Subkey: "Software\Classes\.dds\shellex\{{E357FCCD
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.tga\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.psd\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.webp\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
+Root: HKCU; ValueType: string; Subkey: "Software\Classes\.avif\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.qoi\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.hdr\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs
 Root: HKCU; ValueType: string; Subkey: "Software\Classes\.ppm\shellex\{{E357FCCD-A995-4576-B01F-234630154E96}"; ValueData: "{{{#ThumbClsid}}"; Flags: uninsdeletekey; Tasks: thumbs

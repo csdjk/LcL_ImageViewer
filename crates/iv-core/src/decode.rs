@@ -121,6 +121,7 @@ pub enum ImageKind {
     Bmp,
     Gif,
     WebP,
+    Avif,
     Ico,
     Tiff,
     Hdr,
@@ -141,6 +142,7 @@ impl ImageKind {
             ImageKind::Bmp => "BMP",
             ImageKind::Gif => "GIF",
             ImageKind::WebP => "WebP",
+            ImageKind::Avif => "AVIF",
             ImageKind::Ico => "ICO",
             ImageKind::Tiff => "TIFF",
             ImageKind::Hdr => "Radiance HDR",
@@ -236,6 +238,7 @@ fn first_preview_frame(mut frames: image::Frames<'_>, kind: ImageKind) -> Result
 
 fn decode_with_format(bytes: &[u8], fmt: ImageFormat) -> Result<DecodedImage, DecodeError> {
     match fmt {
+        ImageFormat::Avif => crate::avif::decode_avif(bytes),
         ImageFormat::Dds => crate::dds::decode_dds(bytes),
         ImageFormat::Psd => crate::psd_composite::decode_psd(bytes),
         ImageFormat::Tga => decode_image_crate(bytes, ImageFormat::Tga),
