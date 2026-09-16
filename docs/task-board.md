@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-P1-N12 | 顶部文件名显示浏览根目录相对路径 | IN_PROGRESS | ChatGPT-AgentDock | 用户要求 / N11 DONE | `crates/iv-viewer/src/{directory.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 根目录文件名/子目录相对路径；原省略和完整悬停；无额外IO；单元测试、双构建及实机；中文提交本地合入 |
 | IV-P1-N11 | 子文件夹浏览与中文提交规范 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / N10 DONE | `AGENTS.md`, `crates/iv-viewer/src/{directory.rs,app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 固定根只向下/跳过重解析点；后台取消/进度/资源上限；左右键与按钮共用；删除保留范围；中文提交；测试/双构建/实机/main复验，不发布 |
 | IV-P1-N10 | WebP/PSD缩略图、全画布棋盘格与图片AABB | DONE | ChatGPT-AgentDock | 用户本轮要求 / 当前main | `crates/iv-viewer/src/**`, `crates/iv-shell/**`, `crates/iv-core/src/{decode.rs,psd_composite.rs}`, `crates/iv-core/tests/**`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 标准缩略图GUID/WebP注册与COM图像验证；透明画布连续；边界高亮随图变换；tests/check/双构建及实机；不改实时注册/安装/远端 |
 | IV-DOC-02 | 面向用户精简 README | DONE | ChatGPT-AgentDock | 用户本轮要求 / DOC-01已推送 | `README.md` | RGBA简述不写教程；仅功能/配图/下载/操作；无开发/性能/版本过程；文档检查和本地合入，不push |
@@ -247,3 +248,8 @@ IV-P1-N11 Review：Worker `f2fd19ba54ac1dc828f55661127d07158b8e4cab`；69项Rust
 
 
 IV-P1-N11 DONE：集成 `1780e663d3b424064eb85536557eef7970aa488d`；69+12检查/check/双构建，工作分支四组87状态及菜单25状态、主线38状态GUI通过。后台有界只向下索引，真实junction回环跳过、取消/各保护上限、5,004路径、关闭收窄与删除保持根已验证。AGENTS记录后续中文提交；此前提交与安装/远端不变，未push或打包。NEXT恢复IV-P1-01。
+
+
+## IV-P1-N12 执行合同
+
+Base `56a8923109aac35868a618f5938086763ad15588`；分支 `codex/relative-path-label`，工作树 `Temp/worktrees/relative-path-label`。顶部标签相对于固定浏览根显示，根目录仍仅文件名，子目录显示层级；标签沿用宽度及中间省略，悬停显示完整相对路径和实际文件路径。仅格式化已有路径，不扫描或重置范围；不改系统、安装、解码、发布。使用新建测试图片、隔离偏好完成双主题两尺寸回归，本地中文提交合入。
