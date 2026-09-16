@@ -61,4 +61,15 @@ FMT-02 分支验证：101项Rust回归、13项安装契约检查及workspace che
 
 证据：`ui-verify-shots/animated-avif-worker-final-dark-1280`、`ui-verify-shots/animated-avif-worker-final-light-880`；COM直接调用16个输出（4类AVIF及其PNG参考，各128/512两尺寸）透明度和可见RGB完全一致，见 `Temp/animated-avif-worker-thumbs/verification.json`。未注册或修改任何系统关联。
 
-分支Release EXE SHA256 `00eb1dc9f259aaffccbfcf1242b33009fe1a0e433dd214c52f21183624190080`。主线复验结果待填。
+分支Release EXE SHA256 `00eb1dc9f259aaffccbfcf1242b33009fe1a0e433dd214c52f21183624190080`。主线集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0` 后复验已完成，见下文。
+
+
+### FMT-02 主线交付
+
+本地main集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0`：101项Rust回归、13项安装契约、workspace check、Debug构建通过。Release已重新编译链接；Cargo最终覆盖默认EXE因用户旧进程占用而退出101，不能视为默认路径构建部署成功。主线新链接产物已复制到 `target/animated-avif/release/imageview.exe` 并完成实际运行复验；随附当前 `iv_shell.dll` 和AVIF原生依赖许可。原 `target/release/imageview.exe` 仍为上一版静态/首帧版本，未关闭用户窗口，也未替换用户已安装版本。
+
+主线Release两组实际窗口再次取得79张截图（深色1280×860：41张；浅色880×560：38张，DPI96），自动播放、暂停稳定、前后逐帧、循环回绕、宽窗口拖拽定位和按钮恢复播放、RGBA/Alpha/R独立PNG参考比对全部通过。主线16个COM缩略图输出验证通过（透明度和可见RGB完全一致），不预解码整段动画。已人工查看当前主线深色末帧与浅色动画工具栏画面。
+
+主线EXE SHA256 `ae07c55a9087231884e4a38761654e51b6e5a5fb753076e5ac52c6faf1cefca9`；DLL `768fbf50e2a2ee8374d4a59c0d4f70639e87524157d2389189258ed219f48a49`；Debug `c77eed6b274c3e7176b0f9307975305b4e3dafce1029ac43d16f91d4cb9c7203`。默认旧Release SHA256 `c060847f3f632cd98427601a66202f3b7619bc8f5a1fa0164dea2cc6faeee3be` 未变。
+
+证据：`Temp/animated-avif-main-{tests,check,debug,release,installer}.log`、`Temp/animated-avif-main-summary.json`、`Temp/animated-avif-main-thumbs/verification.json`、`ui-verify-shots/animated-avif-main-dark-1280`、`ui-verify-shots/animated-avif-main-light-880`。测试仅使用复制的生成素材和隔离偏好；未修改系统关联、安装目录、安装包、远端或标签。已有HDR/ICC与有限循环次数限制保留，多DPI/全部生产样本未穷举。

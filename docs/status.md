@@ -1,9 +1,9 @@
 # LcL ImageViewer — 当前状态
 
-> 更新时间：2026-09-15。以Git、当前构建与GitHub实际回读为准。
+> 更新时间：2026-09-16。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-FMT-02 -->
+<!-- project-next: IV-P1-01 -->
 
 ## 最新正式版本
 
@@ -62,11 +62,18 @@ IV-P1-N12 DONE：顶部以浏览根显示相对路径，根目录仍为文件名
 IV-FMT-01 DONE：AVIF解码、透明通道、查看/切图及缩略图集成已合入本地main并完成主线复验；未修改现有安装或远端。
 
 
-## 最新增量：AVIF 支持（2026-09-16）
+## AVIF 静态支持阶段（2026-09-16，FMT-01）
 
 IV-FMT-01 已完成：静态/透明AVIF，8/10/12位转RGBA8，容器裁剪/旋转/镜像、动态首帧，文件对话框/目录导航/缩略图/关联脚本同步。动态播放和HDR/ICC色彩管理不在本轮支持范围。
 
 主线集成32775e2：87项Rust回归、13项安装契约检查、workspace check及Debug/Release构建通过；两主题实际窗口26张截图与12个直接COM缩略图输出复验通过，用户偏好和样例原文件未变。详情 docs/formats/AVIF支持说明.md。可运行 target/release/imageview.exe；当前安装、已发布版本和远端未更新。
 
 
-IV-FMT-02 IN_PROGRESS：按用户追加要求接入动态AVIF完整帧播放，静态支持与首帧缩略图保持。
+IV-FMT-02 DONE：动态AVIF完整帧播放已合入本地main并完成复验，静态支持与首帧缩略图保持。
+
+
+## 最新增量：动态 AVIF 播放（FMT-02）
+
+动态AVIF自动循环播放、Space暂停/恢复、逗号/句号前后逐帧、宽窗口帧进度条已接通；每帧透明度、时间基和容器变换保留。改进动画时间轴，避免累积重绘延迟。有4096帧及整段RGBA含首帧副本256MiB防护，缩略图仅解码首帧；HDR/ICC和按文件有限循环次数自动停止未实现。
+
+集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0`；主线101项Rust/13项安装契约/check/Debug通过，Release编译链接完成。默认Release EXE被用户旧进程占用，Cargo复制阶段返回101，原路径未更新；本轮新程序请运行 **`target/animated-avif/release/imageview.exe`**。备用Release实机双主题79张截图及16个直接COM缩略图输出通过，详见 `docs/formats/AVIF支持说明.md`。中文提交已本地保存，没有push、发布安装包或修改安装/系统关联。

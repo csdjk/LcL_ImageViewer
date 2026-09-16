@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-FMT-02 | 动态AVIF完整播放 | REVIEW | ChatGPT-AgentDock | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
+| IV-FMT-02 | 动态AVIF完整播放 | DONE | ChatGPT-AgentDock | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
 | IV-FMT-01 | AVIF图片查看与缩略图支持 | DONE | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
 | IV-P1-N12 | 顶部文件名显示浏览根目录相对路径 | DONE | ChatGPT-AgentDock | 用户要求 / N11 DONE | `crates/iv-viewer/src/{directory.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 根目录文件名/子目录相对路径；原省略和完整悬停；无额外IO；单元测试、双构建及实机；中文提交本地合入 |
 | IV-P1-N11 | 子文件夹浏览与中文提交规范 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / N10 DONE | `AGENTS.md`, `crates/iv-viewer/src/{directory.rs,app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 固定根只向下/跳过重解析点；后台取消/进度/资源上限；左右键与按钮共用；删除保留范围；中文提交；测试/双构建/实机/main复验，不发布 |
@@ -275,3 +275,5 @@ IV-FMT-01 DONE（2026-09-16）：本地主线32775e2集成后复验通过，87�
 Base `e329c87ed35217dfd50ff4e9143c91b57dbd3ef1`；branch `codex/animated-avif`，worktree `Temp/worktrees/animated-avif`。复用现有libavif依赖和AnimatedFrame/播放器，不引入新依赖、不重写渲染。Viewer解码全部序列，preview仅解码首帧；逐帧保留Alpha和容器变换，时间基精确换算为毫秒，不套用GIF的100ms短帧修正。动画沿用查看器循环预览习惯，帧数和总RGBA内存设上限，超限/坏后续帧明确报错而非伪装成首帧成功。按需要修复现有播放时钟累计延迟，保持原快捷键/布局。核对全部旧工作树干净并冻结，保留已有33个本地提交；只使用新建样例和隔离QA配置，不修改系统关联、安装或远端。主线复验通过才DONE。
 
 IV-FMT-02 Review：Worker `955d61a77c33d9aeead4f639be3fe79879e70531`，101项Rust/13项安装契约/check/Debug通过，Release已链接且备用路径79张实机及16个COM输出通过。默认Release受用户旧进程占用，没有覆盖。范围核对通过，允许本地集成后复验，不发布或push。
+
+IV-FMT-02 DONE：集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0`；101项Rust、13项安装契约、check/Debug通过；Release编译链接完成，默认EXE复制受用户进程占用，交付备用 `target/animated-avif/release/imageview.exe` 并完成79张主线实机和16个COM输出复验。完整帧/变量时长/透明通道/播放暂停逐帧/宽窗口进度条通过，缩略图保持首帧；只在本地中文提交，不push、不更新安装/关联，默认旧Release不变。NEXT恢复IV-P1-01。
