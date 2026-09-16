@@ -6,7 +6,7 @@
 - 静态 AVIF 输出直通 Alpha 的 RGBA8，复用 RGBA 通道、像素取样、棋盘格与图片边界功能。透明 RGB 不进行预乘存储。
 - 8/10/12 位输入按现有查看器 LDR 管线转换为 8 位显示。不提供 HDR 色彩映射和 ICC 色彩管理；相关文件在附加信息中标注。此限制不改变其他格式原来的处理方式。
 - 支持容器中的 clean aperture、逆时针旋转和镜像。非方形像素比例暂按原始像素网格显示，并提示。
-- 动态 AVIF 只解码、显示首帧，不播放；附加信息明确显示帧数与“仅显示首帧”。缩略图使用相同首帧数据，不预解码整个动画。
+- 动态 AVIF 解码完整帧序列，自动循环播放，支持 Space 播放/暂停、逗号/句号逐帧与帧进度条；逐帧保留透明度和容器变换。沿用查看器其他动画格式的循环预览习惯，不按文件内的有限重复次数自动停止。资源管理器缩略图仍仅解码首帧，不预解码整个动画。
 - Windows 缩略图 DLL、安装脚本及手动注册脚本已加入 AVIF；本轮不执行系统注册，不修改当前安装，不构建安装包或发布。已有安装和公开版本不会随源码修改自动更新。
 
 ## 解码依赖与构建
@@ -15,7 +15,7 @@
 
 Windows 源码构建需要 Rust MSVC、Visual Studio C++ Build Tools、CMake 和 NASM。构建工具须在该次构建进程的 PATH 中可见，不应把本机路径写进仓库或改变全局 PATH。NASM 使用官方分发；本轮临时工具位于忽略目录 Temp。
 
-原生解析器在解析/解码前限制单边 32768、总像素 67108864、序列 4096 帧、线程 4；本格式输入字节限制 128 MiB。RGBA 输出最多 256 MiB，但原生 YUV、读取缓冲、变换副本和应用缓存仍占用额外内存，因此这不是进程内存硬上限。超限/截断/异常文件返回明确错误，不改写原文件。
+原生解析器在解析/解码前限制单边 32768、总像素 67108864、序列 4096 帧、线程 4；本格式输入字节限制 128 MiB。静态单帧 RGBA 输出最多 256 MiB；动态按未裁剪尺寸预估全序列与首帧 Mip 副本，总计最多 256 MiB，超限在帧解码前拒绝，不静默截断动画。帧时长用整数时间戳舍入到毫秒，零/不足 1ms 按 1ms，不套用 GIF 的 100ms 修正。原生 YUV、读取缓冲、变换副本和应用缓存仍占用额外内存，因此这不是进程内存硬上限。超限/截断/异常文件返回明确错误，不改写原文件。
 
 ## 可重复验证
 
@@ -33,7 +33,7 @@ GUI 与缩略图输出目录必须是新目录。GUI 只控制本次启动的程
 
 测试覆盖内容识别、兼容品牌/扩展尺寸 ftyp、透明度/颜色参考、大小写、混合目录、动态首帧、截断与畸形文件、尺寸防护；生成的高位深和容器变换测试补充实际编码容器回归。公开/生产图片与多 DPI 未全覆盖，不将单组样例当作所有 AVIF 变体兼容保证。
 
-## 本轮证据
+## 静态支持阶段历史证据（FMT-01）
 
 实现提交 `c1f9b17`；分支最终工作区测试 87 项通过；安装契约测试 13 项通过；workspace check、Debug/Release 构建通过。保留已有 iv-shell 的 LNK4104 PRIVATE 导出提示，本轮未扩大修改范围。
 
@@ -46,3 +46,19 @@ GUI 与缩略图输出目录必须是新目录。GUI 只控制本次启动的程
 主线证据：`Temp/avif-main-{tests,check,debug,release,installer}.log`、`ui-verify-shots/avif-main-dark-1280`、`ui-verify-shots/avif-main-light-880`、`Temp/avif-main-thumbs/verification.json`。主线 EXE SHA256 `c060847f3f632cd98427601a66202f3b7619bc8f5a1fa0164dea2cc6faeee3be`，DLL SHA256 `bd96f29c6d2cf6327b2999f9e7af83c7b8a912609960794ebfdb041b782daf74`；PE 导入表未包含外部 AVIF/AOM/dav1d DLL。
 
 截至本轮结束，源文件、当前用户偏好、已安装版本和系统文件关联未更改；未制作安装包、未 push 或发布。最后状态提交仅更新文档，业务代码与上述主线构建一致。
+
+
+## 动态播放增量（FMT-02）
+
+动态解码沿用固定libavif/libaom版本，无依赖升级。播放器按原时间轴推进并合并掉队帧，避免每次重绘延迟累计导致越播越慢；长时间挂起通过跳过整轮定位，不逐帧追赶。暂停/逐帧/拖条保持现有操作语义。
+
+新增可复现入口：`python tools/ui-qa/animated_avif_smoke.py --binary target/release/imageview.exe --output ui-verify-shots/animated-avif-new --commit <当前提交> --theme dark --width 1280 --height 860`。本轮测试与实际窗口结果完成后填写，不将旧截图作为新验收。
+
+
+FMT-02 分支验证：101项Rust回归、13项安装契约检查及workspace check通过，Debug构建通过。Release源码编译和链接完成，但Cargo向默认EXE复制时因用户运行中的旧程序（PID 32036）报Access Denied；没有关闭、移动或覆盖旧程序，已从本次 `target/release/deps/imageview.exe` 复制到 `target/animated-avif/release/imageview.exe`，随附当前缩略图DLL与原生依赖许可文件。默认Release路径不能宣称已更新。
+
+分支Release双主题/两尺寸共79张实际窗口截图，验证自动播放/暂停稳定/前后逐帧/完整循环、宽窗口真实拖拽帧条和点击播放、RGBA/Alpha/R与独立PNG参考、菜单及隐藏恢复；DPI96，源文件哈希与用户偏好保持。窄窗口沿用第二行播放/帧数控制和快捷键，帧条仍只在宽窗口展示。首次原子点击滑块探针失败后改为持续按住拖拽验收，未绕过断言；修正后复验全部通过。已人工查看深色末帧和浅色动画控件/Alpha合成画面。
+
+证据：`ui-verify-shots/animated-avif-worker-final-dark-1280`、`ui-verify-shots/animated-avif-worker-final-light-880`；COM直接调用16个输出（4类AVIF及其PNG参考，各128/512两尺寸）透明度和可见RGB完全一致，见 `Temp/animated-avif-worker-thumbs/verification.json`。未注册或修改任何系统关联。
+
+分支Release EXE SHA256 `00eb1dc9f259aaffccbfcf1242b33009fe1a0e433dd214c52f21183624190080`。主线复验结果待填。

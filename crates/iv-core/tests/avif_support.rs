@@ -70,17 +70,24 @@ fn alpha_avif_preserves_source_transparency_and_straight_rgb() {
     assert_eq!(decoded.mips[0].rgba8_at(160, 96), None);
 }
 #[test]
-fn animated_avif_exposes_only_first_frame_with_explicit_metadata() {
+fn animated_avif_decodes_all_frames_with_explicit_metadata() {
     let decoded = compare(ANIMATED, "animated-reference.png");
-    assert!(decoded.frames.is_empty());
+    assert_eq!(decoded.frames.len(), 2);
+    let (PixelData::Rgba8(a), PixelData::Rgba8(b)) =
+        (&decoded.frames[0].data, &decoded.frames[1].data)
+    else {
+        panic!("expected RGBA8");
+    };
+    assert_ne!(a, b);
     let metadata = decoded.extra_meta.as_deref().unwrap();
-    assert!(metadata.contains("2 帧") && metadata.contains("仅显示首帧"));
+    assert!(metadata.contains("2 帧") && metadata.contains("循环播放"));
 }
 #[test]
 fn thumbnail_decoding_reuses_exact_avif_pixels() {
     for bytes in [ALPHA, OPAQUE, ANIMATED] {
         let full = decode_bytes(bytes).unwrap();
         let thumb = decode_preview_bytes(bytes).unwrap();
+        assert!(thumb.frames.is_empty());
         assert_eq!(rgba(&full), rgba(&thumb));
         assert_eq!(full.has_alpha, thumb.has_alpha);
     }
