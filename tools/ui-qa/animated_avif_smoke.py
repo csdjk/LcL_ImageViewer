@@ -35,8 +35,15 @@ def run(args):
     key('4'); shot('alpha'); key('1'); shot('red'); key('5'); shot('rgba-restored')
     if args.width >= 1200:
         # Coordinates are local to the verified 1280pt top toolbar, never screen HWNDs.
-        click(args.slider_first_x, 34); shot('seek-first')
-        click(args.slider_last_x, 34); shot('seek-last'); wait(0.9); shot('seek-held')
+        # Slider reacts while held; an atomic down/up within one GUI tick is not a drag.
+        actions.append({'kind':'drag', 'x':args.slider_last_x, 'y':34,
+                        'dx':args.slider_first_x-args.slider_last_x, 'dy':0,
+                        'expect_window_delta':[0,0,0,0]})
+        wait(0.15); shot('seek-first')
+        actions.append({'kind':'drag', 'x':args.slider_first_x, 'y':34,
+                        'dx':args.slider_last_x-args.slider_first_x, 'dy':0,
+                        'expect_window_delta':[0,0,0,0]})
+        wait(0.15); shot('seek-last'); wait(0.9); shot('seek-held')
         click(args.play_x, 34)
     else:
         key(32)
