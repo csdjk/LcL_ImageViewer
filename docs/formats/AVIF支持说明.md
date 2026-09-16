@@ -41,4 +41,8 @@ GUI 与缩略图输出目录必须是新目录。GUI 只控制本次启动的程
 
 真实缩略图 DLL 直接 COM：3 种 AVIF × 128/512 两尺寸，并与对应 PNG 输出对照，共 12 个输出；6 组透明度与可见 RGB 完全一致，alpha 类型标志正确。证据 `Temp/avif-worker-thumbs/verification.json`。没有注册 DLL 或重启 Explorer。
 
-本轮 Release EXE SHA256 `944dfc1604b3c94e577a1f751f2661c065d77dc1584d040dbc10e54bdc0b7f2f`；DLL SHA256 `e7a2d480c61878900d319c1d5376c7c94f943dc17077ef6cbc6f2a3b30a00cae`。主线复验记录待集成后补充。
+本轮 Release EXE SHA256 `944dfc1604b3c94e577a1f751f2661c065d77dc1584d040dbc10e54bdc0b7f2f`；DLL SHA256 `e7a2d480c61878900d319c1d5376c7c94f943dc17077ef6cbc6f2a3b30a00cae`。主线集成 `32775e2` 后重新完成 87 项 Rust 测试、13 项安装契约检查、workspace check、Debug/Release 构建。主线 Release 两主题/两尺寸再录 26 张截图，核心 RGBA/Alpha/R/边界/不透明/动画首帧区域与分支验证完全一致；偏好恢复与原文件哈希检查通过。主线 COM 缩略图再输出并验证 12 项，透明度、可见像素与 PNG 参考完全一致。
+
+主线证据：`Temp/avif-main-{tests,check,debug,release,installer}.log`、`ui-verify-shots/avif-main-dark-1280`、`ui-verify-shots/avif-main-light-880`、`Temp/avif-main-thumbs/verification.json`。主线 EXE SHA256 `c060847f3f632cd98427601a66202f3b7619bc8f5a1fa0164dea2cc6faeee3be`，DLL SHA256 `bd96f29c6d2cf6327b2999f9e7af83c7b8a912609960794ebfdb041b782daf74`；PE 导入表未包含外部 AVIF/AOM/dav1d DLL。
+
+截至本轮结束，源文件、当前用户偏好、已安装版本和系统文件关联未更改；未制作安装包、未 push 或发布。最后状态提交仅更新文档，业务代码与上述主线构建一致。

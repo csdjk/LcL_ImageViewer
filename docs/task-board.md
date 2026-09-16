@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-FMT-01 | AVIF图片查看与缩略图支持 | REVIEW | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
+| IV-FMT-01 | AVIF图片查看与缩略图支持 | DONE | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
 | IV-P1-N12 | 顶部文件名显示浏览根目录相对路径 | DONE | ChatGPT-AgentDock | 用户要求 / N11 DONE | `crates/iv-viewer/src/{directory.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 根目录文件名/子目录相对路径；原省略和完整悬停；无额外IO；单元测试、双构建及实机；中文提交本地合入 |
 | IV-P1-N11 | 子文件夹浏览与中文提交规范 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / N10 DONE | `AGENTS.md`, `crates/iv-viewer/src/{directory.rs,app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 固定根只向下/跳过重解析点；后台取消/进度/资源上限；左右键与按钮共用；删除保留范围；中文提交；测试/双构建/实机/main复验，不发布 |
 | IV-P1-N10 | WebP/PSD缩略图、全画布棋盘格与图片AABB | DONE | ChatGPT-AgentDock | 用户本轮要求 / 当前main | `crates/iv-viewer/src/**`, `crates/iv-shell/**`, `crates/iv-core/src/{decode.rs,psd_composite.rs}`, `crates/iv-core/tests/**`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 标准缩略图GUID/WebP注册与COM图像验证；透明画布连续；边界高亮随图变换；tests/check/双构建及实机；不改实时注册/安装/远端 |
@@ -265,3 +265,5 @@ IV-P1-N12 DONE：集成 `bf37c8cc83268808bcddf7b20af956d537841194`；73项测试
 Base `50c592f56966d1f7f97f7e02ad55d1abc5a4b43c`；用户要求新增AVIF格式。独立分支 `codex/avif-support`，工作树 `Temp/worktrees/avif-support`。只扩展格式识别/解码和现有打开、浏览、缩略图入口，保留RGBA检查与原图；AVIF高位深按既有LDR管线显示8位，动画范围以实测和文档为准，不冒充HDR色彩管理。依赖须许可兼容、可构建；异常数据返回错误，设置尺寸/内存防护。不全仓格式化，不升级无关依赖，不改现有安装/实时关联，不push、打包或发布；仅使用合成图和公开测试样例，保持用户窗口与偏好。完成测试、构建、实机后中文提交、串行本地集成复验。
 
 IV-FMT-01 REVIEW：实现分支 b36e1e7；87项Rust/13项安装契约检查通过，双构建通过；26张真实窗口截图及12个直接COM缩略图输出通过，现由协调者串行合入本地main并复验。
+
+IV-FMT-01 DONE（2026-09-16）：本地主线32775e2集成后复验通过，87项Rust、13项安装契约、check与双构建；主线26张实机截图、12个直接COM缩略图输出通过。详细依据见 docs/formats/AVIF支持说明.md。原有26个本地提交完整保留，不改用户安装/关联，不push或发布。下一待办恢复IV-P1-01。
