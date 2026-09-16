@@ -3,7 +3,7 @@
 > 更新时间：2026-09-15。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-DOC-02 -->
+<!-- project-next: IV-P1-01 -->
 
 ## 最新正式版本
 
@@ -29,7 +29,7 @@ Release程序 `0b6ce0d06bac1927a7a5475eafef3fe8bb22e63d9ac9eb7e56a1877157fc5bf1`
 
 ## NEXT与限制
 
-NOW: IV-DOC-02 IN_PROGRESS — 面向用户精简 README；完成后恢复 IV-P1-01。
+NOW: IV-P1-01 READY — 完善通用验收入口。
 COMPLETED: N01–N09、INSTALL-01/02、PERF-01、REL-030、REL-031 DONE。
 
 P1保持ACTIVE，不将此次授权发布当作所有长期门禁完成。未配置代码签名；原iv-shell LNK4104警告保留。多DPI/混合缩放/跨屏、冷盘及全部格式/权限、生产环境完整安装卸载矩阵未全覆盖。注册及载荷测试在隔离命名空间执行，不等于修改当前用户的真实打开方式菜单；没有更改现有安装、UserChoice或其他应用的关联。
@@ -41,4 +41,4 @@ IV-DOC-01 DONE：README不再按版本介绍更新；开头突出RGBA单通道�
 
 ## README 用户首页精简
 
-IV-DOC-02进行中：上一轮README已按后续授权推送，本轮缩短RGBA说明并移除开发内部信息，只整理用户功能与操作；不改程序或安装包，暂不推送。
+IV-DOC-02 DONE：用户版README已提交 `8e458797f6460f9f6d0883f4cbc481f95fc19207` 并合入本地main。正文从208行缩至107行；只保留功能概览、界面预览、格式、下载和操作，RGBA不再展开教程。文档结构/引用/图片与快捷键核对通过。上一轮文档已推送，本轮新改动尚未push；现有程序、安装包、标签与Release不变。
