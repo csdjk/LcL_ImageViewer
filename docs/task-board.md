@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-DOC-02 | 面向用户精简 README | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮要求 / DOC-01已推送 | `README.md` | RGBA简述不写教程；仅功能/配图/下载/操作；无开发/性能/版本过程；文档检查和本地合入，不push |
 | IV-DOC-01 | README 当前功能与 RGBA 重点说明 | DONE | ChatGPT-AgentDock | 用户明确要求修改提交 / REL-031 DONE | `README.md` | 当前功能而非版本历史；通道/像素说明与代码一致；引用/Markdown/diff检查；本地提交合入，不push或发布 |
 | IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
 | IV-PERF-01 | 图片加载与启动耗时优化 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / 当前main | `crates/iv-viewer/src/{main.rs,app.rs,loader.rs,render.rs,perf.rs,directory.rs}`, `crates/iv-core/src/decode.rs`, `crates/iv-core/tests/**`, `crates/iv-core/examples/**`, `tools/perf/**`, `docs/performance/**`, `README.md` | 同样本同Release基线；调度/扫描/拷贝优化；像素一致；tests/check/双构建及实际窗口验证；不改关联/安装/远端 |
@@ -215,3 +216,8 @@ Base `1d5cb0b3da7213a6019687f2af5be7f6608b71ca`；branch `codex/readme-rgba`；w
 IV-DOC-01 Review：Worker `09a19d96af0686f065e8e475fa9e0868e459d735`，任务分支只改README。已核对快捷键、Shader单通道与像素读取来源；无版本更新段落，六张既有配图和文档/锚点引用及Markdown/HTML检查通过。允许本地主线集成，不push、不改代码或发布包。
 
 IV-DOC-01 DONE：README提交 `09a19d96af0686f065e8e475fa9e0868e459d735`，本地集成 `f873c642c75afcf01434b363921717e5c75b0731`。主页按当前功能组织，RGBA/Alpha/像素检查优先，无逐版本更新段落；说明O与5/C、键盘A与Alpha按钮区别。主线Markdown/HTML、10个本地引用、6张图片、锚点/通道映射及diff检查PASS；54项workspace测试通过。只改README及协调文档，Rust/图片/版本/安装器与Debug、Release二进制均未变；没有push或重新发布。证据位于忽略目录 `Temp/readme-rgba-review/`。NEXT恢复IV-P1-01。
+
+
+## IV-DOC-02 执行合同
+
+Base `e953f321f331ae86259fd434972c317fd960d208`；branch `codex/readme-user-page`；worktree `Temp/worktrees/readme-user-page`。Worker只改README，将通道说明缩为简介和快捷键，删除原理/案例教程、源码构建、注册脚本、实现细节、测试/协作信息与重复说明。保留用户可用功能、实机配图、下载/安装、鼠标和快捷键，复用既有图不重新截图。Integrator核对功能和引用、合入main后复验，同步状态；不改代码/版本/安装包、不push或发布。旧工作树冻结。
