@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-P1-N10 | WebP/PSD缩略图、全画布棋盘格与图片AABB | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮要求 / 当前main | `crates/iv-viewer/src/**`, `crates/iv-shell/**`, `crates/iv-core/src/{decode.rs,psd_composite.rs}`, `crates/iv-core/tests/**`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 标准缩略图GUID/WebP注册与COM图像验证；透明画布连续；边界高亮随图变换；tests/check/双构建及实机；不改实时注册/安装/远端 |
 | IV-DOC-02 | 面向用户精简 README | DONE | ChatGPT-AgentDock | 用户本轮要求 / DOC-01已推送 | `README.md` | RGBA简述不写教程；仅功能/配图/下载/操作；无开发/性能/版本过程；文档检查和本地合入，不push |
 | IV-DOC-01 | README 当前功能与 RGBA 重点说明 | DONE | ChatGPT-AgentDock | 用户明确要求修改提交 / REL-031 DONE | `README.md` | 当前功能而非版本历史；通道/像素说明与代码一致；引用/Markdown/diff检查；本地提交合入，不push或发布 |
 | IV-REL-031 | 发布加载优化及安装器修复 v0.3.1 | DONE | ChatGPT-AgentDock | 用户本轮明确要求 / PERF-01、INSTALL-01/02 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一；54+11测试、隔离注册与目录验证、正式EXE实机；包hash/启动；push main+新tag，正式Release附件回读；不改当前安装 |
@@ -223,3 +224,8 @@ IV-DOC-01 DONE：README提交 `09a19d96af0686f065e8e475fa9e0868e459d735`，本�
 Base `e953f321f331ae86259fd434972c317fd960d208`；branch `codex/readme-user-page`；worktree `Temp/worktrees/readme-user-page`。Worker只改README，将通道说明缩为简介和快捷键，删除原理/案例教程、源码构建、注册脚本、实现细节、测试/协作信息与重复说明。保留用户可用功能、实机配图、下载/安装、鼠标和快捷键，复用既有图不重新截图。Integrator核对功能和引用、合入main后复验，同步状态；不改代码/版本/安装包、不push或发布。旧工作树冻结。
 
 IV-DOC-02 Review / DONE：README提交 `8e458797f6460f9f6d0883f4cbc481f95fc19207`，仅一份产品文档改变并快进合入main。正文208→107行、字符量减少59.2%；RGBA简述+快捷键，保留功能/配图/格式/下载/操作，移除技术实现、构建脚本和过量教程。分支和主线Markdown/HTML、锚点、6处本地引用、4张图片、快捷键映射与diff检查通过。代码/图片/版本/安装器和现有Debug/Release哈希未变；文档任务未重建程序，无push/发布。证据 `Temp/readme-user-review`；NEXT恢复IV-P1-01。
+
+
+## IV-P1-N10 合同
+
+Base `f094a58b882dc8131794b977217828c973f486b2`；独立分支`codex/preview-canvas-bounds`，工作树`Temp/worktrees/preview-canvas-bounds`。用户要求WebP/PSD预览图、透明图全画布棋盘格、顶部AABB高亮开关。已只读确认本机PSD等缩略图键存在多余右花括号，WebP未注册；优先修复真实缺陷。图片边界为完整矩形（非非透明像素包围盒），随平移/缩放/Mip，默认关且记住偏好；不改变原像素或原图。缩略图使用直接DLL COM及重定向隔离注册测试，不改用户实时关联或现有安装，不自动发布或打包，保留三项未推送README提交。

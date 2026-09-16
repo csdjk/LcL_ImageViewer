@@ -3,7 +3,7 @@
 > 更新时间：2026-09-15。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N10 -->
 
 ## 最新正式版本
 
@@ -29,7 +29,7 @@ Release程序 `0b6ce0d06bac1927a7a5475eafef3fe8bb22e63d9ac9eb7e56a1877157fc5bf1`
 
 ## NEXT与限制
 
-NOW: IV-P1-01 READY — 完善通用验收入口。
+NOW: IV-P1-N10 IN_PROGRESS — 缩略图与透明画布边界。
 COMPLETED: N01–N09、INSTALL-01/02、PERF-01、REL-030、REL-031 DONE。
 
 P1保持ACTIVE，不将此次授权发布当作所有长期门禁完成。未配置代码签名；原iv-shell LNK4104警告保留。多DPI/混合缩放/跨屏、冷盘及全部格式/权限、生产环境完整安装卸载矩阵未全覆盖。注册及载荷测试在隔离命名空间执行，不等于修改当前用户的真实打开方式菜单；没有更改现有安装、UserChoice或其他应用的关联。
