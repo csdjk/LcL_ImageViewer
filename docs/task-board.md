@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | REVIEW | ChatGPT-AgentDock | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
+| IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | DONE | ChatGPT-AgentDock | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
 | IV-FMT-02 | 动态AVIF完整播放 | DONE | ChatGPT-AgentDock | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
 | IV-FMT-01 | AVIF图片查看与缩略图支持 | DONE | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
 | IV-P1-N12 | 顶部文件名显示浏览根目录相对路径 | DONE | ChatGPT-AgentDock | 用户要求 / N11 DONE | `crates/iv-viewer/src/{directory.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 根目录文件名/子目录相对路径；原省略和完整悬停；无额外IO；单元测试、双构建及实机；中文提交本地合入 |
@@ -285,3 +285,6 @@ IV-FMT-02 DONE：集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0`；101项Rust�
 Base `0b3cb3cc1ce8209715aa03a89d278e633262993b`；分支 `codex/release-v0.4.0`，工作树 `Temp/worktrees/release-v0.4.0`。用户本轮明确要求打包发布：允许将现有41个本地提交及本轮版本变更推送main，创建新v0.4.0标签与正式Latest Release，保留旧版标签及附件。不强推、不重写历史、不自动升级当前安装或改变实时文件关联，不关闭已有窗口。版本包含静态/动态AVIF、子目录及相对路径、透明画布/图片边界和WebP/PSD缩略图修复。补齐便携包原生许可和验证工具过期计数，正式发布使用独立目标目录静态CRT构建并核验PE导入，避免默认EXE占用与新增C++运行库依赖。验证只使用新建测试文件、隔离偏好、隔离HKCU测试命名空间；先草稿上传核验，再公开发布并下载比对hash。P1长期门禁不自动标通过。
 
 IV-REL-040 分支审查：Worker `42d69b8acb1c5e30cee0ae3db5ee7442abf20305`；101项Rust及18项安装/打包契约检查通过，变更仅版本、文档与构建打包工具，未改变业务解码/UI。新依赖许可纳入便携ZIP白名单；正式版使用静态CRT和PE导入守卫，主线构建及最终包验证尚待执行。
+
+
+IV-REL-040 DONE：v0.4.0于2026-09-16T14:18:52Z正式发布并设Latest，ID 389994098，源码标签 `1649569a903e3620b60f3699ea0f89c176900014`；main及新标签已推送，三附件公开下载SHA256一致。101项Rust/18项契约/check/静态CRT构建、146张合格实机截图、28个COM输出和76值隔离注册及载荷安装卸载通过。当前安装和实时关联保持，不强推或覆盖旧附件；详见v0.4.0-validation.md，NEXT恢复IV-P1-01。

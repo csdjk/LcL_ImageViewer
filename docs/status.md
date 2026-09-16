@@ -3,36 +3,35 @@
 > 更新时间：2026-09-16。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-REL-040 -->
+<!-- project-next: IV-P1-01 -->
 
 ## 最新正式版本
 
-**v0.3.1 已按本轮用户明确要求发布，Latest、非草稿/预发布。**
+**v0.4.0 已正式发布并设为Latest，非草稿/预发布。**
 
-发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.3.1；ID `389181525`，发布时间 `2026-09-15T13:44:36Z`。
-源码标签：`97fcf8e4309d8fe3d2e17c5c47cd216729735e34`；最终文档HEAD见Git。原v0.3.0文件保留，不覆盖旧附件。
+发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.4.0；ID `389994098`；发布时间 `2026-09-16T14:18:52Z`。源码标签 `1649569a903e3620b60f3699ea0f89c176900014`。main及v0.4.0已推送，旧版保留，公开附件下载SHA256一致。
 
-## 已纳入安装包的改进
+包含静态/动态AVIF与透明通道、子目录和相对路径浏览、全画布棋盘格与图片边界、WebP/PSD/AVIF缩略图及动画计时修复。之前本地未发布的增量已统一纳入本版，详见 `docs/releases/v0.4.0.md`。
 
-- 图片加载加速：首图解码与窗口/GPU初始化并行；目录后台扫描、导航复用；最新请求优先、有限去重预读；减少像素拷贝。静态WebP分支错误已修复。性能仅承诺已记录测试范围，不降低分辨率或Alpha。
-- 打开方式安装修复：明确写入71个字符串值，通知Explorer刷新；对应安装任务需勾选。不抢占系统默认应用。
-- 默认D盘：全新安装建议D:\Program Files\LcL ImageViewer，无D盘回退localappdata\Programs；升级沿用原位置且目录页可更改，不自动迁移。
-- 保留新拟态主题、两侧磨砂导航、1秒隐藏、精简菜单/设置、A/D、Delete确认回收站、左键移图、画布右键拖主窗口及设置弹窗独立拖动。
+## 本轮验证与产物
 
-## 发布与验证
+101项Rust、18项打包/安装契约、workspace check、正式静态CRT构建通过；146张合格实机截图、28个COM缩略图输出、76项隔离注册及EXE/DLL安装卸载hash验证完成，ZIP解压启动通过。完整范围和一次未确认原因的初始暂停采样见 `docs/releases/v0.4.0-validation.md`。
 
-主线54项Rust测试+11项安装器检查、check/Debug及Release workspace构建通过。真实Inno隔离71值写入、旧失效路径升级、其他应用哨兵保留、EXE/DLL载荷hash和卸载通过；默认目录解析通过。深色880×560设置16状态、浅色1280×860菜单10状态实机通过；ZIP解压启动通过。所有GUI验证DPI96/100%。
+安装版：`dist/v0.4.0/LcL-ImageViewer-Setup-v0.4.0-win64.exe`。
+免安装版：`dist/v0.4.0/LcL-ImageViewer-v0.4.0-win64.zip`。
+校验：`dist/v0.4.0/SHA256SUMS.txt`。
 
-安装包5983996字节，ZIP5427566字节，另附SHA256SUMS.txt；已上传并公开下载逐项核对hash。完整记录见 `docs/releases/v0.3.1-validation.md`。本地统一入口 `dist/v0.3.1/LcL-ImageViewer-Setup-v0.3.1-win64.exe`，不再需要旧openwith-fix/default-d分散安装包。
-
-Release程序 `0b6ce0d06bac1927a7a5475eafef3fe8bb22e63d9ac9eb7e56a1877157fc5bf1`；Debug程序 `ea28d50cc4ff22f4b0de21e98b88992aa82cfaf0507d20859359d61fd2a8353d`。两者均0.3.1，位于target/release和target/debug。未自动升级用户现有安装。
+正式构建位于 `target/distribution/x86_64-pc-windows-msvc/release`；不能把旧 `target/release`、`target/animated-avif` 或现有安装目录视为已升级。本轮只发布，不自动替换用户安装、关联或旧窗口。
 
 ## NEXT与限制
 
-NOW: IV-P1-01 READY — 完善通用验收入口。
-COMPLETED: N01–N09、INSTALL-01/02、PERF-01、REL-030、REL-031 DONE。
+IV-REL-040 DONE。NOW: IV-P1-01 READY — 完善通用验收入口。
 
-P1保持ACTIVE，不将此次授权发布当作所有长期门禁完成。未配置代码签名；原iv-shell LNK4104警告保留。多DPI/混合缩放/跨屏、冷盘及全部格式/权限、生产环境完整安装卸载矩阵未全覆盖。注册及载荷测试在隔离命名空间执行，不等于修改当前用户的真实打开方式菜单；没有更改现有安装、UserChoice或其他应用的关联。
+P1保持ACTIVE。未做代码签名；保留既有iv-shell LNK4104提示；完整多DPI/跨屏及生产安装矩阵未全覆盖。AVIF 10/12位转RGBA8，HDR/ICC及按源文件有限循环次数自动停止未实现。发布文件使用静态CRT，导入表未包含外部VC运行库或AVIF解码DLL。
+
+## 历史增量记录
+
+以下“未push/未发布”等描述为各任务当时状态；上述增量现在均已纳入v0.4.0并推送，当前状态以上方正式发布信息为准。
 
 ## README 当前功能说明（仅本地提交）
 
@@ -72,11 +71,8 @@ IV-FMT-01 已完成：静态/透明AVIF，8/10/12位转RGBA8，容器裁剪/旋�
 IV-FMT-02 DONE：动态AVIF完整帧播放已合入本地main并完成复验，静态支持与首帧缩略图保持。
 
 
-## 最新增量：动态 AVIF 播放（FMT-02）
+## FMT-02 动态 AVIF 开发阶段记录（发布前）
 
 动态AVIF自动循环播放、Space暂停/恢复、逗号/句号前后逐帧、宽窗口帧进度条已接通；每帧透明度、时间基和容器变换保留。改进动画时间轴，避免累积重绘延迟。有4096帧及整段RGBA含首帧副本256MiB防护，缩略图仅解码首帧；HDR/ICC和按文件有限循环次数自动停止未实现。
 
 集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0`；主线101项Rust/13项安装契约/check/Debug通过，Release编译链接完成。默认Release EXE被用户旧进程占用，Cargo复制阶段返回101，原路径未更新；本轮新程序请运行 **`target/animated-avif/release/imageview.exe`**。备用Release实机双主题79张截图及16个直接COM缩略图输出通过，详见 `docs/formats/AVIF支持说明.md`。中文提交已本地保存，没有push、发布安装包或修改安装/系统关联。
-
-
-IV-REL-040 IN_PROGRESS：按用户授权打包发布v0.4.0，当前正式版本仍为v0.3.1；发布与公开下载验证完成后更新状态。
