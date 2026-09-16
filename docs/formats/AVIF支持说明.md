@@ -35,4 +35,10 @@ GUI 与缩略图输出目录必须是新目录。GUI 只控制本次启动的程
 
 ## 本轮证据
 
-实现分支、构建、截图和主线复验结果在完成后记录于此。
+实现提交 `c1f9b17`；分支最终工作区测试 87 项通过；安装契约测试 13 项通过；workspace check、Debug/Release 构建通过。保留已有 iv-shell 的 LNK4104 PRIVATE 导出提示，本轮未扩大修改范围。
+
+实际 Release：深色 1280×860、浅色 880×560，DPI 96，共 26 张真实窗口截图；隔离偏好均恢复，源文件哈希未变。混合 PNG/AVIF、大小写扩展名、子目录切换及返回通过；中心 RGBA/Alpha 图像区域与 PNG 参考的最大通道差均为 0。已抽查两主题 RGBA/Alpha 关键区域，蓝橙色块与五级透明度、灰度 Alpha 显示正常，完整截图存于 `ui-verify-shots/avif-worker-dark-1280` 和 `ui-verify-shots/avif-worker-light-880`。
+
+真实缩略图 DLL 直接 COM：3 种 AVIF × 128/512 两尺寸，并与对应 PNG 输出对照，共 12 个输出；6 组透明度与可见 RGB 完全一致，alpha 类型标志正确。证据 `Temp/avif-worker-thumbs/verification.json`。没有注册 DLL 或重启 Explorer。
+
+本轮 Release EXE SHA256 `944dfc1604b3c94e577a1f751f2661c065d77dc1584d040dbc10e54bdc0b7f2f`；DLL SHA256 `e7a2d480c61878900d319c1d5376c7c94f943dc17077ef6cbc6f2a3b30a00cae`。主线复验记录待集成后补充。

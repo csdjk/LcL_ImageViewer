@@ -25,7 +25,7 @@ AppPublisherURL=https://github.com/csdjk/LcL_ImageViewer
 AppSupportURL=https://github.com/csdjk/LcL_ImageViewer/issues
 AppUpdatesURL=https://github.com/csdjk/LcL_ImageViewer/releases/latest
 SetupIconFile=..\crates\iv-viewer\assets\icon.ico
-AppComments=Lightweight game-art image viewer (DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG)
+AppComments=Lightweight game-art image viewer (DDS/PSD/TGA/QOI/HDR/GIF/WebP/APNG/AVIF)
 ; New installations prefer D:; upgrades keep their existing location.
 DefaultDirName={code:GetDefaultInstallDir}
 UsePreviousAppDir=yes
@@ -50,6 +50,7 @@ Source: "{#BuildDir}\imageview.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BuildDir}\iv_shell.dll"; DestDir: "{app}"; Flags: ignoreversion restartreplace
 
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\formats\AVIF第三方许可.txt"; DestDir: "{app}\licenses"; DestName: "AVIF-third-party-notices.txt"; Flags: ignoreversion
 Source: "..\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

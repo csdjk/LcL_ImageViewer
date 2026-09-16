@@ -36,6 +36,13 @@ class InstallerAssociationTests(unittest.TestCase):
         for row in self.rows:
             self.assertEqual(row.get('ValueType'), 'string', row)
 
+    def test_avif_native_decoder_license_is_included_in_installer(self):
+        self.assertIn('AVIF第三方许可.txt', self.source)
+        self.assertIn('AVIF-third-party-notices.txt', self.source)
+        notice = (ROOT / 'docs/formats/AVIF第三方许可.txt').read_text(encoding='utf-8')
+        self.assertIn('Alliance for Open Media', notice)
+        self.assertIn('PATENTS', notice)
+
     def test_explorer_refresh_is_enabled(self):
         self.assertRegex(self.source, r'(?m)^ChangesAssociations=yes$')
 
