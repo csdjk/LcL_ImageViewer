@@ -1052,7 +1052,7 @@ impl App {
                                 self.toggle_subfolders();
                             }
                         }
-                        if let Some(d) = self.directory.as_ref().filter(|d| d.files.len() > 1 || self.include_subfolders || self.directory_scanning) {
+                        if let Some(d) = self.directory.as_ref() {
                             ui::sep(ui, pal);
                             let text = if self.directory_scanning {
                                 format!("扫描…{}", self.directory_stats.files)
@@ -1060,7 +1060,12 @@ impl App {
                                 format!("{}/{}{}", if d.files.is_empty() { 0 } else { d.index + 1 }, d.files.len(),
                                     if self.directory_stats.partial() { "·部分" } else { "" })
                             };
-                            ui::bar_label_mono(ui, text, 11.0, pal.dim).on_hover_text(self.browse_description());
+                            // 固定槽宽：计数、扫描状态和“部分”提示不让左侧开关来回移动。
+                            let galley = ui.fonts(|f| f.layout_no_wrap(text,
+                                egui::FontId::new(11.0, egui::FontFamily::Monospace), pal.dim));
+                            let (slot, response) = ui.allocate_exact_size(Vec2::new(108.0, 32.0), Sense::hover());
+                            ui.painter().galley(slot.center() - galley.size() / 2.0, galley, pal.dim);
+                            response.on_hover_text(self.browse_description());
                         }
 
                         // —— 文件信息 ——

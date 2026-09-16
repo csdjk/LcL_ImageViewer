@@ -29,7 +29,7 @@ def run(args):
     actions=[]; expected={}
     def key(code, modifiers=()): actions.append({'kind':'key','code':code,'modifiers':list(modifiers)})
     def shot(name, title):
-        actions.extend([{'kind':'wait','seconds':0.35},{'kind':'move','x':args.width/2,'y':args.height-24},
+        actions.extend([{'kind':'wait','seconds':0.35},{'kind':'move','x':args.width/2+(len(expected)%2)*3,'y':args.height-24},
                         {'kind':'wait','seconds':0.15},{'kind':'shot','name':name}]);expected[name]=title
     def click_side(right):
         x=args.width-42 if right else 42

@@ -296,6 +296,16 @@ mod tests {
         scanner.cancel(101); assert!(scanner.poll().is_none());
     }
     #[test]
+    fn thousands_of_paths_are_indexed_without_decoding_file_contents() {
+        let f = Fixture::new();
+        for i in 0..5_000 { std::fs::write(f.0.join("selected/child").join(format!("bulk-{i:05}.png")), []).unwrap(); }
+        // 全部批量样本故意不是有效图片；目录索引不应读取/解码其内容。
+        let before = Instant::now();
+        let (files, stats) = result(&f.scope(true), Limits::default());
+        assert_eq!(files.len(), 5_004); assert!(!stats.partial());
+        eprintln!("路径索引测试：{}项，扫描与排序{}毫秒", files.len(), before.elapsed().as_millis());
+    }
+    #[test]
     #[cfg(windows)]
     fn junction_to_parent_and_outside_is_not_followed() {
         let f = Fixture::new(); let link = f.0.join("selected").join("escape");
