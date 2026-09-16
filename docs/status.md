@@ -3,7 +3,7 @@
 > 更新时间：2026-09-16。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-REL-040 -->
 
 ## 最新正式版本
 
@@ -77,3 +77,6 @@ IV-FMT-02 DONE：动态AVIF完整帧播放已合入本地main并完成复验，�
 动态AVIF自动循环播放、Space暂停/恢复、逗号/句号前后逐帧、宽窗口帧进度条已接通；每帧透明度、时间基和容器变换保留。改进动画时间轴，避免累积重绘延迟。有4096帧及整段RGBA含首帧副本256MiB防护，缩略图仅解码首帧；HDR/ICC和按文件有限循环次数自动停止未实现。
 
 集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0`；主线101项Rust/13项安装契约/check/Debug通过，Release编译链接完成。默认Release EXE被用户旧进程占用，Cargo复制阶段返回101，原路径未更新；本轮新程序请运行 **`target/animated-avif/release/imageview.exe`**。备用Release实机双主题79张截图及16个直接COM缩略图输出通过，详见 `docs/formats/AVIF支持说明.md`。中文提交已本地保存，没有push、发布安装包或修改安装/系统关联。
+
+
+IV-REL-040 IN_PROGRESS：按用户授权打包发布v0.4.0，当前正式版本仍为v0.3.1；发布与公开下载验证完成后更新状态。

@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | READY | — | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
+| IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | IN_PROGRESS | ChatGPT-AgentDock | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
 | IV-FMT-02 | 动态AVIF完整播放 | DONE | ChatGPT-AgentDock | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
 | IV-FMT-01 | AVIF图片查看与缩略图支持 | DONE | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
 | IV-P1-N12 | 顶部文件名显示浏览根目录相对路径 | DONE | ChatGPT-AgentDock | 用户要求 / N11 DONE | `crates/iv-viewer/src/{directory.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 根目录文件名/子目录相对路径；原省略和完整悬停；无额外IO；单元测试、双构建及实机；中文提交本地合入 |
@@ -278,3 +278,8 @@ Base `e329c87ed35217dfd50ff4e9143c91b57dbd3ef1`；branch `codex/animated-avif`�
 IV-FMT-02 Review：Worker `955d61a77c33d9aeead4f639be3fe79879e70531`，101项Rust/13项安装契约/check/Debug通过，Release已链接且备用路径79张实机及16个COM输出通过。默认Release受用户旧进程占用，没有覆盖。范围核对通过，允许本地集成后复验，不发布或push。
 
 IV-FMT-02 DONE：集成 `54f06ebec0ad39efde59afd74de89099ae43d1f0`；101项Rust、13项安装契约、check/Debug通过；Release编译链接完成，默认EXE复制受用户进程占用，交付备用 `target/animated-avif/release/imageview.exe` 并完成79张主线实机和16个COM输出复验。完整帧/变量时长/透明通道/播放暂停逐帧/宽窗口进度条通过，缩略图保持首帧；只在本地中文提交，不push、不更新安装/关联，默认旧Release不变。NEXT恢复IV-P1-01。
+
+
+## IV-REL-040 发布合同
+
+Base `0b3cb3cc1ce8209715aa03a89d278e633262993b`；分支 `codex/release-v0.4.0`，工作树 `Temp/worktrees/release-v0.4.0`。用户本轮明确要求打包发布：允许将现有41个本地提交及本轮版本变更推送main，创建新v0.4.0标签与正式Latest Release，保留旧版标签及附件。不强推、不重写历史、不自动升级当前安装或改变实时文件关联，不关闭已有窗口。版本包含静态/动态AVIF、子目录及相对路径、透明画布/图片边界和WebP/PSD缩略图修复。补齐便携包原生许可和验证工具过期计数，正式发布使用独立目标目录静态CRT构建并核验PE导入，避免默认EXE占用与新增C++运行库依赖。验证只使用新建测试文件、隔离偏好、隔离HKCU测试命名空间；先草稿上传核验，再公开发布并下载比对hash。P1长期门禁不自动标通过。
