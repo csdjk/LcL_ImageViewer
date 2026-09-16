@@ -32,7 +32,7 @@ class InstallerAssociationTests(unittest.TestCase):
         cls.rows = registry_rows(cls.source)
 
     def test_all_values_have_an_explicit_registry_type(self):
-        self.assertEqual(len(self.rows), 71)
+        self.assertEqual(len(self.rows), 72)
         for row in self.rows:
             self.assertEqual(row.get('ValueType'), 'string', row)
 
@@ -61,6 +61,25 @@ class InstallerAssociationTests(unittest.TestCase):
             if row['Subkey'].endswith('\\OpenWithProgids') or row['Subkey'] == 'Software\\RegisteredApplications':
                 self.assertEqual(row.get('Flags'), 'uninsdeletevalue')
                 self.assertIn(row['ValueName'], ('{#MyProgId}', '{#MyAppName}'))
+
+    def test_thumbnail_slot_matches_windows_guid_not_just_source_text(self):
+        import uuid
+        expected = '{E357FCCD-A995-4576-B01F-234630154E96}'
+        rows = [r for r in self.rows if r.get('Tasks') == 'thumbs' and '\\shellex\\' in r['Subkey']]
+        self.assertEqual(len(rows), 9)
+        extensions = set()
+        for row in rows:
+            key = row['Subkey'].replace('{{', '{')
+            slot = key.rsplit('\\', 1)[-1]
+            self.assertEqual(slot, expected)
+            self.assertEqual(str(uuid.UUID(slot)), expected.strip('{}').lower())
+            extensions.add(key.split('\\')[2])
+        self.assertIn('.psd', extensions)
+        self.assertIn('.webp', extensions)
+        for script in ('register_thumbnail.ps1', 'unregister_thumbnail.ps1'):
+            source = (ROOT / 'tools' / script).read_text(encoding='utf-8')
+            listed = set(re.findall(r"'(\.[a-z]+)'", source))
+            self.assertEqual(extensions, listed)
 
     def test_no_default_app_or_userchoice_write(self):
         for row in self.rows:

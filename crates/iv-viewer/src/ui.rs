@@ -644,6 +644,7 @@ pub enum Icon {
     Next,
     Fit,
     Actual,
+    Bounds,
     Play,
     Pause,
     Grid,
@@ -712,6 +713,13 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
                     ],
                     st,
                 ));
+            }
+        }
+        Icon::Bounds => {
+            let b = rect.shrink(3.0 * u);
+            p.rect_stroke(b, 0.0, Stroke::new(1.0 * u, color));
+            for corner in [b.left_top(), b.right_top(), b.left_bottom(), b.right_bottom()] {
+                p.rect_filled(Rect::from_center_size(corner, Vec2::splat(3.2 * u)), 0.0, color);
             }
         }
         Icon::Actual => {
@@ -1521,5 +1529,51 @@ mod settings_popup_drag_tests {
         let popup = Rect::from_min_size(Pos2::new(400.0, 200.0), Vec2::new(392.0, 430.0));
         assert_eq!(clamp_settings_popup(popup, Rect::from_min_size(Pos2::ZERO, Vec2::new(880.0, 560.0))), Pos2::new(400.0, 122.0));
         assert_eq!(clamp_settings_popup(popup, Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, 240.0))), Pos2::new(8.0, 8.0));
+    }
+}
+
+/// Bounds stay in image coordinates until transformed; do not clamp to the canvas
+/// or an offscreen image would acquire false borders along the viewport edges.
+pub fn image_bounds_rect(origin: Pos2, offset: Vec2, scale: f32, size: Vec2) -> Option<Rect> {
+    if !scale.is_finite() || scale <= 0.0 || !size.is_finite() || size.min_elem() <= 0.0
+        || !offset.is_finite() || !origin.x.is_finite() || !origin.y.is_finite() {
+        return None;
+    }
+    let min = origin + offset;
+    let scaled = size * scale;
+    let max = min + scaled;
+    if !scaled.is_finite() || !max.x.is_finite() || !max.y.is_finite() { return None; }
+    Some(Rect::from_min_max(min, max))
+}
+
+pub fn paint_image_bounds(p: &egui::Painter, bounds: Rect, pal: &Palette) {
+    // A slim dual-tone contour remains visible over white, dark and transparent pixels.
+    // No fill, handles, hit targets or changes to the CPU pixels / sampling.
+    let color = if pal.is_dark { Color32::from_rgb(102, 209, 255) }
+        else { Color32::from_rgb(0, 116, 210) };
+    p.rect_stroke(bounds, 0.0, Stroke::new(3.0_f32, Color32::from_black_alpha(160)));
+    p.rect_stroke(bounds, 0.0, Stroke::new(1.25_f32, color));
+}
+
+#[cfg(test)]
+mod image_bounds_tests {
+    use super::*;
+    #[test]
+    fn full_image_bounds_follow_translation_scale_and_mip() {
+        let b = image_bounds_rect(Pos2::new(10.0, 20.0), Vec2::new(30.0, 40.0),
+            2.0, Vec2::new(256.0, 128.0)).unwrap();
+        assert_eq!(b.min, Pos2::new(40.0, 60.0));
+        assert_eq!(b.size(), Vec2::new(512.0, 256.0));
+        let mip = image_bounds_rect(Pos2::ZERO, Vec2::ZERO, 2.0, Vec2::new(128.0, 64.0)).unwrap();
+        assert_eq!(mip.size(), Vec2::new(256.0, 128.0));
+    }
+    #[test]
+    fn offscreen_and_invalid_bounds_are_not_clamped_to_viewport() {
+        let b = image_bounds_rect(Pos2::ZERO, Vec2::new(-400.0,-200.0),
+            1.0, Vec2::new(100.0,100.0)).unwrap();
+        assert_eq!(b.max, Pos2::new(-300.0,-100.0));
+        for scale in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            assert!(image_bounds_rect(Pos2::ZERO,Vec2::ZERO,scale,Vec2::splat(1.0)).is_none());
+        }
     }
 }

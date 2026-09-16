@@ -157,6 +157,8 @@ pub struct App {
     show_settings: bool,
     /// 半透明图像背景：true=棋盘格，false=纯画布背景色
     checkerboard: bool,
+    /// Show the full image rectangle, including transparent margins.
+    show_image_bounds: bool,
     /// "打开方式"注册状态缓存（打开设置窗口时刷新）
     assoc_registered: bool,
     /// 画布上一帧尺寸（检测 resize）
@@ -276,6 +278,7 @@ impl App {
             show_props: false,
             show_probe: false,
             show_settings: false,
+            show_image_bounds: cc.storage.and_then(|s| s.get_string("iv-image-bounds")).as_deref() == Some("on"),
             checkerboard: cc
                 .storage
                 .and_then(|s| s.get_string("iv-checkerboard"))
@@ -707,6 +710,9 @@ impl App {
         if key(Key::O) {
             self.channel = ChannelMode::RgbOpaque;
         }
+        if key(Key::B) {
+            self.show_image_bounds = !self.show_image_bounds;
+        }
         if key(Key::N) {
             self.nearest = !self.nearest;
         }
@@ -989,11 +995,11 @@ impl App {
                                 .unwrap_or_default();
                             let window_width = ctx.screen_rect().width();
                             let name_width = if window_width < 1000.0 {
-                                132.0
+                                96.0
                             } else if window_width < 1200.0 {
-                                180.0
+                                144.0
                             } else {
-                                240.0
+                                204.0
                             };
                             ui::filename_label(ui, raw, name_width, pal.text_bright)
                                 .on_hover_text(raw);
@@ -1106,6 +1112,13 @@ impl App {
                                 .clicked()
                             {
                                 self.pending_actual = true;
+                            }
+
+                            if ui::icon_btn(ui, Icon::Bounds, self.show_image_bounds, pal)
+                                .on_hover_text("显示图片边界 (B) — 包含透明区域的完整矩形")
+                                .clicked()
+                            {
+                                self.show_image_bounds = !self.show_image_bounds;
                             }
 
                             // —— 动画播放控件（多帧时显示）——
@@ -2014,6 +2027,7 @@ impl App {
 impl eframe::App for App {
     /// 退出时持久化主题与外观设置（eframe persistence）。
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("iv-image-bounds", if self.show_image_bounds { "on" } else { "off" }.into());
         storage.set_string(
             "iv-theme",
             match self.theme {
@@ -2508,7 +2522,7 @@ impl eframe::App for App {
                         exposure: self.exposure,
                         flags,
                         glass_count: glass_count as u32,
-                        _pad: 0.0,
+                        checker_cell: 8.0 * ppp,
                         canvas_top,
                         canvas_bottom,
                         backdrop_params: [
@@ -2528,6 +2542,12 @@ impl eframe::App for App {
                         canvas_rect,
                     );
                     canvas_painter.add(crate::render::new_paint_callback(canvas_rect));
+                    if self.show_image_bounds {
+                        if let Some(bounds) = ui::image_bounds_rect(canvas_rect.min, self.view.offset,
+                            self.view.scale, Vec2::new(mip.width as f32, mip.height as f32)) {
+                            ui::paint_image_bounds(&canvas_painter, bounds, &pal);
+                        }
+                    }
                     if self.perf_paint_pending {
                         crate::perf::mark("image_paint_queued", self.current.as_ref().map(|c| c.path.as_path()), 0.0);
                         self.perf_paint_pending = false;

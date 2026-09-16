@@ -202,6 +202,38 @@ pub fn decode_bytes(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     decode_with_format(bytes, fmt)
 }
 
+/// Thumbnail-only decoding: animated files contribute just the first composed frame.
+/// Full viewer decoding remains unchanged, preserving all frames and delays.
+pub fn decode_preview_bytes(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
+    use image::AnimationDecoder;
+    use std::io::Cursor;
+    let err = |e: image::ImageError| DecodeError::Decode(e.to_string());
+    match detect_format(bytes) {
+        ImageFormat::WebP => {
+            let decoder = image::codecs::webp::WebPDecoder::new(Cursor::new(bytes)).map_err(err)?;
+            if decoder.has_animation() { first_preview_frame(decoder.into_frames(), ImageKind::WebP) }
+            else { static_decoder(decoder, ImageKind::WebP) }
+        }
+        ImageFormat::Gif => {
+            let decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(err)?;
+            first_preview_frame(decoder.into_frames(), ImageKind::Gif)
+        }
+        ImageFormat::Png => {
+            let decoder = image::codecs::png::PngDecoder::new(Cursor::new(bytes)).map_err(err)?;
+            if decoder.is_apng().map_err(err)? {
+                first_preview_frame(decoder.apng().map_err(err)?.into_frames(), ImageKind::Png)
+            } else { static_decoder(decoder, ImageKind::Png) }
+        }
+        other => decode_with_format(bytes, other),
+    }
+}
+
+fn first_preview_frame(mut frames: image::Frames<'_>, kind: ImageKind) -> Result<DecodedImage, DecodeError> {
+    let frame = frames.next().ok_or_else(|| DecodeError::Decode("图像无有效预览帧".into()))?
+        .map_err(|e| DecodeError::Decode(e.to_string()))?;
+    Ok(static_image(image::DynamicImage::ImageRgba8(frame.into_buffer()), kind))
+}
+
 fn decode_with_format(bytes: &[u8], fmt: ImageFormat) -> Result<DecodedImage, DecodeError> {
     match fmt {
         ImageFormat::Dds => crate::dds::decode_dds(bytes),

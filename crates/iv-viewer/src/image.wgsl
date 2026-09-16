@@ -10,7 +10,7 @@ struct Uniforms {
     exposure: f32,          // HDR 曝光倍数
     flags: u32,             // bit0 nearest, bit1 棋盘格, bit2 HDR
     glass_count: u32,       // 玻璃区域数量（0..=6）
-    _pad: f32,
+    checker_cell: f32,     // checker size in physical pixels (8 logical points)
     canvas_top: vec4f,      // 回退画布顶部颜色（线性 RGBA）
     canvas_bottom: vec4f,   // 回退画布底部颜色（线性 RGBA）
     backdrop_params: vec4f, // 亮度、tint、深色标记、面板模糊物理半径
@@ -65,6 +65,16 @@ fn glass_alpha_at(px: vec2f) -> f32 {
 
 /// 画布背景：桌面快照（已由 CPU 降采样模糊）或主题渐变。
 fn canvas_at(screen_px: vec2f) -> vec3f {
+    // Draw the checker BEFORE testing image bounds, so it covers the full canvas.
+    if ((u.flags & 2u) != 0u) {
+        let cell = max(u.checker_cell, 1.0);
+        let parity = (floor(screen_px.x / cell) + floor(screen_px.y / cell)) % 2.0;
+        let light = parity == 0.0;
+        if (u.backdrop_params.z > 0.5) {
+            return select(vec3f(0.20), vec3f(0.25), light);
+        }
+        return select(vec3f(0.78), vec3f(0.92), light);
+    }
     if ((u.flags & 8u) != 0u) {
         let uv = clamp(screen_px / u.canvas_size, vec2f(0.0), vec2f(1.0));
         var c = textureSampleLevel(t_backdrop, s_linear, uv, 0.0).rgb;
@@ -116,15 +126,7 @@ fn scene_at(screen_px: vec2f, nearest: bool) -> vec3f {
         default: {}
     }
 
-    // RGB 模式下含 alpha：先与棋盘格或画布合成，模糊采样因此不会产生透明暗边。
-    if ((u.flags & 2u) != 0u && u.channel_mode == 0u && c.a < 1.0) {
-        let cell = 8.0; // 物理像素
-        let cx = floor(screen_px.x / cell);
-        let cy = floor(screen_px.y / cell);
-        let light = ((cx + cy) % 2.0) == 0.0;
-        let checker = select(vec3f(0.78), vec3f(0.92), light);
-        return mix(checker, c.rgb, c.a);
-    }
+    // Both transparent image pixels and the surrounding canvas share this background.
     return mix(bg, c.rgb, c.a);
 }
 

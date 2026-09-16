@@ -28,6 +28,9 @@ pub fn decode_psd(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         return Err(DecodeError::UnsupportedFormat("PSB（version 2）暂不支持".into()));
     }
     let channels = read_u16(bytes, 12)?;
+    if !(1..=56).contains(&channels) {
+        return Err(DecodeError::NotAnImage("PSD 通道数量无效".into()));
+    }
     let height = read_u32(bytes, 14)?;
     let width = read_u32(bytes, 18)?;
     let depth = read_u16(bytes, 22)?;
@@ -48,6 +51,10 @@ pub fn decode_psd(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
             )))
         }
     };
+
+    if (channels as usize) < n_color {
+        return Err(DecodeError::NotAnImage("PSD 颜色通道不完整".into()));
+    }
 
     // 跳过 Color Mode Data / Image Resources / Layer and Mask 三段
     let mut pos = 26usize;
@@ -86,13 +93,14 @@ pub fn decode_psd(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         }
         1 => {
             // RLE (PackBits)：先是每行每通道的 byte count 表，再是压缩数据
-            let total_counts = height as usize * n_read_channels;
+            // The table includes ALL channels, even extra masks we do not display.
+            let total_counts = height as usize * channels as usize;
             let counts: Vec<usize> = (0..total_counts)
                 .map(|i| read_u16(bytes, pos + i * 2).map(|v| v as usize))
                 .collect::<Result<_, _>>()?;
             pos += total_counts * 2;
             let plane_len = width as usize * (depth as usize / 8);
-            for (i, &cnt) in counts.iter().enumerate() {
+            for (i, &cnt) in counts.iter().take(height as usize * n_read_channels).enumerate() {
                 let src = bytes
                     .get(pos..pos + cnt)
                     .ok_or(DecodeError::Truncated)?;
