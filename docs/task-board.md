@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N11 | 子文件夹浏览与中文提交规范 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮明确要求 / N10 DONE | `AGENTS.md`, `crates/iv-viewer/src/{directory.rs,app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 固定根只向下/跳过重解析点；后台取消/进度/资源上限；左右键与按钮共用；删除保留范围；中文提交；测试/双构建/实机/main复验，不发布 |
+| IV-P1-N11 | 子文件夹浏览与中文提交规范 | REVIEW | ChatGPT-AgentDock | 用户本轮明确要求 / N10 DONE | `AGENTS.md`, `crates/iv-viewer/src/{directory.rs,app.rs,ui.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 固定根只向下/跳过重解析点；后台取消/进度/资源上限；左右键与按钮共用；删除保留范围；中文提交；测试/双构建/实机/main复验，不发布 |
 | IV-P1-N10 | WebP/PSD缩略图、全画布棋盘格与图片AABB | DONE | ChatGPT-AgentDock | 用户本轮要求 / 当前main | `crates/iv-viewer/src/**`, `crates/iv-shell/**`, `crates/iv-core/src/{decode.rs,psd_composite.rs}`, `crates/iv-core/tests/**`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 标准缩略图GUID/WebP注册与COM图像验证；透明画布连续；边界高亮随图变换；tests/check/双构建及实机；不改实时注册/安装/远端 |
 | IV-DOC-02 | 面向用户精简 README | DONE | ChatGPT-AgentDock | 用户本轮要求 / DOC-01已推送 | `README.md` | RGBA简述不写教程；仅功能/配图/下载/操作；无开发/性能/版本过程；文档检查和本地合入，不push |
 | IV-DOC-01 | README 当前功能与 RGBA 重点说明 | DONE | ChatGPT-AgentDock | 用户明确要求修改提交 / REL-031 DONE | `README.md` | 当前功能而非版本历史；通道/像素说明与代码一致；引用/Markdown/diff检查；本地提交合入，不push或发布 |
@@ -241,3 +241,6 @@ IV-P1-N10 DONE：集成 `9aea77d3596a8e3dc962573c03aa81f38c42ec87`；主线62+12
 ## IV-P1-N11 执行合同
 
 Base `0af9790e037da570f2faf3ad9c552fe3f116359a`；分支 `codex/subfolder-browse`，工作树 `Temp/worktrees/subfolder-browse`。新增包含子文件夹开关，默认每次运行关闭；开启/显式打开时固定当前图片父目录为搜索根，普通导航及删除不重设根，关闭后回到当前图片同目录。后台单线程扫描，不解码列表中全部图片；新请求覆盖旧请求且协作取消，进度限频。列表设路径数量/估算内存/目录条目/深度/时间保护，触发保护明确显示部分结果；符号链接、junction等重解析点不递归，规范化检查不逃逸根。保持原预读和192MiB缓存边界，不把缓存预算说成进程内存硬上限。顶栏提供开关、范围及进度/部分结果提示。修正删除后的同步目录重扫，使递归范围稳定。用户要求以后提交日志中文：写入AGENTS并从本次所有普通/合并/收尾提交开始执行，不改写历史。仅本地提交与构建，不push/发布/安装/注册。
+
+
+IV-P1-N11 Review：Worker `f2fd19ba54ac1dc828f55661127d07158b8e4cab`；69项Rust、5,004路径样本和各资源预算/取消测试，真实junction回环、四组明暗/两尺寸87状态及原有菜单25状态通过；子目录回收站删除hash与固定范围已确认。仅约定范围文件改变，提交日志中文，允许本地主线集成与重建，不发布。
