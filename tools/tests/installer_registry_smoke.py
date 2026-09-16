@@ -75,10 +75,10 @@ def run(args):
                 raise FileNotFoundError(path)
             payload[filename] = hashlib.sha256(path.read_bytes()).hexdigest()
     rows = registry_rows(fixed)
-    assert len(rows) == 72 and all(row['Root'] == 'HKCU' for row in rows)
+    assert len(rows) == 76 and all(row['Root'] == 'HKCU' for row in rows)
     actual_keys = sorted({expand(row['Subkey'], install) for row in rows})
     actual_keys += ['Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\' + ext + '\\UserChoice'
-                    for ext in ('.png', '.jpg', '.dds', '.tga')]
+                    for ext in ('.png', '.jpg', '.dds', '.tga', '.avif', '.webp', '.psd')]
     actual_keys += ['Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{B8F2C1A0-3E4D-4F5A-9B6C-7D8E9F0A1B2C}_is1']
     before = {key: tree(key) for key in actual_keys}
     fingerprint = hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
@@ -94,7 +94,7 @@ def run(args):
         registry = source.split('[Registry]', 1)[1].split('\n[', 1)[0]
         registry = registry.replace('Subkey: "', 'Subkey: "' + prefix + '\\')
         transformed = registry_rows('[Registry]\n' + registry)
-        assert len(transformed) == (72 if name == 'corrected' else 71)
+        assert len(transformed) == len(registry_rows(source))
         assert all(row['Root'] == 'HKCU' and row['Subkey'].startswith(prefix + '\\') for row in transformed)
         script = definitions + f'''
 [Setup]
@@ -155,7 +155,7 @@ Name: "thumbs"; Description: "Isolated thumbnail values"
             assert hashlib.sha256((install / filename).read_bytes()).hexdigest() == digest, filename
         # Independent Windows contract: previous tests mirrored the malformed source
         # and accepted a double closing brace. Never derive this expected slot from .iss.
-        for ext in ('.psd', '.webp'):
+        for ext in ('.psd', '.webp', '.avif'):
             key = prefix + '\\Software\\Classes\\' + ext + '\\shellex\\{E357FCCD-A995-4576-B01F-234630154E96}'
             assert read(key) == ('{7A3E9B21-4C5D-4E8F-9A6B-1D2C3E4F5A6B}', reg.REG_SZ)
         uninstaller = install / 'unins000.exe'
