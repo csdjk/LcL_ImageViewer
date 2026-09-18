@@ -943,7 +943,21 @@ impl App {
 
     /// 弹出打开文件对话框。
     fn open_dialog(&mut self) {
-        if let Some(p) = rfd::FileDialog::new()
+        // rfd 0.13's unparented Win32 dialog is not topmost. Its synchronous modal
+        // loop runs before queued viewport commands, so suspend the native level now.
+        self.background_menu_pos = None;
+        self.applied_topmost = None;
+        let _topmost_guard = if self.always_on_top {
+            match DialogTopmostGuard::suspend(self.hwnd) {
+                Ok(guard) => Some(guard),
+                Err(error) => { self.error_msg = Some(error); return; }
+            }
+        } else { None };
+        let mut dialog = rfd::FileDialog::new();
+        if let Some(folder) = self.current.as_ref().and_then(|c| c.path.parent()) {
+            dialog = dialog.set_directory(folder);
+        }
+        if let Some(p) = dialog
             .add_filter(
                 "所有支持的图像",
                 &[
@@ -3230,5 +3244,32 @@ mod animation_timing_tests {
             advance_animation(&frames(&[0, 0]), 0, start, start),
             Some((1, start + Duration::from_millis(1)))
         );
+    }
+}
+
+/// Only temporarily changes our own HWND. Drop restores pinning even on cancel/unwind.
+struct DialogTopmostGuard(isize);
+impl DialogTopmostGuard {
+    fn set(hwnd: isize, pinned: bool) -> Result<(), String> {
+        #[link(name = "user32")]
+        extern "system" {
+            fn SetWindowPos(hwnd: isize, after: isize, x: i32, y: i32,
+                width: i32, height: i32, flags: u32) -> i32;
+        }
+        // SAFETY: HWND belongs to this App; NOMOVE/NOSIZE/NOACTIVATE preserve geometry/focus.
+        let ok = unsafe { SetWindowPos(hwnd, if pinned { -1 } else { -2 }, 0, 0, 0, 0, 0x0013) };
+        if ok == 0 { Err(format!("切换窗口置顶失败：{}", std::io::Error::last_os_error())) }
+        else { Ok(()) }
+    }
+    fn suspend(hwnd: Option<isize>) -> Result<Self, String> {
+        let hwnd = hwnd.filter(|&h| h != 0).ok_or("窗口尚未准备好，请稍后再打开图片")?;
+        Self::set(hwnd, false)?;
+        Ok(Self(hwnd))
+    }
+}
+impl Drop for DialogTopmostGuard {
+    fn drop(&mut self) {
+        if let Err(error) = Self::set(self.0, true) { eprintln!("{error}"); }
+        // The next update also reapplies the requested level via egui.
     }
 }

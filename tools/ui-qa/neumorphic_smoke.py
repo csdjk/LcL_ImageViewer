@@ -407,6 +407,32 @@ def run(args):
                         u.keybd_event(virtual, 0, 2, 0)
                 if code == ord('T') and not action.get('modifiers'):
                     current_theme = 'dark' if current_theme == 'light' else 'light'
+            elif kind == 'open-dialog-cancel':
+                # Inspect only this new process's HWNDs; no dialog screenshot or file selection.
+                old_pin = bool(bind(u, 'GetWindowLongPtrW', [w.HWND, c.c_int], c.c_ssize_t)(hwnd, -20) & 8)
+                focus(hwnd)
+                u.keybd_event(0x11, 0, 0, 0)
+                try: key(hwnd, ord('O'))
+                finally: u.keybd_event(0x11, 0, 2, 0)
+                dialog = None
+                try:
+                    deadline = time.monotonic() + 12
+                    while time.monotonic() < deadline:
+                        found = [h for h in windows_for_pid(proc.pid) if h != hwnd]
+                        if len(found) == 1: dialog = found[0]; break
+                        time.sleep(0.1)
+                    assert dialog is not None, 'File dialog was not created'
+                    focus(dialog)
+                    assert u.GetForegroundWindow() == dialog
+                    assert not bool(u.GetWindowLongPtrW(hwnd, -20) & 8), 'Pinned viewer obscures its unowned dialog'
+                    key(dialog, 27)
+                    time.sleep(0.4)
+                    assert dialog not in windows_for_pid(proc.pid)
+                    focus(hwnd)
+                    assert bool(u.GetWindowLongPtrW(hwnd, -20) & 8) == old_pin
+                    summary['file_dialog_cancel_keeps_pin'] = True
+                finally:
+                    if dialog and dialog in windows_for_pid(proc.pid): u.PostMessageW(dialog, 0x0010, 0, 0)
             elif kind == 'assert-topmost':
                 get_style = bind(u, 'GetWindowLongPtrW', [w.HWND, c.c_int], c.c_ssize_t)
                 actual = bool(get_style(hwnd, -20) & 8)
