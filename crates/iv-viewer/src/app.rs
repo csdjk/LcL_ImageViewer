@@ -163,6 +163,13 @@ pub struct App {
     show_settings: bool,
     /// 半透明图像背景：true=棋盘格，false=纯画布背景色
     checkerboard: bool,
+    /// 画布纯色与界面主题分离；None 沿用主题/桌面磨砂。
+    background_color: Option<[u8; 3]>,
+    background_menu_pos: Option<Pos2>,
+    background_button_rect: egui::Rect,
+    background_custom_open: bool,
+    always_on_top: bool,
+    applied_topmost: Option<bool>,
     /// Show the full image rectangle, including transparent margins.
     show_image_bounds: bool,
     /// "打开方式"注册状态缓存（打开设置窗口时刷新）
@@ -291,6 +298,12 @@ impl App {
             show_probe: false,
             show_settings: false,
             show_image_bounds: cc.storage.and_then(|s| s.get_string("iv-image-bounds")).as_deref() == Some("on"),
+            background_color: ui::parse_background_color(cc.storage.and_then(|s| s.get_string("iv-background-color")).as_deref()),
+            background_menu_pos: None,
+            background_button_rect: egui::Rect::NOTHING,
+            background_custom_open: false,
+            always_on_top: cc.storage.and_then(|s| s.get_string("iv-always-on-top")).as_deref() == Some("on"),
+            applied_topmost: None,
             checkerboard: cc
                 .storage
                 .and_then(|s| s.get_string("iv-checkerboard"))
@@ -358,6 +371,7 @@ impl App {
         let path = std::path::absolute(&path).unwrap_or(path);
         crate::perf::mark("load_request", Some(&path), 0.0);
         self.error_msg = None;
+        self.background_menu_pos = None;
         self.mip_index = 0;
         self.auto_fit = true;
         let cached = self.cache.get(&path);
@@ -664,6 +678,12 @@ impl App {
             }
             return; // dialog owns all keys, including held Delete and navigation
         }
+        // 背景菜单优先关闭，不让 Esc 穿透为退出。
+        if self.background_menu_pos.is_some() && ctx.input(|i| i.key_pressed(Key::Escape)) {
+            self.background_menu_pos = None;
+            self.last_move = Instant::now();
+            return;
+        }
         // Esc 逐层关闭：右键菜单 → 下拉弹窗 → 属性/设置窗口 → 退出程序
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             if self.right_window_drag.take().is_some() {
@@ -713,7 +733,7 @@ impl App {
         }
 
         let blocked = self.show_settings || self.show_props || self.show_probe
-            || self.ctx_menu_pos.is_some() || ctx.memory(|m| m.any_popup_open());
+            || self.ctx_menu_pos.is_some() || self.background_menu_pos.is_some() || ctx.memory(|m| m.any_popup_open());
         if !viewer_shortcuts_allowed(ctx.wants_keyboard_input(), blocked) {
             return;
         }
@@ -952,6 +972,80 @@ impl App {
         }
     }
 
+    fn apply_topmost(&mut self, ctx: &egui::Context) {
+        if self.applied_topmost != Some(self.always_on_top) {
+            ctx.send_viewport_cmd(ViewportCommand::WindowLevel(ui::window_level(self.always_on_top)));
+            self.applied_topmost = Some(self.always_on_top);
+        }
+    }
+
+    fn use_desktop_background(&self) -> bool {
+        self.backdrop && self.background_color.is_none()
+    }
+
+    fn draw_background_menu(&mut self, ctx: &egui::Context, pal: &Palette) {
+        let Some(pos) = self.background_menu_pos else { return };
+        if self.show_settings || self.delete_active() {
+            self.background_menu_pos = None;
+            return;
+        }
+        let screen = ctx.screen_rect().shrink(8.0);
+        let pos = Pos2::new(pos.x.clamp(screen.left(), (screen.right() - 256.0).max(screen.left())), pos.y);
+        let mut close = false;
+        let shown = egui::Area::new(egui::Id::new("iv-background-menu"))
+            .order(egui::Order::Foreground).fixed_pos(pos).movable(false).constrain_to(screen)
+            .show(ctx, |ui| {
+                ui::menu_frame(pal).show(ui, |ui| {
+                    ui.set_width(228.0);
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    ui.label(RichText::new("画布背景").strong().color(pal.text));
+                    let choices = [
+                        ("棋盘格", true, None),
+                        ("跟随主题", false, None),
+                        ("白色", false, Some([255, 255, 255])),
+                        ("灰色", false, Some([128, 128, 128])),
+                        ("黑色", false, Some([0, 0, 0])),
+                    ];
+                    for (label, checker, color) in choices {
+                        let selected = self.checkerboard == checker && self.background_color == color;
+                        let response = ui.add_sized([228.0, 30.0], egui::SelectableLabel::new(selected, label));
+                        if let Some(rgb) = color {
+                            let rect = egui::Rect::from_center_size(response.rect.right_center() - Vec2::new(18.0, 0.0), Vec2::splat(16.0));
+                            ui.painter().rect_filled(rect, 3.0, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                            ui.painter().rect_stroke(rect, 3.0, Stroke::new(1.0_f32, pal.dim));
+                        }
+                        if response.clicked() {
+                            self.checkerboard = checker;
+                            self.background_color = color;
+                            close = true;
+                        }
+                    }
+                    if ui.add_sized([228.0, 30.0], egui::SelectableLabel::new(self.background_custom_open, "自定义颜色…")).clicked() {
+                        self.background_custom_open = !self.background_custom_open;
+                    }
+                    if self.background_custom_open {
+                        let mut rgb = self.background_color.unwrap_or([128, 128, 128]);
+                        let mut changed = false;
+                        for (index, label) in ["R", "G", "B"].into_iter().enumerate() {
+                            changed |= ui.add(egui::Slider::new(&mut rgb[index], 0..=255).text(label)).changed();
+                        }
+                        ui.label(format!("#{:02X}{:02X}{:02X}", rgb[0], rgb[1], rgb[2]));
+                        if changed { self.background_color = Some(rgb); self.checkerboard = false; }
+                        if ui.add_sized([228.0, 28.0], egui::Button::new("应用并关闭")).clicked() {
+                            self.background_color = Some(rgb);
+                            self.checkerboard = false;
+                            close = true;
+                        }
+                    }
+                    ui.label(RichText::new("仅改变画布，不修改图片").size(11.5).color(pal.dim));
+                });
+            });
+        let outside = ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p|
+            !shown.response.rect.contains(p) && !self.background_button_rect.contains(p)));
+        if close || outside { self.background_menu_pos = None; }
+        self.last_move = Instant::now();
+    }
+
     /// 切换深/浅主题（立即生效，退出时经 eframe persistence 持久化）。
     fn toggle_theme(&mut self, ctx: &egui::Context) {
         self.theme = ThemeMode::toggle(ctx);
@@ -967,6 +1061,8 @@ impl App {
         }) {
             self.last_move = Instant::now();
         }
+        // 菜单展开时保持入口可见，关闭后再开始一秒计时。
+        if self.background_menu_pos.is_some() { self.last_move = Instant::now(); }
         let has_image = self.current.is_some();
         let idle = self.last_move.elapsed();
         let recent = idle < OVERLAY_HIDE_DELAY;
@@ -1063,7 +1159,7 @@ impl App {
                             // 固定槽宽：计数、扫描状态和“部分”提示不让左侧开关来回移动。
                             let galley = ui.fonts(|f| f.layout_no_wrap(text,
                                 egui::FontId::new(11.0, egui::FontFamily::Monospace), pal.dim));
-                            let (slot, response) = ui.allocate_exact_size(Vec2::new(108.0, 32.0), Sense::hover());
+                            let (slot, response) = ui.allocate_exact_size(Vec2::new(88.0, 32.0), Sense::hover());
                             ui.painter().galley(slot.center() - galley.size() / 2.0, galley, pal.dim);
                             response.on_hover_text(self.browse_description());
                         }
@@ -1080,13 +1176,7 @@ impl App {
                                 .map(|m| fmt_size(m.len()))
                                 .unwrap_or_default();
                             let window_width = ctx.screen_rect().width();
-                            let name_width = if window_width < 1000.0 {
-                                72.0
-                            } else if window_width < 1200.0 {
-                                116.0
-                            } else {
-                                168.0
-                            };
+                            let name_width = ui::topbar_name_width(window_width);
                             ui::filename_label(ui, raw.as_ref(), name_width, pal.text_bright)
                                 .on_hover_ui(|ui| {
                                     ui.label(raw.as_ref());
@@ -1107,7 +1197,7 @@ impl App {
                         if self.current.is_some() {
                             // —— 通道 ——
                             ui::sep(ui, pal);
-                            let compact = ctx.screen_rect().width() < 1000.0;
+                            let compact = ctx.screen_rect().width() < 1120.0;
                             let channels = [
                                 (
                                     ChannelMode::Rgb,
@@ -1289,8 +1379,23 @@ impl App {
                             }
                         }
 
-                        // —— 主题切换 + 设置 ——
+                        // —— 背景入口：无图、窄窗口也始终提供 ——
                         ui::sep(ui, pal);
+                        let background = ui::icon_btn(ui, Icon::Background, self.background_menu_pos.is_some(), pal)
+                            .on_hover_text("背景颜色 · 棋盘格 / 主题 / 纯色");
+                        self.background_button_rect = background.rect;
+                        if background.clicked() {
+                            if self.background_menu_pos.is_some() {
+                                self.background_menu_pos = None;
+                            } else {
+                                self.background_menu_pos = Some(background.rect.left_bottom() + Vec2::new(0.0, 8.0));
+                                self.background_custom_open = false;
+                                self.ctx_menu_pos = None;
+                                ctx.memory_mut(|m| m.close_popup());
+                            }
+                            self.last_move = Instant::now();
+                        }
+                        // —— 主题切换 + 设置 ——
                         if ctx.screen_rect().width() >= 1000.0 {
                             let (icon, tip) = match self.theme {
                                 ThemeMode::Dark => (Icon::Sun, "切换到浅色主题 (T)"),
@@ -1307,12 +1412,20 @@ impl App {
                             .on_hover_text("设置")
                             .clicked()
                         {
+                            self.background_menu_pos = None;
                             self.show_settings = true;
                             self.assoc_registered = winassoc::is_registered();
                         }
 
-                        // —— 窗口控制（无边框自绘）：最小化 / 最大化·还原 / 关闭 ——
+                        // —— 窗口控制：置顶 / 最小化 / 最大化·还原 / 关闭 ——
                         ui::sep(ui, pal);
+                        if ui::icon_btn(ui, Icon::Pin, self.always_on_top, pal)
+                            .on_hover_text(if self.always_on_top { "取消置顶" } else { "窗口置顶 · 保持在其他普通窗口上方" })
+                            .clicked()
+                        {
+                            self.always_on_top = !self.always_on_top;
+                            self.apply_topmost(ctx);
+                        }
                         if ui::icon_btn(ui, Icon::Min, false, pal)
                             .on_hover_text("最小化")
                             .clicked()
@@ -2030,14 +2143,6 @@ impl App {
                                 self.theme = ThemeMode::Light;
                             }
                         });
-                        ui::setting_row(ui, pal, "透明背景", "透明图片区域使用棋盘格或画布色", |ui| {
-                            if ui::segment_button(ui, "纯色", !self.checkerboard, pal).clicked() {
-                                self.checkerboard = false;
-                            }
-                            if ui::segment_button(ui, "棋盘格", self.checkerboard, pal).clicked() {
-                                self.checkerboard = true;
-                            }
-                        });
                         ui::setting_row(ui, pal, "减少动效", "关闭工具栏淡入淡出动画", |ui| {
                             ui::toggle(ui, &mut self.reduce_motion, pal);
                         });
@@ -2116,6 +2221,8 @@ impl App {
 impl eframe::App for App {
     /// 退出时持久化主题与外观设置（eframe persistence）。
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("iv-always-on-top", if self.always_on_top { "on" } else { "off" }.into());
+        storage.set_string("iv-background-color", ui::background_color_key(self.background_color));
         storage.set_string("iv-image-bounds", if self.show_image_bounds { "on" } else { "off" }.into());
         storage.set_string(
             "iv-theme",
@@ -2146,6 +2253,7 @@ impl eframe::App for App {
         self.handle_loader_messages();
         self.poll_directory();
         self.update_window_title(ctx);
+        self.apply_topmost(ctx);
         let pal = ui::palette(ctx);
 
         // 首帧：获取本进程窗口句柄（伪磨砂的截图排除/抓图都基于它）
@@ -2170,7 +2278,7 @@ impl eframe::App for App {
                 Ok(result) => {
                     self.backdrop_job_running = false;
                     capture_completed = true;
-                    if self.backdrop {
+                    if self.use_desktop_background() {
                         match result {
                             Ok(cap) => {
                                 if let Some(renderer) = &mut self.renderer {
@@ -2200,7 +2308,7 @@ impl eframe::App for App {
             }
         }
 
-        if self.backdrop && !self.exclude_unsupported {
+        if self.use_desktop_background() && !self.exclude_unsupported {
             if let Some(hwnd) = self.hwnd {
                 let outer = ctx.input(|i| i.viewport().outer_rect);
                 let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
@@ -2324,7 +2432,7 @@ impl eframe::App for App {
         // 全窗口画布（图像铺满，UI 以悬浮层叠加其上）。
         // 磨砂开启且有背景快照：画模糊快照 + 主题 tint；
         // 否则（关闭/老系统/首张快照未到）回退不透明对角渐变。
-        let backdrop_tex_id = if self.backdrop {
+        let backdrop_tex_id = if self.use_desktop_background() {
             self.backdrop_tex.as_ref().map(|t| t.id())
         } else {
             None
@@ -2366,6 +2474,8 @@ impl eframe::App for App {
                         Color32::from_white_alpha(a)
                     };
                     ui.painter().rect_filled(rect, 0.0, tint);
+                } else if let Some(rgb) = self.background_color {
+                    ui.painter().rect_filled(rect, 0.0, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
                 } else {
                     // 玻璃拟态底衬：画布对角渐变（回退路径）
                     ui::paint_canvas_bg(ui.painter(), rect, &pal);
@@ -2484,6 +2594,7 @@ impl eframe::App for App {
         if !self.delete_active() {
             self.draw_side_navigation(ctx, &pal);
             self.draw_top_overlay(ctx, &pal);
+            self.draw_background_menu(ctx, &pal);
             self.draw_context_tools_overlay(ctx, &pal);
             self.draw_error_overlay(ctx, &pal);
             self.draw_bottom_overlay(ctx, &pal);
@@ -2578,14 +2689,14 @@ impl eframe::App for App {
                         .map(|c| c.img.has_alpha)
                         .unwrap_or(false);
                     // 半透明背景：棋盘格或纯画布背景色（ALPHA_BLENDING 透出底色）
-                    if has_alpha && self.checkerboard {
+                    if has_alpha && self.checkerboard && self.background_color.is_none() {
                         flags |= 2;
                     }
                     let is_hdr = self.current.as_ref().map(|c| c.img.is_hdr).unwrap_or(false);
                     if is_hdr {
                         flags |= 4;
                     }
-                    if self.backdrop && self.backdrop_tex.is_some() {
+                    if self.use_desktop_background() && self.backdrop_tex.is_some() {
                         flags |= 8;
                     }
                     // 玻璃区域（逻辑坐标 → 画布内物理像素）
@@ -2603,9 +2714,15 @@ impl eframe::App for App {
                         glass_alpha[i / 4][i % 4] = *a;
                         glass_corner[i / 4][i % 4] = corner * ppp;
                     }
-                    let (canvas_top, canvas_bottom) = ui::canvas_gradient(&pal);
-                    let canvas_top = egui::Rgba::from(canvas_top).to_array();
-                    let canvas_bottom = egui::Rgba::from(canvas_bottom).to_array();
+                    let (canvas_top, canvas_bottom) = if let Some(rgb) = self.background_color {
+                        // The image shader writes gamma-encoded values to an UNORM target.
+                        // Do not linearize a user-selected color a second time.
+                        let color = ui::background_uniform(rgb);
+                        (color, color)
+                    } else {
+                        let (top, bottom) = ui::canvas_gradient(&pal);
+                        (egui::Rgba::from(top).to_array(), egui::Rgba::from(bottom).to_array())
+                    };
                     let uniforms = Uniforms {
                         canvas_size: [csize.x, csize.y],
                         image_size: [mip.width as f32, mip.height as f32],

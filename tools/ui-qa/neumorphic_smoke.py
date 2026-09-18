@@ -276,6 +276,11 @@ def run(args):
     try:
         # RON maps accept the same simple string key/value syntax as this JSON subset.
         prefs = {'iv-theme': args.theme, 'iv-backdrop': 'off', 'iv-checkerboard': 'on', 'iv-reduce-motion': 'off'}
+        seed = getattr(args, 'seed_preferences', {})
+        allowed = {'iv-always-on-top', 'iv-background-color', 'iv-checkerboard', 'iv-backdrop', 'iv-theme'}
+        if not set(seed) <= allowed or not all(isinstance(v, str) for v in seed.values()):
+            raise ValueError('Only explicit appearance preference values can be seeded')
+        prefs.update(seed)
         storage.write_text(json.dumps(prefs), encoding='utf-8')
         with (out / 'runtime.log').open('wb') as log:
             proc = subprocess.Popen([str(binary)] + ([str(args.input.resolve())] if args.input else []),
@@ -309,6 +314,8 @@ def run(args):
             bind(u, 'GetWindowTextW', [w.HWND, w.LPWSTR, c.c_int], c.c_int)(hwnd, title, len(title))
             filename = out / f'{name}.png'
             meta = capture(hwnd, filename)
+            get_style = bind(u, 'GetWindowLongPtrW', [w.HWND, c.c_int], c.c_ssize_t)
+            meta['window_topmost'] = bool(get_style(hwnd, -20) & 8)
             if meta['logical_client'] != [args.width, args.height]:
                 raise RuntimeError(f'Client size mismatch: {meta}')
             meta.update({key: value for key, value in summary.items() if key != 'captures'})
@@ -400,6 +407,45 @@ def run(args):
                         u.keybd_event(virtual, 0, 2, 0)
                 if code == ord('T') and not action.get('modifiers'):
                     current_theme = 'dark' if current_theme == 'light' else 'light'
+            elif kind == 'assert-topmost':
+                get_style = bind(u, 'GetWindowLongPtrW', [w.HWND, c.c_int], c.c_ssize_t)
+                actual = bool(get_style(hwnd, -20) & 8)
+                assert actual == action['value'], ('WS_EX_TOPMOST', actual, action['value'])
+            elif kind == 'minimize-restore':
+                show = bind(u, 'ShowWindow', [w.HWND, c.c_int], w.BOOL)
+                iconic = bind(u, 'IsIconic', [w.HWND], w.BOOL)
+                show(hwnd, 6); time.sleep(0.25)
+                assert iconic(hwnd), 'test window was not minimized'
+                show(hwnd, 9); time.sleep(0.35); focus(hwnd)
+                assert not iconic(hwnd), 'test window was not restored'
+            elif kind == 'resize-client':
+                wr, cr, _, dpi = geometry(hwnd)
+                args.width, args.height = int(action['width']), int(action['height'])
+                dw, dh = wr.right-wr.left-cr.right, wr.bottom-wr.top-cr.bottom
+                checked(u.SetWindowPos(hwnd, None, wr.left, wr.top,
+                    round(args.width*dpi/96)+dw, round(args.height*dpi/96)+dh,
+                    0x0004 | 0x0010), 'Resize without changing Z order')
+                time.sleep(0.4)
+            elif kind == 'assert-z-order':
+                # An inert peer owned by this QA process, not an existing user application.
+                create = bind(u, 'CreateWindowExW', [w.DWORD,w.LPCWSTR,w.LPCWSTR,w.DWORD,
+                    c.c_int,c.c_int,c.c_int,c.c_int,w.HWND,w.HMENU,w.HINSTANCE,PTR], w.HWND)
+                destroy = bind(u, 'DestroyWindow', [w.HWND], w.BOOL)
+                peer = create(0, 'STATIC', 'LcL isolated Z-order QA', 0x90000000,
+                    80, 140, 180, 120, None, None, None, None)
+                checked(peer, 'Create isolated peer')
+                try:
+                    focus(peer); time.sleep(0.2)
+                    order = []
+                    @ENUM
+                    def collect(h, _):
+                        if h in (hwnd, peer): order.append(h)
+                        return True
+                    checked(u.EnumWindows(collect, 0), 'Inspect test-window stacking')
+                    assert len(order) == 2
+                    assert (order.index(hwnd) < order.index(peer)) == action['value'], ('Z-order', order)
+                finally:
+                    destroy(peer); focus(hwnd)
             elif kind == 'wait':
                 time.sleep(float(action['seconds']))
             elif kind == 'shot':
