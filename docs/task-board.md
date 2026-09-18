@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N13 | 顶部置顶与背景颜色菜单 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮要求 / REL-040 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,background.rs,main.rs}`, `crates/iv-viewer/Cargo.toml`, `Cargo.lock`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 真正窗口置顶可切换；背景/棋盘格顶部入口及偏好兼容；窄宽布局、原图像素、动画与菜单回归；测试/构建/实机后中文本地合入，不发布 |
+| IV-P1-N13 | 顶部置顶与背景颜色菜单 | REVIEW | ChatGPT-AgentDock | 用户本轮要求 / REL-040 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,background.rs,main.rs}`, `crates/iv-viewer/Cargo.toml`, `Cargo.lock`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 真正窗口置顶可切换；背景/棋盘格顶部入口及偏好兼容；窄宽布局、原图像素、动画与菜单回归；测试/构建/实机后中文本地合入，不发布 |
 | IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | DONE | ChatGPT-AgentDock | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
 | IV-FMT-02 | 动态AVIF完整播放 | DONE | ChatGPT-AgentDock | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
 | IV-FMT-01 | AVIF图片查看与缩略图支持 | DONE | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
@@ -289,3 +289,6 @@ IV-REL-040 分支审查：Worker `42d69b8acb1c5e30cee0ae3db5ee7442abf20305`；10
 
 
 IV-REL-040 DONE：v0.4.0于2026-09-16T14:18:52Z正式发布并设Latest，ID 389994098，源码标签 `1649569a903e3620b60f3699ea0f89c176900014`；main及新标签已推送，三附件公开下载SHA256一致。101项Rust/18项契约/check/静态CRT构建、146张合格实机截图、28个COM输出和76值隔离注册及载荷安装卸载通过。当前安装和实时关联保持，不强推或覆盖旧附件；详见v0.4.0-validation.md，NEXT恢复IV-P1-01。
+
+
+IV-P1-N13 Review：顶部置顶/背景、偏好与窗口对话框适配已提交；105项Rust/18项配置检查通过，主体Release四组88状态及修复后Debug70状态通过。保留原生父窗口及Esc取消回归；只合入本地主线，重新构建实机复验，不发布或安装。
