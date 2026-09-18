@@ -653,6 +653,8 @@ pub enum Icon {
     Moon,
     Close,
     Settings,
+    Pin,
+    Background,
     /// 窗口最小化（无边框自绘标题栏）
     Min,
     /// 窗口最大化
@@ -667,6 +669,17 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
     let u = rect.width().min(rect.height()) / 16.0; // 以 16px 为设计基准
     let st = Stroke::new(1.5 * u, color);
     match icon {
+        Icon::Pin => {
+            let point = |x, y| c + Vec2::new(x, y) * u;
+            p.add(egui::Shape::closed_line(vec![point(-4.0,-6.0), point(4.0,-6.0), point(2.8,-3.0), point(2.8,0.0), point(5.0,2.5), point(-5.0,2.5), point(-2.8,0.0), point(-2.8,-3.0)], st));
+            p.line_segment([point(0.0,2.5), point(0.0,7.0)], st);
+        }
+        Icon::Background => {
+            let box_rect = rect.shrink(2.0 * u);
+            p.rect_stroke(box_rect, 2.0 * u, st);
+            p.line_segment([box_rect.left_bottom(), box_rect.right_top()], st);
+            p.add(egui::Shape::convex_polygon(vec![box_rect.left_top()+Vec2::splat(1.5*u), box_rect.right_top()+Vec2::new(-1.5,1.5)*u, box_rect.left_bottom()+Vec2::new(1.5,-1.5)*u], color, Stroke::NONE));
+        }
         Icon::Open => {
             // 文件夹：闭合轮廓 + 标签页凸起
             let l = c.x - 7.0 * u;
@@ -1585,5 +1598,57 @@ mod image_bounds_tests {
         for scale in [0.0, -1.0, f32::NAN, f32::INFINITY] {
             assert!(image_bounds_rect(Pos2::ZERO,Vec2::ZERO,scale,Vec2::splat(1.0)).is_none());
         }
+    }
+}
+
+/// Persist only an RGB value; malformed/legacy values fall back to the existing theme.
+pub fn parse_background_color(value: Option<&str>) -> Option<[u8; 3]> {
+    let text = value?.strip_prefix('#')?;
+    if text.len() != 6 || !text.is_ascii() { return None; }
+    Some([u8::from_str_radix(&text[0..2], 16).ok()?, u8::from_str_radix(&text[2..4], 16).ok()?, u8::from_str_radix(&text[4..6], 16).ok()?])
+}
+pub fn background_color_key(value: Option<[u8; 3]>) -> String {
+    match value { Some([r,g,b]) => format!("#{r:02X}{g:02X}{b:02X}"), None => "theme".into() }
+}
+pub fn background_uniform([r,g,b]: [u8; 3]) -> [f32; 4] {
+    [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0]
+}
+pub fn window_level(pinned: bool) -> egui::WindowLevel {
+    if pinned { egui::WindowLevel::AlwaysOnTop } else { egui::WindowLevel::Normal }
+}
+pub fn topbar_name_width(width: f32) -> f32 {
+    if width < 1000.0 { 72.0 } else if width < 1200.0 { 96.0 }
+    else { (96.0 + (width - 1200.0) * 0.6).clamp(96.0, 144.0) }
+}
+#[cfg(test)]
+mod topbar_background_tests {
+    use super::*;
+    #[test]
+    fn background_color_round_trips_and_preserves_old_preferences() {
+        for value in [None, Some([0,0,0]), Some([255,255,255]), Some([23,127,214])] {
+            assert_eq!(parse_background_color(Some(&background_color_key(value))), value);
+        }
+        assert_eq!(parse_background_color(Some("#aAbBcC")), Some([170,187,204]));
+        for value in [None, Some(""), Some("off"), Some("#123"), Some("#GGGGGG"), Some("#12345678"), Some("#中文色")] {
+            assert_eq!(parse_background_color(value), None);
+        }
+    }
+    #[test]
+    fn selected_gray_stays_gamma_encoded_and_opaque() {
+        assert_eq!(background_uniform([0,0,0]), [0.0,0.0,0.0,1.0]);
+        assert_eq!(background_uniform([255,255,255]), [1.0;4]);
+        assert!((background_uniform([128,128,128])[0] - 0.5019608).abs() < 0.00001);
+    }
+    #[test]
+    fn pin_maps_to_native_topmost_and_normal_levels() {
+        assert_eq!(window_level(true), egui::WindowLevel::AlwaysOnTop);
+        assert_eq!(window_level(false), egui::WindowLevel::Normal);
+    }
+    #[test]
+    fn name_slot_leaves_room_at_toolbar_breakpoints() {
+        for width in [880.0,1000.0,1119.0,1120.0,1199.0,1200.0,1280.0,1920.0] {
+            assert!((72.0..=144.0).contains(&topbar_name_width(width)));
+        }
+        assert_eq!(topbar_name_width(1200.0),96.0);
     }
 }

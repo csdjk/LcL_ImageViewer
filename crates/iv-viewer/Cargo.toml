@@ -30,3 +30,6 @@ winreg = "0.52"
 # Native, recycle-only deletion. Versions already present in the dependency cache.
 windows = { version = "0.58", features = ["implement", "Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
 windows-core = "0.58"
+
+# Reuse the already-locked 0.5 handle type required by rfd for native dialog ownership.
+raw-window-handle = "0.5"
