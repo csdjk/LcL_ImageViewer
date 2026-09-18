@@ -3,7 +3,11 @@
 > 更新时间：2026-09-16。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N13 -->
+
+## 当前开发：顶部置顶与背景入口
+
+IV-P1-N13 IN_PROGRESS，Owner ChatGPT-AgentDock；Base `4753bb9`；branch `codex/topbar-pin-background`，worktree `Temp/worktrees/topbar-pin-background`。置顶默认关闭并记住选择；背景菜单提供棋盘格、主题底色、黑/白/灰及自定义色，背景与界面主题分离，旧偏好兼容。保持原图、动画及桌面磨砂选项；显式纯色时暂不使用磨砂。相关工作树已检查且无未提交改动。本次只本地提交与运行验证，不发布、打包、更新安装或修改系统关联。
 
 ## 最新正式版本
 
