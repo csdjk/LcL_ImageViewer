@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N13 | 顶部置顶与背景颜色菜单 | REVIEW | ChatGPT-AgentDock | 用户本轮要求 / REL-040 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,background.rs,main.rs}`, `crates/iv-viewer/Cargo.toml`, `Cargo.lock`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 真正窗口置顶可切换；背景/棋盘格顶部入口及偏好兼容；窄宽布局、原图像素、动画与菜单回归；测试/构建/实机后中文本地合入，不发布 |
+| IV-P1-N13 | 顶部置顶与背景颜色菜单 | DONE | ChatGPT-AgentDock | 用户本轮要求 / REL-040 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,background.rs,main.rs}`, `crates/iv-viewer/Cargo.toml`, `Cargo.lock`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 真正窗口置顶可切换；背景/棋盘格顶部入口及偏好兼容；窄宽布局、原图像素、动画与菜单回归；测试/构建/实机后中文本地合入，不发布 |
 | IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | DONE | ChatGPT-AgentDock | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
 | IV-FMT-02 | 动态AVIF完整播放 | DONE | ChatGPT-AgentDock | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
 | IV-FMT-01 | AVIF图片查看与缩略图支持 | DONE | ChatGPT-AgentDock | 用户明确要求 / 当前main | `crates/iv-core/**`, `crates/iv-viewer/src/{app.rs,directory.rs,winassoc.rs}`, `crates/iv-shell/**`, `Cargo.lock`, `tools/{setup.iss,register_thumbnail.ps1,unregister_thumbnail.ps1}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 内容识别、静态/透明AVIF、打开/切图/预览；有界解码及坏文件测试；测试/双构建/实机；中文提交本地合入，不发布/安装/改关联 |
@@ -292,3 +292,6 @@ IV-REL-040 DONE：v0.4.0于2026-09-16T14:18:52Z正式发布并设Latest，ID 389
 
 
 IV-P1-N13 Review：顶部置顶/背景、偏好与窗口对话框适配已提交；105项Rust/18项配置检查通过，主体Release四组88状态及修复后Debug70状态通过。保留原生父窗口及Esc取消回归；只合入本地主线，重新构建实机复验，不发布或安装。
+
+
+IV-P1-N13 DONE：集成 `9fc85ba48c264ae7ccb24bc96117a0666816c5b5`；105项Rust/18项配置/check/双构建及当前Release92张实机截图通过。置顶/原生文件对话框/取消Esc、背景预设与RGB、偏好兼容、可见窄宽布局及AVIF回归完成。当前入口 `target/topbar-controls/x86_64-pc-windows-msvc/release/imageview.exe`，仅本地中文提交，不推送/打包/安装。NEXT恢复IV-P1-01。

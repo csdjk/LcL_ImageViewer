@@ -1,13 +1,17 @@
 # LcL ImageViewer — 当前状态
 
-> 更新时间：2026-09-16。以Git、当前构建与GitHub实际回读为准。
+> 更新时间：2026-09-18。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-N13 -->
+<!-- project-next: IV-P1-01 -->
 
-## 当前开发：顶部置顶与背景入口
+## 本地新增：顶部置顶与背景颜色（未发布）
 
-IV-P1-N13 IN_PROGRESS，Owner ChatGPT-AgentDock；Base `4753bb9`；branch `codex/topbar-pin-background`，worktree `Temp/worktrees/topbar-pin-background`。置顶默认关闭并记住选择；背景菜单提供棋盘格、主题底色、黑/白/灰及自定义色，背景与界面主题分离，旧偏好兼容。保持原图、动画及桌面磨砂选项；显式纯色时暂不使用磨砂。相关工作树已检查且无未提交改动。本次只本地提交与运行验证，不发布、打包、更新安装或修改系统关联。
+IV-P1-N13 DONE：图钉开关及背景菜单已完成。支持棋盘格/跟随主题/黑白灰/自定义RGB；置顶及背景选择保存，原设置入口已移至顶部。原生文件对话框归属于查看器，取消时Esc不再穿透退出。
+
+集成 `9fc85ba48c264ae7ccb24bc96117a0666816c5b5`；105项Rust、18项配置检查、check/Debug/Release及当前Release92张实机截图通过，覆盖两主题/两尺寸、7档可见布局、原生置顶、保存恢复、颜色/通道及AVIF动画。验收见 `docs/ui-qa/顶部置顶与背景菜单验收.md`。
+
+最新本地程序：`target/topbar-controls/x86_64-pc-windows-msvc/release/imageview.exe`。本轮未推送、打包或更新用户安装，下面的v0.4.0公开发布包仍不包含本轮增量。
 
 ## 最新正式版本
 
