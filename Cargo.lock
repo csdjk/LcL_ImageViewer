@@ -1319,6 +1319,7 @@ dependencies = [
  "eframe",
  "image 0.25.10",
  "iv-core",
+ "raw-window-handle 0.5.2",
  "rfd",
  "windows 0.58.0",
  "windows-core 0.58.0",

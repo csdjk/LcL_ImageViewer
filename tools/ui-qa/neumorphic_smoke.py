@@ -424,7 +424,10 @@ def run(args):
                     assert dialog is not None, 'File dialog was not created'
                     focus(dialog)
                     assert u.GetForegroundWindow() == dialog
-                    assert not bool(u.GetWindowLongPtrW(hwnd, -20) & 8), 'Pinned viewer obscures its unowned dialog'
+                    get_owner = bind(u, 'GetWindow', [w.HWND,w.UINT], w.HWND)
+                    assert get_owner(dialog,4) == hwnd, 'Dialog must be owned by this viewer'
+                    assert bool(u.GetWindowLongPtrW(hwnd, -20) & 8) == old_pin
+                    assert bool(u.GetWindowLongPtrW(dialog, -20) & 8) == old_pin, 'Owned dialog must inherit topmost level'
                     key(dialog, 27)
                     time.sleep(0.4)
                     assert dialog not in windows_for_pid(proc.pid)

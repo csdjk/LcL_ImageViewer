@@ -24,7 +24,7 @@ def run(args):
     def key(code): actions.append({'kind':'key','code':code})
     def wait(seconds=0.25): actions.append({'kind':'wait','seconds':seconds})
     def shot(name): actions.append({'kind':'shot','name':name})
-    def move(): actions.append({'kind':'move','x':30,'y':135})
+    def move(): actions.extend([{'kind':'move','x':30,'y':135},{'kind':'move','x':35,'y':136}])
     def click(x,y=34): actions.append({'kind':'click','x':x,'y':y})
     def pin(value): actions.append({'kind':'assert-topmost','value':value})
     def bg(): click(args.background_x); wait()
@@ -65,6 +65,8 @@ def run(args):
     for name,v in [('white',255),('gray',128),('black',0),('gray-other-theme',128),('gray-final',128)]:
         for xy in [(24,145),(48,170),(args.width-26,180)]:
             assert all(abs(c-v)<=1 for c in image(name).getpixel(xy)),(name,xy,image(name).getpixel(xy))
+    assert image('hidden').getpixel((args.width//2,20)) == (128,128,128)
+    assert image('restored').getpixel((args.width//2,20)) != (128,128,128), 'Toolbar did not reappear'
     custom_rgb = image('custom-applied').getpixel((24,145))
     assert max(custom_rgb)-min(custom_rgb)>40, ('RGB sliders did not change the background',custom_rgb)
     opaque=(args.width//2+52,args.height//2-35,args.width//2+70,args.height//2+35)

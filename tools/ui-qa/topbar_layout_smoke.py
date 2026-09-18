@@ -15,7 +15,7 @@ def run(args):
     for width in widths:
         actions += [{'kind':'resize-client','width':width,'height':560},
             {'kind':'assert-topmost','value':True},{'kind':'move','x':30,'y':135},
-            {'kind':'wait','seconds':0.3},{'kind':'shot','name':f'width-{width}'}]
+            {'kind':'move','x':35,'y':136}, {'kind':'wait','seconds':0.3},{'kind':'shot','name':f'width-{width}'}]
     script=out/'actions.json';script.write_text(json.dumps(actions),encoding='utf-8')
     seed={'iv-background-color':'#177FD6','iv-checkerboard':'off','iv-always-on-top':'on','iv-backdrop':'on'}
     qa.run(SimpleNamespace(binary=args.binary,output=out/'viewer',input=source,theme=args.theme,
@@ -23,6 +23,7 @@ def run(args):
     assert qa.sha(source)==original
     for width in widths:
         im=Image.open(out/'viewer'/f'width-{width}.png').convert('RGB')
+        assert im.getpixel((width//2,20)) != (23,127,214), (width,'Toolbar must be visible for layout verification')
         for xy in [(24,145),(width-24,145),(4,34),(width-5,34)]:
             assert im.getpixel(xy)==(23,127,214),(width,xy,im.getpixel(xy),'background mismatch or toolbar clipped')
     meta=json.loads((out/'viewer/run.json').read_text('utf-8'))
