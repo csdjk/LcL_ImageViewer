@@ -431,6 +431,9 @@ def run(args):
                     key(dialog, 27)
                     time.sleep(0.4)
                     assert dialog not in windows_for_pid(proc.pid)
+                    is_window = bind(u, 'IsWindow', [w.HWND], w.BOOL)
+                    is_enabled = bind(u, 'IsWindowEnabled', [w.HWND], w.BOOL)
+                    print('DIALOG_CANCEL_STATE', {'exit':proc.poll(), 'main_exists':bool(is_window(hwnd)), 'main_enabled':bool(is_enabled(hwnd)), 'own_visible_windows':windows_for_pid(proc.pid)}, flush=True)
                     focus(hwnd)
                     assert bool(u.GetWindowLongPtrW(hwnd, -20) & 8) == old_pin
                     summary['file_dialog_cancel_keeps_pin'] = True

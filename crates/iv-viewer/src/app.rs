@@ -170,6 +170,7 @@ pub struct App {
     background_custom_open: bool,
     always_on_top: bool,
     applied_topmost: Option<bool>,
+    dialog_escape_until: Option<Instant>,
     /// Show the full image rectangle, including transparent margins.
     show_image_bounds: bool,
     /// "打开方式"注册状态缓存（打开设置窗口时刷新）
@@ -304,6 +305,7 @@ impl App {
             background_custom_open: false,
             always_on_top: cc.storage.and_then(|s| s.get_string("iv-always-on-top")).as_deref() == Some("on"),
             applied_topmost: None,
+            dialog_escape_until: None,
             checkerboard: cc
                 .storage
                 .and_then(|s| s.get_string("iv-checkerboard"))
@@ -672,6 +674,16 @@ impl App {
     }
 
     fn handle_global_input(&mut self, ctx: &egui::Context, canvas: Vec2) {
+        // A synchronous native picker can leave its dismissing Escape in winit's
+        // pending input queue. Consume only that key until it is released/settled.
+        if let Some(until) = self.dialog_escape_until {
+            if Instant::now() >= until && !ctx.input(|i| i.key_down(Key::Escape)) {
+                self.dialog_escape_until = None;
+            } else {
+                ctx.request_repaint_after(Duration::from_millis(16));
+                if ctx.input(|i| i.key_pressed(Key::Escape)) { return; }
+            }
+        }
         if self.delete_active() {
             if self.delete_job.is_none() && ctx.input(|i| i.key_pressed(Key::Escape)) {
                 self.delete_prompt = None;
@@ -955,7 +967,7 @@ impl App {
         if let Some(folder) = self.current.as_ref().and_then(|c| c.path.parent()) {
             dialog = dialog.set_directory(folder);
         }
-        if let Some(p) = dialog
+        let selected = dialog
             .add_filter(
                 "所有支持的图像",
                 &[
@@ -963,10 +975,9 @@ impl App {
                     "psd", "qoi", "tga", "ppm", "pgm", "pbm",
                 ],
             )
-            .pick_file()
-        {
-            self.open(p);
-        }
+            .pick_file();
+        self.dialog_escape_until = Some(Instant::now() + Duration::from_millis(250));
+        if let Some(p) = selected { self.open(p); }
     }
 
     /// 窗口标题跟随当前文件。
