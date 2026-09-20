@@ -5,6 +5,10 @@
 <!-- project-stage: P1 -->
 <!-- project-next: IV-P1-01 -->
 
+## 本地新增：圆形左右切图按钮（未发布）
+
+IV-P1-N15 DONE：左右切图按钮由 48×64 圆角矩形改为 56×56 真圆，圆形玻璃模糊遮罩、描边、阴影和焦点轮廓同步；原箭头、点击切图、禁用态和 1 秒自动隐藏/恢复逻辑保持。分支 Release 构建及深浅主题实机验证通过，主线 `c556a2e1e28d87dabb55cfb9d048db3f78d60c01` 完成导航专项测试、check、Debug 构建与 6 状态实机复验。当前改动未重新发布安装包。
+
 ## 当前任务：macOS云端打包
 
 IV-MAC-01 DONE；独立分支 codex/macos-package。构建Apple Silicon/Intel DMG，保留Windows正式版；无Developer ID/公证凭据，不发布新Latest。
