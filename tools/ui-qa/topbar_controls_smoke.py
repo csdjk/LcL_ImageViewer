@@ -46,10 +46,11 @@ def run(args):
     preset(1,'theme-background')
     preset(0,'checker-restored')
     bg(); click(menu_x,args.first_row_y + 34*5); wait(); shot('custom-menu')
-    # Drag the real R/G/B handles; verify the resulting canvas is no longer gray.
-    for row,dx in enumerate([-32,28,-18]):
-        actions.append({'kind':'drag','x':menu_x-22,'y':304+25*row,'dx':dx,'dy':0,'expect_window_delta':[0,0,0,0]})
-    click(menu_x,407); wait(); move(); shot('custom-applied')
+    # The custom page now uses a 2D color area and a hue strip, not RGB sliders.
+    left = min(args.background_x-16, args.width-264) + 8
+    click(left+150,269); click(left+180,130)
+    actions.append({'kind':'drag','x':left+180,'y':130,'dx':-30,'dy':35,'expect_window_delta':[0,0,0,0]})
+    click(left+100,396); wait(); move(); shot('custom-applied')
     preset(3,'gray-final')
     click(args.settings_x); wait(); shot('settings'); key(27)
     click(args.pin_x); wait(); pin(True); move(); shot('final-pinned')
@@ -68,7 +69,7 @@ def run(args):
     assert image('hidden').getpixel((args.width//2,20)) == (128,128,128)
     assert image('restored').getpixel((args.width//2,20)) != (128,128,128), 'Toolbar did not reappear'
     custom_rgb = image('custom-applied').getpixel((24,145))
-    assert max(custom_rgb)-min(custom_rgb)>40, ('RGB sliders did not change the background',custom_rgb)
+    assert max(custom_rgb)-min(custom_rgb)>40, ('Palette did not change the background',custom_rgb)
     opaque=(args.width//2+52,args.height//2-35,args.width//2+70,args.height//2+35)
     for name in ['white','gray','black','checker-restored']:
         assert peak(image(name).crop(opaque),image('base-rgba').crop(opaque))==0,(name,'opaque pixels changed')
