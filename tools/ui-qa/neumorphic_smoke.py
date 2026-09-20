@@ -174,8 +174,9 @@ def capture(hwnd, output: Path):
         img = Image.frombytes('RGB', (width, height), bytes(pixels), 'raw', 'BGRX')
         left, top = origin.x - wr.left, origin.y - wr.top
         img = img.crop((left, top, left + cw, top + ch))
-        lo, hi = img.convert('L').getextrema()
-        if hi - lo < 4 or hi <= 4:
+        # Different colors can have the same luminance (e.g. purple canvas and orange image).
+        extrema = img.getextrema()
+        if max(hi - lo for lo, hi in extrema) < 4 or max(hi for lo, hi in extrema) <= 4:
             raise RuntimeError('Blank or uniform capture; no usable UI evidence')
         img.save(output)
         return {'physical_window': [wr.left, wr.top, wr.right, wr.bottom],
