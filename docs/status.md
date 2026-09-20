@@ -3,7 +3,11 @@
 > 更新时间：2026-09-18。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-P1-N14 -->
+
+## 当前任务
+
+IV-P1-N14 IN_PROGRESS：自定义背景调色板，独立工作树开发，本轮不发布或更新安装。
 
 ## 本地新增：顶部置顶与背景颜色（未发布）
 
