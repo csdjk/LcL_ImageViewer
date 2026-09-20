@@ -5,21 +5,21 @@
 <!-- project-stage: P1 -->
 <!-- project-next: IV-P1-01 -->
 
-## 本地新增：圆形左右切图按钮（未发布）
+## 当前最新正式版：v0.5.1
 
-IV-P1-N15 DONE：左右切图按钮由 48×64 圆角矩形改为 56×56 真圆，圆形玻璃模糊遮罩、描边、阴影和焦点轮廓同步；原箭头、点击切图、禁用态和 1 秒自动隐藏/恢复逻辑保持。分支 Release 构建及深浅主题实机验证通过，主线 `c556a2e1e28d87dabb55cfb9d048db3f78d60c01` 完成导航专项测试、check、Debug 构建与 6 状态实机复验。当前改动未重新发布安装包。
+IV-REL-051 DONE。2026-09-20T11:26:21Z 正式发布，Release ID 392408919，Latest、非草稿/预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.5.1；源码标签 `7bce74beada33ab19ad38ce18f722bcc4236d327`。
 
-## 当前任务：macOS云端打包
+本版将左右切图按钮由 48×64 圆角矩形改为 56×56 真圆，玻璃模糊遮罩、描边、阴影和焦点轮廓同步圆形化；点击切图、禁用态及 1 秒自动隐藏/恢复保持。110项Rust、24项Windows契约、5项macOS边界检查、静态CRT正式构建、76项隔离注册及15张正式/便携实机截图通过，三个公开附件重新下载SHA256一致。详见 `docs/releases/v0.5.1-validation.md`。
 
-IV-MAC-01 DONE；独立分支 codex/macos-package。构建Apple Silicon/Intel DMG，保留Windows正式版；无Developer ID/公证凭据，不发布新Latest。
+本地安装包：`dist/v0.5.1/LcL-ImageViewer-Setup-v0.5.1-win64.exe`；便携包同目录。当前用户安装未自动更新。
 
-## 当前最新正式版：v0.5.0
+## macOS 预览构建
 
-IV-REL-050 DONE。2026-09-20T06:49:57Z正式发布，Release ID 392340200，Latest、非草稿/预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.5.0；源码标签 `0fb8b97049bb1f4ee974a8aae857e1ea897e6209`。
+IV-MAC-01 DONE；Apple Silicon / Intel DMG 构建流程继续保留，无 Developer ID / 公证凭据。本次 v0.5.1 正式 Release 的附件为 Windows 版本，没有把旧 macOS 预览 DMG 改名发布。
 
-包含顶部置顶、背景切换和二维调色板；README新增11组功能图文（10张静态图+1段实机动画），RGBA六种显示模式及播放/暂停/逐帧分别展示。110项Rust、24项配置/README、正式构建与138张GUI验证、28个COM输出和76项隔离注册/载荷验证通过；三附件及README引用图片公开下载hash一致。详见 `docs/releases/v0.5.0-validation.md`。
+## 上一正式版：v0.5.0
 
-本地安装包：`dist/v0.5.0/LcL-ImageViewer-Setup-v0.5.0-win64.exe`；便携包同目录。当前用户安装未自动更新，旧开发目录EXE不代表已升级。NEXT恢复IV-P1-01，P1长期门禁保持。
+v0.5.0 于 2026-09-20T06:49:57Z 发布，Release ID 392340200；包含顶部置顶、背景调色板和 README 功能图解等更新。当前 Latest 已由 v0.5.1 取代，旧标签与附件继续保留。
 
 ## 历史开发记录
 
