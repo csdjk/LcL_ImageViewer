@@ -118,3 +118,5 @@ tools/setup.iss
 ## IV-P1-N14 — 自定义背景调色板
 
 Base `265ff830f578aa5e40845cbcad55008dcd95e24e`；Owner ChatGPT-AgentDock；branch `codex/background-palette`；worktree `Temp/worktrees/background-palette`。将RGB滑条改为二维SV调色板、色相条、快捷色与HEX输入，实时预览并复用原背景持久化语义；自定义独立子面板避免560高窗口溢出。只改菜单和回归资料，不改解码/图像/主题/原生置顶、不升级依赖、不push或打包。完成测试、局部格式、双主题实机与本地main复验。
+
+IV-P1-N14 DONE：主线 `98abd01e4abbdf34b1a70c0fc4c66d55d137153d` 完成110项Rust、18项配置/check/Release及74张实机复验；原图/偏好/置顶保持。代码与验证文档本地中文提交，未发布或更新安装。

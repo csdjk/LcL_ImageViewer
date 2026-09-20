@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N14 | 自定义背景调色板 | REVIEW | ChatGPT-AgentDock | 用户本轮要求 / N13 DONE | `crates/iv-viewer/src/{app.rs,main.rs,color_palette.rs}`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 二维SV色板/色相条/快捷色/HEX，实时预览；黑白灰不丢色相，旧偏好与原图不变；测试/构建/实机/本地合入，不发布 |
+| IV-P1-N14 | 自定义背景调色板 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N13 DONE | `crates/iv-viewer/src/{app.rs,main.rs,color_palette.rs}`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 二维SV色板/色相条/快捷色/HEX，实时预览；黑白灰不丢色相，旧偏好与原图不变；测试/构建/实机/本地合入，不发布 |
 | IV-P1-N13 | 顶部置顶与背景颜色菜单 | DONE | ChatGPT-AgentDock | 用户本轮要求 / REL-040 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,background.rs,main.rs}`, `crates/iv-viewer/Cargo.toml`, `Cargo.lock`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 真正窗口置顶可切换；背景/棋盘格顶部入口及偏好兼容；窄宽布局、原图像素、动画与菜单回归；测试/构建/实机后中文本地合入，不发布 |
 | IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | DONE | ChatGPT-AgentDock | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
 | IV-FMT-02 | 动态AVIF完整播放 | DONE | ChatGPT-AgentDock | 用户明确追加要求 / FMT-01 DONE | `crates/iv-core/src/{avif.rs,decode.rs}`, `crates/iv-core/tests/**`, `crates/iv-viewer/src/app.rs`, `tools/ui-qa/**`, `docs/formats/**`, `README.md` | 完整帧/时长/Alpha；自动循环/暂停/逐帧/进度；有界总帧内存，预览只取首帧；测试/双构建/实机/main复验；中文提交不发布 |
@@ -298,3 +298,5 @@ IV-P1-N13 Review：顶部置顶/背景、偏好与窗口对话框适配已提交
 IV-P1-N13 DONE：集成 `9fc85ba48c264ae7ccb24bc96117a0666816c5b5`；105项Rust/18项配置/check/双构建及当前Release92张实机截图通过。置顶/原生文件对话框/取消Esc、背景预设与RGB、偏好兼容、可见窄宽布局及AVIF回归完成。当前入口 `target/topbar-controls/x86_64-pc-windows-msvc/release/imageview.exe`，仅本地中文提交，不推送/打包/安装。NEXT恢复IV-P1-01。
 
 IV-P1-N14 REVIEW：分支 `bd8964d48ad834f2bc8b0a3676396e3b19cca67e`；110项Rust/18项配置/格式/check及深色Debug完整交互与像素回归通过，接下来主线Release和双主题复验。
+
+IV-P1-N14 DONE：集成 `98abd01e4abbdf34b1a70c0fc4c66d55d137153d`，110项Rust/18项配置/check/Release及74张主线实机通过。调色板/色相/HEX/快捷色与旧预设、置顶、持久化兼容。中文本地提交，不push或更新安装。

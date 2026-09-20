@@ -1,13 +1,15 @@
 # LcL ImageViewer — 当前状态
 
-> 更新时间：2026-09-18。以Git、当前构建与GitHub实际回读为准。
+> 更新时间：2026-09-20。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-N14 -->
+<!-- project-next: IV-P1-01 -->
 
-## 当前任务
+## 本地新增：自定义背景调色板（未发布）
 
-IV-P1-N14 IN_PROGRESS：自定义背景调色板，独立工作树开发，本轮不发布或更新安装。
+IV-P1-N14 DONE：自定义RGB滑条替换为二维色板、色相条、颜色预览、快捷色块和HEX输入，实时预览、非法输入保护及保存恢复通过。集成 `98abd01e4abbdf34b1a70c0fc4c66d55d137153d`；110项Rust、18项配置、check/Release与74张主线实机验证通过。
+
+最新本地程序仍为 `target/topbar-controls/x86_64-pc-windows-msvc/release/imageview.exe`。详见 `docs/ui-qa/背景调色板验收.md`。当前安装和公开v0.4.0包不自动更新；未推送或发布。
 
 ## 本地新增：顶部置顶与背景颜色（未发布）
 
