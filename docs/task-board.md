@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-MAC-01 | macOS双架构GitHub打包 | REVIEW | ChatGPT-AgentDock | 用户明确要求macOS安装包 | `crates/iv-viewer/**`, `crates/iv-core/tests/**`, `Cargo.lock`, `.github/workflows/**`, `tools/macos/**`, `README.md`, `docs/releases/macos.md` | 双架构云端编译/测试/启动及DMG校验；Windows无回归；仅工作流产物不发新Latest |
+| IV-MAC-01 | macOS双架构GitHub打包 | DONE | ChatGPT-AgentDock | 用户明确要求macOS安装包 | `crates/iv-viewer/**`, `crates/iv-core/tests/**`, `Cargo.lock`, `.github/workflows/**`, `tools/macos/**`, `README.md`, `docs/releases/macos.md` | 双架构云端编译/测试/启动及DMG校验；Windows无回归；仅工作流产物不发新Latest |
 | IV-REL-050 | 发布置顶调色板与图文说明v0.5.0 | DONE | ChatGPT-AgentDock | 用户本轮授权 / N13及调色板已完成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/screenshots/**`, `docs/releases/**`, `docs/screenshot-*.jpg` | 全部功能配当前实机图、动画播放暂停逐帧GIF；版本/测试/构建/包体验证；main与新标签及Latest正式发布和下载hash；保留当前安装 |
 | IV-P1-N14 | 自定义背景调色板 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N13 DONE | `crates/iv-viewer/src/{app.rs,main.rs,color_palette.rs}`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 二维SV色板/色相条/快捷色/HEX，实时预览；黑白灰不丢色相，旧偏好与原图不变；测试/构建/实机/本地合入，不发布 |
 | IV-P1-N13 | 顶部置顶与背景颜色菜单 | DONE | ChatGPT-AgentDock | 用户本轮要求 / REL-040 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,background.rs,main.rs}`, `crates/iv-viewer/Cargo.toml`, `Cargo.lock`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 真正窗口置顶可切换；背景/棋盘格顶部入口及偏好兼容；窄宽布局、原图像素、动画与菜单回归；测试/构建/实机后中文本地合入，不发布 |
@@ -312,3 +312,5 @@ IV-REL-050 REVIEW：分支 `50360dc91986ecf1a1b497ac1b3cd84a78d72bc2`，业务�
 IV-REL-050 DONE：v0.5.0 Latest正式发布，ID 392340200；源码 `0fb8b97049bb1f4ee974a8aae857e1ea897e6209`，README11组图文和公开图片hash核验通过，110项Rust/24项检查/正式包与便携复验通过。保留旧版，不更新当前安装；NEXT IV-P1-01。
 
 IV-MAC-01 REVIEW：分支f1041f891361bcaaa9760b44a754c07e9aae99b2，云端构建源e39c1b22460d16bc99eb56238cc84c9d06d05782，两架构DMG及原生测试、启动、动画像素检查通过，RGBA交互覆盖按架构如实记录。Windows回归通过，进入主线必要复验；不修改Windows正式Release。
+
+IV-MAC-01 DONE：集成7cc927f1ee42be5b311abde068b2bb0e5dbf513b，main 110项Rust、24+5项配置检查通过，代码/打包树与GitHub成功构建源一致。Mac安装包及SHA256保存dist/macos-v0.5.0，具体链接和平台限制见docs/releases/macos.md；未变更Windows正式发布附件。

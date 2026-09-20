@@ -3,11 +3,11 @@
 > 更新时间：2026-09-20。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-MAC-01 -->
+<!-- project-next: IV-P1-01 -->
 
 ## 当前任务：macOS云端打包
 
-IV-MAC-01 IN_PROGRESS；独立分支 codex/macos-package。构建Apple Silicon/Intel DMG，保留Windows正式版；无Developer ID/公证凭据，不发布新Latest。
+IV-MAC-01 DONE；独立分支 codex/macos-package。构建Apple Silicon/Intel DMG，保留Windows正式版；无Developer ID/公证凭据，不发布新Latest。
 
 ## 当前最新正式版：v0.5.0
 
@@ -111,3 +111,7 @@ IV-FMT-02 DONE：动态AVIF完整帧播放已合入本地main并完成复验，�
 ## 当前任务：v0.5.0发布与功能配图
 
 IV-REL-050 DONE：v0.5.0及README功能图文已正式发布，详情以上方最新发布与验收文档为准。
+
+## macOS预览安装包已完成
+
+IV-MAC-01 DONE。两架构DMG来自GitHub运行35497058297，实际构建源e39c1b22460d16bc99eb56238cc84c9d06d05782，通过原生测试、挂载启动、动效像素检查及下载hash验证。未公证、仅ad-hoc签名；不包含Windows磨砂/Explorer扩展，Mac预览从应用内打开图片。安装包位于dist/macos-v0.5.0，详情docs/releases/macos.md。main必要复验通过，长期阶段不自动升级。
