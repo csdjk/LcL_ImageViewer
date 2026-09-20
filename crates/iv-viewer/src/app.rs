@@ -741,7 +741,7 @@ impl App {
         }
 
         // Ctrl+O 打开文件
-        if ctx.input(|i| i.modifiers.ctrl && !i.modifiers.shift && i.key_pressed(Key::O)) {
+        if ctx.input(|i| (i.modifiers.command || i.modifiers.ctrl) && !i.modifiers.shift && i.key_pressed(Key::O)) {
             self.open_dialog();
             return;
         }
@@ -751,7 +751,8 @@ impl App {
         if !viewer_shortcuts_allowed(ctx.wants_keyboard_input(), blocked) {
             return;
         }
-        if ctx.input(|i| fresh_delete_press(&i.events)) {
+        if ctx.input(|i| fresh_delete_press(&i.events) || (cfg!(target_os = "macos")
+            && i.modifiers == egui::Modifiers::NONE && i.key_pressed(Key::Backspace))) {
             self.request_delete();
             return;
         }
@@ -1005,7 +1006,7 @@ impl App {
     }
 
     fn use_desktop_background(&self) -> bool {
-        self.backdrop && self.background_color.is_none()
+        cfg!(windows) && self.backdrop && self.background_color.is_none()
     }
 
     fn draw_background_menu(&mut self, ctx: &egui::Context, pal: &Palette) {
@@ -1139,6 +1140,9 @@ impl App {
         if fixed_window {
             return;
         }
+        #[cfg(target_os = "macos")]
+        ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+        #[cfg(windows)]
         if let (Some(hwnd), Some(start)) = (self.hwnd, ctx.input(|i| i.pointer.press_origin())) {
             self.right_window_drag = crate::backdrop::WindowDrag::begin(
                 hwnd, [start.x, start.y], ctx.pixels_per_point(),
@@ -1167,7 +1171,7 @@ impl App {
 
                         // —— 打开 ——
                         if ui::icon_btn(ui, Icon::Open, false, pal)
-                            .on_hover_text("打开文件 (Ctrl+O)")
+                            .on_hover_text(if cfg!(target_os = "macos") { "打开文件 (⌘O)" } else { "打开文件 (Ctrl+O)" })
                             .clicked()
                         {
                             self.open_dialog();
@@ -1980,7 +1984,7 @@ impl App {
                 self.ctx_menu_pos = None;
             }
         }
-        if ui::menu_item(ui, "打开文件…", "Ctrl+O", false, &pal).clicked() {
+        if ui::menu_item(ui, "打开文件…", if cfg!(target_os = "macos") { "⌘O" } else { "Ctrl+O" }, false, &pal).clicked() {
             self.open_dialog();
             self.ctx_menu_pos = None;
         }
@@ -2181,6 +2185,7 @@ impl App {
                         ui::setting_row(ui, pal, "减少动效", "关闭工具栏淡入淡出动画", |ui| {
                             ui::toggle(ui, &mut self.reduce_motion, pal);
                         });
+                        #[cfg(windows)]
                         ui::setting_row(ui, pal, "桌面磨砂", "柔化窗口后方内容；不可用时回退为主题渐变", |ui| {
                             let mut on = self.backdrop;
                             if ui::toggle(ui, &mut on, pal).changed() && on != self.backdrop {
@@ -2198,7 +2203,7 @@ impl App {
                         if let Some(error) = &self.backdrop_restore_error {
                             ui.label(RichText::new(format!("截图状态异常：{error}")).small().color(pal.err_text));
                         }
-                        if self.backdrop {
+                        if cfg!(windows) && self.backdrop {
                             if self.backdrop_restore_error.is_none() {
                                 if let Some(error) = &self.backdrop_capture_error {
                                     ui.label(RichText::new(format!("桌面磨砂不可用：{error}")).small().color(pal.err_text));
@@ -2211,6 +2216,7 @@ impl App {
                             }
                             ui::compact_slider_row(ui, pal, "背景亮度", &mut self.backdrop_brightness, 0.6..=1.4);
                         }
+                        #[cfg(windows)]
                         ui::setting_row(ui, pal, "打开方式", "将查看器添加到或移出 Windows 的打开方式列表", |ui| {
                             let label = if self.assoc_registered { "解除注册" } else { "注册" };
                             if ui::text_button(ui, label, 112.0, pal)
@@ -2222,6 +2228,7 @@ impl App {
                                 self.assoc_registered = winassoc::is_registered();
                             }
                         });
+                        #[cfg(windows)]
                         ui::setting_row(ui, pal, "默认看图软件", "在 Windows 默认应用设置中确认，不会自动改为默认应用", |ui| {
                             if ui::text_button(ui, "系统设置…", 112.0, pal).clicked() {
                                 if !self.assoc_registered {
@@ -2859,7 +2866,7 @@ fn containing_directory_command(path: &Path) -> std::io::Result<std::process::Co
             "图片所在路径不是文件夹",
         ));
     }
-    let mut command = std::process::Command::new("explorer.exe");
+    let mut command = std::process::Command::new(if cfg!(target_os = "macos") { "/usr/bin/open" } else { "explorer.exe" });
     command.arg(directory);
     Ok(command)
 }
@@ -3072,7 +3079,7 @@ mod folder_open_tests {
         let directory = std::env::current_dir().unwrap();
         // 图片即使已删除，只要父目录存在仍应能打开；这里不创建或启动任何文件。
         let command = containing_directory_command(&directory.join("未保存文件, & (副本).png")).unwrap();
-        assert_eq!(command.get_program(), "explorer.exe");
+        assert_eq!(command.get_program(), if cfg!(target_os = "macos") { "/usr/bin/open" } else { "explorer.exe" });
         assert_eq!(command.get_args().collect::<Vec<_>>(), vec![directory.as_os_str()]);
     }
 
@@ -3274,8 +3281,13 @@ struct DialogOwner(isize);
 // SAFETY: constructed only from this App's live HWND, kept alive throughout pick_file.
 unsafe impl raw_window_handle::HasRawWindowHandle for DialogOwner {
     fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
-        let mut handle = raw_window_handle::Win32WindowHandle::empty();
-        handle.hwnd = self.0 as *mut std::ffi::c_void;
-        raw_window_handle::RawWindowHandle::Win32(handle)
+        #[cfg(windows)] {
+            let mut handle = raw_window_handle::Win32WindowHandle::empty();
+            handle.hwnd = self.0 as *mut std::ffi::c_void;
+            raw_window_handle::RawWindowHandle::Win32(handle)
+        }
+        #[cfg(target_os = "macos")] {
+            crate::backdrop::dialog_handle(self.0)
+        }
     }
 }
