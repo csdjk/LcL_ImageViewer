@@ -43,3 +43,15 @@ python3 tools/macos/smoke.py --app 'dist/macos/LcL ImageViewer.app' --output evi
 `.app` 包含图标、许可、版本和源码提交信息；打包脚本核验 Mach-O 架构及动态库依赖，不允许依赖 runner 的 Homebrew dylib。DMG 包含 Applications 快捷入口及安装说明；工作流挂载 DMG 后重新核验并启动其中的应用。屏幕录制权限不足时必须明确记录，不将缺少截图视为视觉验收通过。
 
 本次不自动发布新 Release 或替换 Windows Latest。
+
+## 本次构建验收
+
+源码 `e39c1b22460d16bc99eb56238cc84c9d06d05782`；GitHub Actions [成功运行](https://github.com/csdjk/LcL_ImageViewer/actions/runs/35497058297)。两个架构均从挂载后的DMG启动，版本、Mach-O架构、系统动态库依赖、ad-hoc签名和SHA256校验通过。
+
+- x86_64：104项Rust测试，11张Mac真实窗口截图，AVIF自动播放/暂停/逐帧像素检查通过。RGBA键盘交互：本轮首次窗口未被捕获，未计为通过。
+  本轮首次静态AVIF采样时未发现可见窗口；此前23122da运行中的同一核心代码已取得该格式截图。不把缺失的本轮截图当成通过，保留云端日志。
+- arm64：104项Rust测试，17张Mac真实窗口截图，AVIF自动播放/暂停/逐帧像素检查通过。RGBA键盘交互：通过。
+
+本地Windows 110项Rust测试、24项既有配置/README检查及5项Mac打包边界检查通过；当前Windows构建双主题52张截图回归通过。一次初始自动交互采样丢失图片视野，保留失败日志，未放宽截图门禁；新会话重跑通过。
+
+主线集成后复验Windows测试，并逐项核对`crates`、Cargo锁文件与`tools/macos`树和云端构建源码一致；DMG保留上述实际构建提交，不把后续文档提交伪称为新的Mac二进制。
