@@ -79,7 +79,7 @@ Windows 专属桌面磨砂/Explorer 缩略图不包含在 Mac 版；暂未提供
     (output/'安装说明.txt').write_text(notes,encoding='utf-8')
     (resources/'安装说明.txt').write_text(notes,encoding='utf-8')
     manifest = {'version':version,'preview':True,'source_commit':source,'target':args.target,
-        'architecture':arch,'minimum_macos':'12.0','build_macos':command('sw_vers','-productVersion'),
+        'architecture':arch,'rustc':command('rustc','--version'),'minimum_macos':'12.0','build_macos':command('sw_vers','-productVersion'),
         'signing':'ad-hoc','notarized':False,'system_imports':imports,'unsigned_binary_sha256':sha(executable)}
     (resources/'build-manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     command('codesign','--force','--sign','-','--timestamp=none','--options','runtime',app)

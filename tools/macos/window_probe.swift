@@ -31,6 +31,13 @@ shot.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
 shot.arguments = ["-x", "-o", "-l", String(id), args[2]]
 try shot.run(); shot.waitUntilExit()
 if shot.terminationStatus != 0 { fatalError("Window capture failed: \(shot.terminationStatus)") }
-let result: [String:Any] = ["pid":Int(pid), "window_id":id, "bounds":bounds, "title":window[kCGWindowName as String] ?? "", "layer":window[kCGWindowLayer as String] ?? 0, "capture":args[2], "screen_capture_allowed":CGPreflightScreenCaptureAccess(), "accessibility_trusted":AXIsProcessTrusted()]
+var result: [String:Any] = ["pid":Int(pid), "window_id":id, "bounds":bounds, "title":window[kCGWindowName as String] ?? "", "layer":window[kCGWindowLayer as String] ?? 0, "capture":args[2], "screen_capture_allowed":CGPreflightScreenCaptureAccess(), "accessibility_trusted":AXIsProcessTrusted()]
+if let bitmap = NSBitmapImageRep(data: try Data(contentsOf: URL(fileURLWithPath: args[2]))) {
+    let points: [(Double, Double)] = [(0.4,0.5), (0.6,0.35), (0.75,0.5), (0.8,0.6)]
+    result["image_samples_rgb"] = points.map { point -> [Int] in
+        let color = bitmap.colorAt(x: Int(Double(bitmap.pixelsWide)*point.0), y: Int(Double(bitmap.pixelsHigh)*point.1))!.usingColorSpace(.sRGB)!
+        return [color.redComponent, color.greenComponent, color.blueComponent].map { Int(($0*255).rounded()) }
+    }
+}
 let data = try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
 print(String(data:data,encoding:.utf8)!)
