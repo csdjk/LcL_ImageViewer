@@ -168,6 +168,7 @@ pub struct App {
     background_menu_pos: Option<Pos2>,
     background_button_rect: egui::Rect,
     background_custom_open: bool,
+    background_palette: crate::color_palette::ColorPalette,
     always_on_top: bool,
     applied_topmost: Option<bool>,
     dialog_escape_until: Option<Instant>,
@@ -303,6 +304,7 @@ impl App {
             background_menu_pos: None,
             background_button_rect: egui::Rect::NOTHING,
             background_custom_open: false,
+            background_palette: crate::color_palette::ColorPalette::default(),
             always_on_top: cc.storage.and_then(|s| s.get_string("iv-always-on-top")).as_deref() == Some("on"),
             applied_topmost: None,
             dialog_escape_until: None,
@@ -1021,41 +1023,51 @@ impl App {
                 ui::menu_frame(pal).show(ui, |ui| {
                     ui.set_width(228.0);
                     ui.spacing_mut().item_spacing.y = 4.0;
-                    ui.label(RichText::new("画布背景").strong().color(pal.text));
-                    let choices = [
-                        ("棋盘格", true, None),
-                        ("跟随主题", false, None),
-                        ("白色", false, Some([255, 255, 255])),
-                        ("灰色", false, Some([128, 128, 128])),
-                        ("黑色", false, Some([0, 0, 0])),
-                    ];
-                    for (label, checker, color) in choices {
-                        let selected = self.checkerboard == checker && self.background_color == color;
-                        let response = ui.add_sized([228.0, 30.0], egui::SelectableLabel::new(selected, label));
-                        if let Some(rgb) = color {
-                            let rect = egui::Rect::from_center_size(response.rect.right_center() - Vec2::new(18.0, 0.0), Vec2::splat(16.0));
-                            ui.painter().rect_filled(rect, 3.0, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
-                            ui.painter().rect_stroke(rect, 3.0, Stroke::new(1.0_f32, pal.dim));
+                    if !self.background_custom_open {
+                        ui.label(RichText::new("画布背景").strong().color(pal.text));
+                        let choices = [
+                            ("棋盘格", true, None),
+                            ("跟随主题", false, None),
+                            ("白色", false, Some([255, 255, 255])),
+                            ("灰色", false, Some([128, 128, 128])),
+                            ("黑色", false, Some([0, 0, 0])),
+                        ];
+                        for (label, checker, color) in choices {
+                            let selected = self.checkerboard == checker && self.background_color == color;
+                            let response = ui.add_sized([228.0, 30.0], egui::SelectableLabel::new(selected, label));
+                            if let Some(rgb) = color {
+                                let rect = egui::Rect::from_center_size(response.rect.right_center() - Vec2::new(18.0, 0.0), Vec2::splat(16.0));
+                                ui.painter().rect_filled(rect, 3.0, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                                ui.painter().rect_stroke(rect, 3.0, Stroke::new(1.0_f32, pal.dim));
+                            }
+                            if response.clicked() {
+                                self.checkerboard = checker;
+                                self.background_color = color;
+                                close = true;
+                            }
                         }
-                        if response.clicked() {
-                            self.checkerboard = checker;
-                            self.background_color = color;
-                            close = true;
+                        if ui.add_sized([228.0, 30.0], egui::SelectableLabel::new(false, "自定义颜色…")).clicked() {
+                            self.background_palette.set_rgb(self.background_color.unwrap_or([128, 128, 128]));
+                            self.background_custom_open = true;
                         }
-                    }
-                    if ui.add_sized([228.0, 30.0], egui::SelectableLabel::new(self.background_custom_open, "自定义颜色…")).clicked() {
-                        self.background_custom_open = !self.background_custom_open;
-                    }
-                    if self.background_custom_open {
-                        let mut rgb = self.background_color.unwrap_or([128, 128, 128]);
-                        let mut changed = false;
-                        for (index, label) in ["R", "G", "B"].into_iter().enumerate() {
-                            changed |= ui.add(egui::Slider::new(&mut rgb[index], 0..=255).text(label)).changed();
+                    } else {
+                        ui.horizontal(|ui| {
+                            if ui::icon_btn(ui, Icon::Prev, false, pal).on_hover_text("返回背景选项").clicked() {
+                                self.background_custom_open = false;
+                            }
+                            ui.label(RichText::new("自定义颜色").strong().color(pal.text));
+                        });
+                        ui.add_space(4.0);
+                        if self.background_palette.show(ui, pal) {
+                            self.background_color = Some(self.background_palette.rgb());
+                            self.checkerboard = false;
                         }
-                        ui.label(format!("#{:02X}{:02X}{:02X}", rgb[0], rgb[1], rgb[2]));
-                        if changed { self.background_color = Some(rgb); self.checkerboard = false; }
-                        if ui.add_sized([228.0, 28.0], egui::Button::new("应用并关闭")).clicked() {
-                            self.background_color = Some(rgb);
+                        ui.add_space(4.0);
+                        let valid = self.background_palette.valid_hex();
+                        if ui.add_enabled(valid, egui::Button::new("应用并关闭")
+                            .fill(pal.btn_pressed).min_size(Vec2::new(228.0, 30.0))).clicked()
+                            || (valid && ui.input(|i| i.key_pressed(Key::Enter))) {
+                            self.background_color = Some(self.background_palette.rgb());
                             self.checkerboard = false;
                             close = true;
                         }

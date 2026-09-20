@@ -63,8 +63,11 @@ class MouseInput(c.Structure):
     _fields_ = [('dx', w.LONG), ('dy', w.LONG), ('data', w.DWORD),
                 ('flags', w.DWORD), ('time', w.DWORD), ('extra', c.c_size_t)]
 
+class KeyInput(c.Structure):
+    _fields_ = [('key', w.WORD), ('scan', w.WORD), ('flags', w.DWORD), ('time', w.DWORD), ('extra', c.c_size_t)]
+
 class InputUnion(c.Union):
-    _fields_ = [('mouse', MouseInput)]  # MouseInput is the largest INPUT variant.
+    _fields_ = [('mouse', MouseInput), ('keyboard', KeyInput)]  # MouseInput is the largest variant.
 
 class NativeInput(c.Structure):
     _fields_ = [('type', w.DWORD), ('value', InputUnion)]
@@ -171,8 +174,9 @@ def capture(hwnd, output: Path):
         img = Image.frombytes('RGB', (width, height), bytes(pixels), 'raw', 'BGRX')
         left, top = origin.x - wr.left, origin.y - wr.top
         img = img.crop((left, top, left + cw, top + ch))
-        lo, hi = img.convert('L').getextrema()
-        if hi - lo < 4 or hi <= 4:
+        # Different colors can have the same luminance (e.g. purple canvas and orange image).
+        extrema = img.getextrema()
+        if max(hi - lo for lo, hi in extrema) < 4 or max(hi for lo, hi in extrema) <= 4:
             raise RuntimeError('Blank or uniform capture; no usable UI evidence')
         img.save(output)
         return {'physical_window': [wr.left, wr.top, wr.right, wr.bottom],
@@ -392,6 +396,23 @@ def run(args):
                     expected = [round(v * dpi / 96) for v in action['expect_window_delta']]
                     if any(abs(a-b)>3 for a,b in zip(actual, expected)):
                         raise AssertionError(f'Drag {button}: window delta {actual}, expected {expected}')
+            elif kind == 'text':
+                # Unicode input bypasses the active IME without changing its language,
+                # clipboard contents or global settings. Only the owned QA viewer is targeted.
+                text = action['text']
+                if not isinstance(text, str) or len(text) > 256:
+                    raise ValueError('QA text must be a string of at most 256 characters')
+                focus(hwnd)
+                encoded = text.encode('utf-16-le')
+                for i in range(0, len(encoded), 2):
+                    if u.GetForegroundWindow() != hwnd:
+                        raise RuntimeError('Foreground changed; refusing text input to another app')
+                    unit = int.from_bytes(encoded[i:i+2], 'little')
+                    batch = (NativeInput * 2)(*[NativeInput(1, InputUnion(keyboard=KeyInput(0, unit, flags, 0, 0))) for flags in (4, 6)])
+                    if u.SendInput(2, batch, c.sizeof(NativeInput)) != 2:
+                        raise OSError('Unicode input failed')
+                    time.sleep(0.04)
+                time.sleep(0.15)
             elif kind == 'key':
                 code = action['code']
                 code = ord(code.upper()) if isinstance(code, str) and len(code) == 1 else int(code)
