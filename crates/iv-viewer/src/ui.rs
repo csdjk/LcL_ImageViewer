@@ -1310,6 +1310,7 @@ pub fn draw_placeholder(painter: &egui::Painter, rect: Rect, loading: Option<&st
 
 /// 加载 Windows 系统字体：Segoe UI（UI/数字）+ 微软雅黑（中文）+ Consolas（等宽）。
 /// 任一字体缺失时跳过，保持 egui 默认。
+#[cfg(windows)]
 fn install_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
     let mut changed = false;
@@ -1650,5 +1651,23 @@ mod topbar_background_tests {
             assert!((72.0..=144.0).contains(&topbar_name_width(width)));
         }
         assert_eq!(topbar_name_width(1200.0),96.0);
+    }
+}
+
+/// Load installed macOS CJK glyphs without redistributing Apple's font files.
+#[cfg(target_os = "macos")]
+fn install_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    let paths = ["/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/STHeiti Light.ttc",
+        "/System/Library/Fonts/Supplemental/Songti.ttc"];
+    for path in paths {
+        if let Ok(bytes) = std::fs::read(path) {
+            fonts.font_data.insert("mac_cjk".into(), egui::FontData::from_owned(bytes));
+            for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+                fonts.families.entry(family).or_default().push("mac_cjk".into());
+            }
+            ctx.set_fonts(fonts);
+            return;
+        }
     }
 }

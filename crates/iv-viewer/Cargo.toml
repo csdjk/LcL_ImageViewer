@@ -25,11 +25,16 @@ rfd = "0.13"
 bytemuck = { version = "1", features = ["derive"] }
 # 仅用于启动时解码窗口图标 PNG
 image = { version = "0.25", default-features = false, features = ["png"] }
+# Native dialog ownership; both AppKit and Win32 use the locked rfd handle version.
+raw-window-handle = "0.5"
+
+[target.'cfg(windows)'.dependencies]
 # HKCU 文件关联注册（设置面板"打开方式"集成）
 winreg = "0.52"
 # Native, recycle-only deletion. Versions already present in the dependency cache.
 windows = { version = "0.58", features = ["implement", "Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
 windows-core = "0.58"
 
-# Reuse the already-locked 0.5 handle type required by rfd for native dialog ownership.
-raw-window-handle = "0.5"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"

@@ -6,13 +6,25 @@
 
 mod app;
 mod color_palette;
+#[cfg(windows)]
+mod backdrop;
+#[cfg(target_os = "macos")]
+#[path = "macos_platform.rs"]
 mod backdrop;
 mod loader;
 mod directory;
 mod perf;
 mod render;
+#[cfg(windows)]
+mod recycle;
+#[cfg(target_os = "macos")]
+#[path = "macos_recycle.rs"]
 mod recycle;
 mod ui;
+#[cfg(windows)]
+mod winassoc;
+#[cfg(target_os = "macos")]
+#[path = "macos_association.rs"]
 mod winassoc;
 
 fn main() -> eframe::Result<()> {

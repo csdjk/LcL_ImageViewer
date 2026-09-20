@@ -1,0 +1,101 @@
+name: macOS DMG (preview)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/macos-package]
+    paths:
+      - 'crates/**'
+      - 'Cargo.*'
+      - 'tools/macos/**'
+      - '.github/workflows/macos-package.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-package-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple-Silicon
+            runner: macos-14
+            target: aarch64-apple-darwin
+            arch: arm64
+          - label: Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Toolchain and native codec tools
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          brew list cmake >/dev/null 2>&1 || brew install cmake
+          rustc --version
+          uname -m
+          sw_vers
+      - name: Restore native build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-${{ matrix.runner }}-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            macos-${{ matrix.runner }}-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Compatible Intel assembler
+        if: matrix.arch == 'x86_64'
+        run: bash tools/macos/install_nasm.sh
+      - name: Check packaging boundaries
+        run: python3 tools/macos/test_contracts.py
+      - name: Test shared viewer and image decoders
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          cargo test --locked -p iv-core -p iv-viewer --target ${{ matrix.target }} 2>&1 | tee evidence/tests.log
+      - name: Build native Release
+        run: |
+          set -o pipefail
+          cargo build --locked --release -p iv-viewer --target ${{ matrix.target }} 2>&1 | tee evidence/build.log
+      - name: Create app bundle and DMG
+        run: python3 tools/macos/package.py --target ${{ matrix.target }} --arch ${{ matrix.arch }}
+      - name: Launch native app and inspect window
+        run: python3 tools/macos/smoke.py --app 'dist/macos/LcL ImageViewer.app' --output evidence
+      - name: Verify final artifacts
+        run: |
+          hdiutil verify dist/macos/*.dmg
+          cd dist/macos && shasum -a 256 -c SHA256SUMS.txt
+      - name: Upload installer and checksums
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: LcL-ImageViewer-macos-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            dist/macos/*.dmg
+            dist/macos/SHA256SUMS.txt
+            dist/macos/build-manifest.json
+            dist/macos/安装说明.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload build and launch evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-evidence-${{ matrix.arch }}-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: ignore
+          retention-days: 30
