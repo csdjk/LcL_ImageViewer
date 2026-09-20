@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-REL-051 | 发布圆形侧边按钮 v0.5.1 | IN_PROGRESS | ChatGPT-AgentDock | 用户明确要求打包发布 / N15 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `CHANGELOG.md`, `docs/releases/**`, `README.md` | 版本统一；正式构建/测试/安装与便携包验证；push main+新tag并设Latest；公开下载hash；不改当前安装 |
 | IV-P1-N15 | 左右切图按钮圆形化 | DONE | ChatGPT-AgentDock | 用户本轮要求 / v0.5.0 当前main | `crates/iv-viewer/src/{ui.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**` | 两侧按钮背景和玻璃遮罩为真圆形；箭头/点击/禁用/显隐保持；测试+实机截图+本地main复验，不发布 |
 | IV-MAC-01 | macOS双架构GitHub打包 | DONE | ChatGPT-AgentDock | 用户明确要求macOS安装包 | `crates/iv-viewer/**`, `crates/iv-core/tests/**`, `Cargo.lock`, `.github/workflows/**`, `tools/macos/**`, `README.md`, `docs/releases/macos.md` | 双架构云端编译/测试/启动及DMG校验；Windows无回归；仅工作流产物不发新Latest |
 | IV-REL-050 | 发布置顶调色板与图文说明v0.5.0 | DONE | ChatGPT-AgentDock | 用户本轮授权 / N13及调色板已完成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/screenshots/**`, `docs/releases/**`, `docs/screenshot-*.jpg` | 全部功能配当前实机图、动画播放暂停逐帧GIF；版本/测试/构建/包体验证；main与新标签及Latest正式发布和下载hash；保留当前安装 |
