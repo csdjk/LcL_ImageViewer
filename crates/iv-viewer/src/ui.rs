@@ -961,9 +961,9 @@ pub fn filename_label(
 
 /* ============================== 图标按钮 ============================== */
 
-/// 两侧导航的安全边距避开6点系统缩放热区，矩形尺寸与命中区一致。
-pub const SIDE_NAV_SIZE: Vec2 = Vec2::new(48.0, 64.0);
-pub const SIDE_NAV_RADIUS: f32 = 16.0;
+/// 两侧导航为真圆形按钮；外接方形同时作为命中区，并避开6点系统缩放热区。
+pub const SIDE_NAV_SIZE: Vec2 = Vec2::splat(56.0);
+pub const SIDE_NAV_RADIUS: f32 = SIDE_NAV_SIZE.x / 2.0;
 pub const SIDE_NAV_GAP: f32 = 18.0;
 
 pub fn side_navigation_rects(screen: Rect) -> [Rect; 2] {
@@ -1471,6 +1471,8 @@ mod side_navigation_tests {
             let [left, right] = side_navigation_rects(screen);
             assert_eq!(left.size(), SIDE_NAV_SIZE);
             assert_eq!(right.size(), SIDE_NAV_SIZE);
+            assert_eq!(SIDE_NAV_SIZE.x, SIDE_NAV_SIZE.y);
+            assert_eq!(SIDE_NAV_RADIUS, SIDE_NAV_SIZE.x / 2.0);
             assert_eq!(left.center().y, screen.center().y);
             assert_eq!(right.center().y, screen.center().y);
             assert_eq!(left.left() - screen.left(), SIDE_NAV_GAP);
