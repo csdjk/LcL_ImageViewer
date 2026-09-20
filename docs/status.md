@@ -3,7 +3,20 @@
 > 更新时间：2026-09-20。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-REL-050 -->
+<!-- project-next: IV-P1-01 -->
+
+## 当前最新正式版：v0.5.0
+
+IV-REL-050 DONE。2026-09-20T06:49:57Z正式发布，Release ID 392340200，Latest、非草稿/预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.5.0；源码标签 `0fb8b97049bb1f4ee974a8aae857e1ea897e6209`。
+
+包含顶部置顶、背景切换和二维调色板；README新增11组功能图文（10张静态图+1段实机动画），RGBA六种显示模式及播放/暂停/逐帧分别展示。110项Rust、24项配置/README、正式构建与138张GUI验证、28个COM输出和76项隔离注册/载荷验证通过；三附件及README引用图片公开下载hash一致。详见 `docs/releases/v0.5.0-validation.md`。
+
+本地安装包：`dist/v0.5.0/LcL-ImageViewer-Setup-v0.5.0-win64.exe`；便携包同目录。当前用户安装未自动更新，旧开发目录EXE不代表已升级。NEXT恢复IV-P1-01，P1长期门禁保持。
+
+## 历史开发记录
+
+下方“未发布/未push”等是各任务当时状态；顶部置顶和调色板现已统一纳入v0.5.0并推送。
+
 
 ## 本地新增：自定义背景调色板（未发布）
 
@@ -19,9 +32,9 @@ IV-P1-N13 DONE：图钉开关及背景菜单已完成。支持棋盘格/跟随�
 
 最新本地程序：`target/topbar-controls/x86_64-pc-windows-msvc/release/imageview.exe`。本轮未推送、打包或更新用户安装，下面的v0.4.0公开发布包仍不包含本轮增量。
 
-## 最新正式版本
+## v0.4.0 发布时记录
 
-**v0.4.0 已正式发布并设为Latest，非草稿/预发布。**
+v0.4.0 为此前正式版本，当前最新正式版是上方的v0.5.0。
 
 发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.4.0；ID `389994098`；发布时间 `2026-09-16T14:18:52Z`。源码标签 `1649569a903e3620b60f3699ea0f89c176900014`。main及v0.4.0已推送，旧版保留，公开附件下载SHA256一致。
 
@@ -93,4 +106,4 @@ IV-FMT-02 DONE：动态AVIF完整帧播放已合入本地main并完成复验，�
 
 ## 当前任务：v0.5.0发布与功能配图
 
-IV-REL-050 IN_PROGRESS，已检查主线及所有旧工作树干净。README更新为功能图文介绍，使用真实截图及动画演示；本轮用户授权打包推送和正式发布，当前安装与系统关联保持不变。
+IV-REL-050 DONE：v0.5.0及README功能图文已正式发布，详情以上方最新发布与验收文档为准。

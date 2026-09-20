@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-050 | 发布置顶调色板与图文说明v0.5.0 | REVIEW | ChatGPT-AgentDock | 用户本轮授权 / N13及调色板已完成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/screenshots/**`, `docs/releases/**`, `docs/screenshot-*.jpg` | 全部功能配当前实机图、动画播放暂停逐帧GIF；版本/测试/构建/包体验证；main与新标签及Latest正式发布和下载hash；保留当前安装 |
+| IV-REL-050 | 发布置顶调色板与图文说明v0.5.0 | DONE | ChatGPT-AgentDock | 用户本轮授权 / N13及调色板已完成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/screenshots/**`, `docs/releases/**`, `docs/screenshot-*.jpg` | 全部功能配当前实机图、动画播放暂停逐帧GIF；版本/测试/构建/包体验证；main与新标签及Latest正式发布和下载hash；保留当前安装 |
 | IV-P1-N14 | 自定义背景调色板 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N13 DONE | `crates/iv-viewer/src/{app.rs,main.rs,color_palette.rs}`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 二维SV色板/色相条/快捷色/HEX，实时预览；黑白灰不丢色相，旧偏好与原图不变；测试/构建/实机/本地合入，不发布 |
 | IV-P1-N13 | 顶部置顶与背景颜色菜单 | DONE | ChatGPT-AgentDock | 用户本轮要求 / REL-040 DONE | `crates/iv-viewer/src/{app.rs,ui.rs,background.rs,main.rs}`, `crates/iv-viewer/Cargo.toml`, `Cargo.lock`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 真正窗口置顶可切换；背景/棋盘格顶部入口及偏好兼容；窄宽布局、原图像素、动画与菜单回归；测试/构建/实机后中文本地合入，不发布 |
 | IV-REL-040 | 发布AVIF与浏览增强正式版v0.4.0 | DONE | ChatGPT-AgentDock | 用户明确授权 / FMT-02及N10–N12 DONE | `Cargo.toml`, `Cargo.lock`, `tools/{setup.iss,package_release.py,build_windows_release.py}`, `tools/tests/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**` | 版本统一、完整许可/运行依赖；101项Rust与安装契约、Release实机、隔离安装/卸载、ZIP与hash；推送main及新tag、正式Release与公开下载核验；不改变当前安装 |
@@ -307,3 +307,5 @@ IV-P1-N14 DONE：集成 `98abd01e4abbdf34b1a70c0fc4c66d55d137153d`，110项Rust/
 Base `dce3e4ab520fddff5f45459161ad23fd42fc64bd`；branch `codex/release-v0.5.0`，worktree `Temp/worktrees/release-v0.5.0`。本轮允许打包发布、推送现有本地功能及中文新提交、创建v0.5.0正式Latest并保留旧版本。README面向用户，每项主要功能配当前版本实机图；RGBA各通道、动画播放/暂停/逐帧展示，公开素材仅项目自有和合成测试图片，截图不能暴露本机路径。发布使用独立静态CRT构建、固定源码hash、110项现有Rust和配置测试、隔离安装与便携运行验证，公开下载复核hash。不更改系统关联或当前安装、不关闭用户窗口、不强推。
 
 IV-REL-050 REVIEW：分支 `50360dc91986ecf1a1b497ac1b3cd84a78d72bc2`，业务源码与已截图0.5.0版本一致；110项Rust及24项配置/README检查通过。11组功能图解含10张静态图和1段实际播放暂停逐帧GIF，公开图片不含本机路径。准备串行合入后重新构建正式包。
+
+IV-REL-050 DONE：v0.5.0 Latest正式发布，ID 392340200；源码 `0fb8b97049bb1f4ee974a8aae857e1ea897e6209`，README11组图文和公开图片hash核验通过，110项Rust/24项检查/正式包与便携复验通过。保留旧版，不更新当前安装；NEXT IV-P1-01。
