@@ -499,6 +499,23 @@ def run(args):
                     assert (order.index(hwnd) < order.index(peer)) == action['value'], ('Z-order', order)
                 finally:
                     destroy(peer); focus(hwnd)
+            elif kind == 'burst':
+                # Record the real native window at bounded intervals, never fabricate animation.
+                count = int(action['count'])
+                interval = float(action.get('interval', 0.1))
+                if not 1 <= count <= 120 or not 0.05 <= interval <= 1.0:
+                    raise ValueError('Capture burst exceeds its safe bounds')
+                focus(hwnd)
+                _, _, origin, dpi = geometry(hwnd)
+                started = time.monotonic()
+                for index in range(count):
+                    time.sleep(max(0.0, started + index * interval - time.monotonic()))
+                    if u.GetForegroundWindow() != hwnd:
+                        raise RuntimeError('Foreground changed while recording this viewer')
+                    if action.get('keep_toolbar'):
+                        checked(u.SetCursorPos(origin.x + round((30 + index % 2 * 4) * dpi / 96),
+                                               origin.y + round(135 * dpi / 96)), 'Keep toolbar visible')
+                    shot(f"{action['name']}-{index:03}")
             elif kind == 'wait':
                 time.sleep(float(action['seconds']))
             elif kind == 'shot':

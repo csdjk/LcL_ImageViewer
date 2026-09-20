@@ -164,6 +164,8 @@ def run(args: argparse.Namespace) -> None:
   上下方向键：Mipmap；Space：动画播放暂停；逗号/句号：逐帧。
   B：图片完整边界；S：向下浏览子文件夹；顶部显示相对路径。
   T：深浅主题；Delete：确认后移入回收站；Esc：关弹层/退出。
+  顶部图钉：窗口置顶；背景按钮：棋盘格、纯色和调色板，实时预览并保存。
+  调色板：二维选色、色相条、HEX色号和快捷色块。
 
 可选的资源管理器缩略图扩展
   iv_shell.dll、register_thumbnail.ps1、unregister_thumbnail.ps1 请保持同目录。
