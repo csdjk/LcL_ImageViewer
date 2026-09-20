@@ -120,3 +120,7 @@ tools/setup.iss
 Base `265ff830f578aa5e40845cbcad55008dcd95e24e`；Owner ChatGPT-AgentDock；branch `codex/background-palette`；worktree `Temp/worktrees/background-palette`。将RGB滑条改为二维SV调色板、色相条、快捷色与HEX输入，实时预览并复用原背景持久化语义；自定义独立子面板避免560高窗口溢出。只改菜单和回归资料，不改解码/图像/主题/原生置顶、不升级依赖、不push或打包。完成测试、局部格式、双主题实机与本地main复验。
 
 IV-P1-N14 DONE：主线 `98abd01e4abbdf34b1a70c0fc4c66d55d137153d` 完成110项Rust、18项配置/check/Release及74张实机复验；原图/偏好/置顶保持。代码与验证文档本地中文提交，未发布或更新安装。
+
+## IV-MAC-01 — 用户授权macOS构建
+
+Base f25287e；独立分支 codex/macos-package，worktree Temp/worktrees/macos-package。允许新增最小平台适配、推送任务分支/集成主线和GitHub Actions构建产物；不创建或修改正式Release/Latest、不改用户安装。保留核心解码/渲染，Windows API使用平台条件隔离，macOS以原生打开面板、Cmd+O、系统废纸篓和中文系统字体适配。Windows桌面磨砂及Explorer缩略图不伪装为Mac可用。公开仓库使用标准macos-14 ARM及macos-15-intel runner；未提供开发者证书，不假称公证。DMG拖入Applications，包包含许可、版本与源commit/hash。两架构执行测试和窗口启动截图，Windows回归及main复验；失败保留日志并修复。

@@ -3,7 +3,11 @@
 > 更新时间：2026-09-20。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-MAC-01 -->
+
+## 当前任务：macOS云端打包
+
+IV-MAC-01 IN_PROGRESS；独立分支 codex/macos-package。构建Apple Silicon/Intel DMG，保留Windows正式版；无Developer ID/公证凭据，不发布新Latest。
 
 ## 当前最新正式版：v0.5.0
 
