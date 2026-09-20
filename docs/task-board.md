@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-P1-N15 | 左右切图按钮圆形化 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮要求 / v0.5.0 当前main | `crates/iv-viewer/src/{ui.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**` | 两侧按钮背景和玻璃遮罩为真圆形；箭头/点击/禁用/显隐保持；测试+实机截图+本地main复验，不发布 |
 | IV-MAC-01 | macOS双架构GitHub打包 | DONE | ChatGPT-AgentDock | 用户明确要求macOS安装包 | `crates/iv-viewer/**`, `crates/iv-core/tests/**`, `Cargo.lock`, `.github/workflows/**`, `tools/macos/**`, `README.md`, `docs/releases/macos.md` | 双架构云端编译/测试/启动及DMG校验；Windows无回归；仅工作流产物不发新Latest |
 | IV-REL-050 | 发布置顶调色板与图文说明v0.5.0 | DONE | ChatGPT-AgentDock | 用户本轮授权 / N13及调色板已完成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/screenshots/**`, `docs/releases/**`, `docs/screenshot-*.jpg` | 全部功能配当前实机图、动画播放暂停逐帧GIF；版本/测试/构建/包体验证；main与新标签及Latest正式发布和下载hash；保留当前安装 |
 | IV-P1-N14 | 自定义背景调色板 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N13 DONE | `crates/iv-viewer/src/{app.rs,main.rs,color_palette.rs}`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**` | 二维SV色板/色相条/快捷色/HEX，实时预览；黑白灰不丢色相，旧偏好与原图不变；测试/构建/实机/本地合入，不发布 |
