@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import ApplicationServices
 
 // Only inspect/activate the exact new process passed by the smoke test.
 let args = CommandLine.arguments

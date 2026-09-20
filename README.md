@@ -28,6 +28,8 @@ RGBA 通道查看 · 动画播放与逐帧检查 · DDS / TGA / PSD / AVIF · �
 
 升级前先关闭旧版本。升级沿用原安装目录；全新安装默认使用 `D:\Program Files\LcL ImageViewer`，没有 D 盘时使用当前用户目录，安装位置也可手动修改。程序不会擅自更改系统默认看图软件。
 
+**macOS 预览版：** 已新增 Apple Silicon / Intel 云端构建入口，安装方式、签名状态和平台差异见 [macOS 构建说明](docs/releases/macos.md)。下方功能配图为 Windows 版本实机图。
+
 ## 功能图解
 
 ### RGBA 单独切换查看

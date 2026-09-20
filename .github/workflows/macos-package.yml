@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: macos-package-${{ github.ref }}
+  group: macos-package-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -45,10 +45,24 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
           brew list cmake >/dev/null 2>&1 || brew install cmake
-          brew list nasm >/dev/null 2>&1 || brew install nasm
           rustc --version
           uname -m
           sw_vers
+      - name: Restore native build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-${{ matrix.runner }}-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            macos-${{ matrix.runner }}-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Compatible Intel assembler
+        if: matrix.arch == 'x86_64'
+        run: bash tools/macos/install_nasm.sh
+      - name: Check packaging boundaries
+        run: python3 tools/macos/test_contracts.py
       - name: Test shared viewer and image decoders
         run: |
           set -o pipefail

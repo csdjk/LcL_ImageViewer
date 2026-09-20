@@ -59,7 +59,7 @@ def run(args: argparse.Namespace) -> None:
     notes = f'''LcL ImageViewer {version} · macOS preview · {args.arch}
 
 安装：打开 DMG，将 LcL ImageViewer.app 拖入 Applications。
-Apple Silicon (M1/M2/M3/M4/M5 等) 使用 arm64；Intel Mac 使用 x86_64。
+Apple Silicon（M 系列芯片） 使用 arm64；Intel Mac 使用 x86_64。
 最低部署目标 macOS 12.0；云端实际验证系统见 build-manifest.json。
 
 此测试包使用 ad-hoc 签名，未使用 Developer ID，也未经过 Apple 公证。
