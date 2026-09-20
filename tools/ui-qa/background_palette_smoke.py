@@ -31,7 +31,7 @@ def run(args):
         move(); wait(); click(bx, 34); click(left + 90, 276); wait()
     def type_hex(text):
         click(left + 150, 300); key('A', ['ctrl'])
-        for char in text: key(char)
+        actions.append({'kind': 'text', 'text': text})
         wait()
     key('0'); key('5'); shot('base'); key('4'); shot('base-alpha'); key('5')
     actions.append({'kind': 'assert-topmost', 'value': True})
