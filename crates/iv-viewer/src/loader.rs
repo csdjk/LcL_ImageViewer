@@ -10,11 +10,14 @@ use iv_core::decode::{decode_path, DecodeError, DecodedImage};
 
 pub enum Msg {
     Ready(Result<(PathBuf, Arc<DecodedImage>), (PathBuf, String)>),
+    Outdated(PathBuf),
 }
 
 impl Msg {
     fn path(&self) -> &Path {
-        match self { Self::Ready(Ok((p, _))) | Self::Ready(Err((p, _))) => p }
+        match self {
+            Self::Ready(Ok((p, _))) | Self::Ready(Err((p, _))) | Self::Outdated(p) => p,
+        }
     }
 }
 
@@ -65,7 +68,7 @@ impl Requests {
 pub struct Loader {
     requests: Arc<(Mutex<Requests>, Condvar)>,
     wake: Arc<Mutex<Option<egui::Context>>>,
-    results: Receiver<(u64, Msg)>,
+    results: Receiver<(u64, crate::file_watch::FileState, Msg)>,
 }
 
 impl Loader {
@@ -90,6 +93,7 @@ impl Loader {
                     (state.generation, state.next().unwrap())
                 };
                 let started = Instant::now();
+                let source_version = crate::file_watch::FileState::read(&path);
                 crate::perf::mark("decode_start", Some(&path), 0.0);
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode(&path)))
                     .unwrap_or_else(|_| Err(DecodeError::Decode("解码器异常，请检查图片文件".into())))
@@ -102,7 +106,7 @@ impl Loader {
                     state.inflight = None;
                     state.undelivered.insert(path.clone());
                 }
-                if tx.send((generation, Msg::Ready(result.map(|img| (path, Arc::new(img)))))).is_err() { break; }
+                if tx.send((generation, source_version, Msg::Ready(result.map(|img| (path, Arc::new(img)))))).is_err() { break; }
                 if let Some(ctx) = &*wake_worker.lock().unwrap() { ctx.request_repaint(); }
             }
         }).expect("创建解码线程失败");
@@ -135,10 +139,16 @@ impl Loader {
     }
 
     pub fn poll(&self) -> Option<Msg> {
-        while let Ok((generation, msg)) = self.results.try_recv() {
+        while let Ok((generation, source_version, msg)) = self.results.try_recv() {
             let mut state = self.requests.0.lock().unwrap();
             if generation != state.generation { continue; }
             state.undelivered.remove(msg.path());
+            drop(state);
+            // A -> B -> edited A may reuse in-flight A. Validate before delivery,
+            // including results already queued while another file was displayed.
+            if source_version != crate::file_watch::FileState::read(msg.path()) {
+                return Some(Msg::Outdated(msg.path().to_path_buf()));
+            }
             return Some(msg);
         }
         None
@@ -247,5 +257,37 @@ mod tests {
             assert!(Instant::now() < deadline);
             std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    #[test]
+    fn navigating_back_to_an_edited_inflight_file_never_delivers_old_pixels() {
+        use std::time::{Duration, SystemTime};
+        let path = std::env::temp_dir().join(format!("iv-source-version-{}-{}",
+            std::process::id(), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::write(&path, b"v1").unwrap();
+        let (started_tx, started_rx) = crossbeam_channel::unbounded();
+        let (release_tx, release_rx) = crossbeam_channel::bounded(1);
+        let decoder_path = path.clone();
+        let loader = Loader::with_decoder(move |p| {
+            started_tx.send(p.to_path_buf()).unwrap();
+            if p == decoder_path { release_rx.recv_timeout(Duration::from_secs(3)).unwrap(); }
+            Err(DecodeError::Truncated)
+        });
+        loader.load(path.clone());
+        assert_eq!(started_rx.recv_timeout(Duration::from_secs(3)).unwrap(), path);
+        loader.load(p("other"));
+        std::fs::write(&path, b"version-2").unwrap();
+        loader.load(path.clone());
+        release_tx.send(()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            if let Some(message) = loader.poll() {
+                assert!(matches!(message, Msg::Outdated(ref p) if *p == path));
+                break;
+            }
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        std::fs::remove_file(path).unwrap();
     }
 }

@@ -324,6 +324,8 @@ def run(args):
             if meta['logical_client'] != [args.width, args.height]:
                 raise RuntimeError(f'Client size mismatch: {meta}')
             meta.update({key: value for key, value in summary.items() if key != 'captures'})
+            if args.input:
+                meta['input_sha256'] = sha(args.input) if args.input.is_file() else None
             meta.update({'theme': current_theme, 'state': name, 'actions': list(history),
                          'utc': datetime.now(timezone.utc).isoformat(), 'pid': proc.pid, 'window_title': title.value,
                          'window_discovery': 'launched PID + verified process image path + unique visible client',

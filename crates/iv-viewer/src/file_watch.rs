@@ -18,7 +18,7 @@ pub enum FileState {
 }
 
 impl FileState {
-    fn read(path: &Path) -> Self {
+    pub(crate) fn read(path: &Path) -> Self {
         let metadata = (|| {
             let meta = std::fs::metadata(path)?;
             if !meta.is_file() {

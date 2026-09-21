@@ -695,6 +695,10 @@ impl App {
     fn handle_loader_messages(&mut self) {
         while let Some(msg) = self.loader.poll() {
             match msg {
+                Msg::Outdated(path) => {
+                    self.cache.remove(&path);
+                    if self.pending.as_ref() == Some(&path) { self.reload_current(); }
+                }
                 Msg::Ready(Ok((path, img))) => {
                     if !path.is_file() {
                         self.cache.remove(&path);
