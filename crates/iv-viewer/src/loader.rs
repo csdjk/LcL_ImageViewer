@@ -9,14 +9,14 @@ use eframe::egui;
 use iv_core::decode::{decode_path, DecodeError, DecodedImage};
 
 pub enum Msg {
-    Ready(Result<(PathBuf, Arc<DecodedImage>), (PathBuf, String)>),
+    Ready(Result<(PathBuf, Arc<DecodedImage>, crate::file_watch::FileState), (PathBuf, String)>),
     Outdated(PathBuf),
 }
 
 impl Msg {
     fn path(&self) -> &Path {
         match self {
-            Self::Ready(Ok((p, _))) | Self::Ready(Err((p, _))) | Self::Outdated(p) => p,
+            Self::Ready(Ok((p, _, _))) | Self::Ready(Err((p, _))) | Self::Outdated(p) => p,
         }
     }
 }
@@ -106,7 +106,8 @@ impl Loader {
                     state.inflight = None;
                     state.undelivered.insert(path.clone());
                 }
-                if tx.send((generation, source_version, Msg::Ready(result.map(|img| (path, Arc::new(img)))))).is_err() { break; }
+                let ready = result.map(|img| (path, Arc::new(img), source_version.clone()));
+                if tx.send((generation, source_version, Msg::Ready(ready))).is_err() { break; }
                 if let Some(ctx) = &*wake_worker.lock().unwrap() { ctx.request_repaint(); }
             }
         }).expect("创建解码线程失败");

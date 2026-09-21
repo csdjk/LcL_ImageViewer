@@ -48,7 +48,7 @@ struct ImageCache {
     map: HashMap<PathBuf, Arc<DecodedImage>>,
     order: Vec<PathBuf>,
     bytes: usize,
-    stamps: HashMap<PathBuf, (u64, Option<std::time::SystemTime>)>,
+    stamps: HashMap<PathBuf, crate::file_watch::FileState>,
 }
 
 impl ImageCache {
@@ -72,13 +72,12 @@ impl ImageCache {
         mip + frm
     }
 
-    fn stamp(path: &Path) -> Option<(u64, Option<std::time::SystemTime>)> {
-        let meta = std::fs::metadata(path).ok()?;
-        if !meta.is_file() { return None; }
-        Some((meta.len(), meta.modified().ok()))
+    fn stamp(path: &Path) -> Option<crate::file_watch::FileState> {
+        let state = crate::file_watch::FileState::read(path);
+        matches!(state, crate::file_watch::FileState::Present { .. }).then_some(state)
     }
 
-    fn get(&mut self, path: &Path) -> Option<Arc<DecodedImage>> {
+    fn get(&mut self, path: &Path) -> Option<(Arc<DecodedImage>, crate::file_watch::FileState)> {
         if !self.map.contains_key(path) { return None; }
         if Self::stamp(path).as_ref() != self.stamps.get(path) {
             self.remove(path);
@@ -86,7 +85,7 @@ impl ImageCache {
         }
         self.order.retain(|p| p != path);
         self.order.push(path.to_path_buf());
-        self.map.get(path).cloned()
+        Some((self.map.get(path)?.clone(), self.stamps.get(path)?.clone()))
     }
 
     fn remove(&mut self, path: &Path) {
@@ -97,11 +96,12 @@ impl ImageCache {
         self.order.retain(|p| p != path);
     }
 
-    fn put(&mut self, path: PathBuf, img: Arc<DecodedImage>, keep: &Path) {
+    fn put(&mut self, path: PathBuf, img: Arc<DecodedImage>, keep: &Path, stamp: crate::file_watch::FileState) {
         if self.map.contains_key(&path) {
             return;
         }
-        let Some(stamp) = Self::stamp(&path) else { return; };
+        // Stamp pixels with their decoded source, never a later on-disk version.
+        if !matches!(stamp, crate::file_watch::FileState::Present { .. }) { return; }
         // Oversized speculative entries must not evict all useful neighbours.
         if Self::image_bytes(&img) > CACHE_BUDGET_BYTES && path != keep { return; }
         self.stamps.insert(path.clone(), stamp);
@@ -416,7 +416,7 @@ impl App {
         } else if let Some(index) = self.directory.as_ref().and_then(|d| d.files.iter().position(|p| p == &path)) {
             self.directory.as_mut().unwrap().index = index;
         }
-        if let Some(img) = cached { self.set_current(path, img); }
+        if let Some((img, source)) = cached { self.set_current(path, img, source); }
     }
 
     fn request_directory_scan(&mut self, anchor: Option<PathBuf>) {
@@ -482,7 +482,7 @@ impl App {
         }
     }
 
-    fn set_current(&mut self, path: PathBuf, img: Arc<DecodedImage>) {
+    fn set_current(&mut self, path: PathBuf, img: Arc<DecodedImage>, source: crate::file_watch::FileState) {
         let reloading = self.load_intent == LoadIntent::Reload;
         let preserve_view = self.load_intent != LoadIntent::Open;
         self.mip_index = self.mip_index.min(img.mips.len().saturating_sub(1));
@@ -496,7 +496,7 @@ impl App {
         self.playing = img.frames.len() > 1 && (!preserve_animation || self.playing);
         self.next_frame_at = Instant::now()
             + Duration::from_millis(img.frames.get(self.frame_index).map(|f| f.delay_ms as u64).unwrap_or(100));
-        self.cache.put(path.clone(), img.clone(), &path);
+        self.cache.put(path.clone(), img.clone(), &path, source);
         self.current = Some(CurrentImage { path, img });
         self.pending = None;
         self.error_msg = None;
@@ -699,7 +699,7 @@ impl App {
                     self.cache.remove(&path);
                     if self.pending.as_ref() == Some(&path) { self.reload_current(); }
                 }
-                Msg::Ready(Ok((path, img))) => {
+                Msg::Ready(Ok((path, img, source))) => {
                     if !path.is_file() {
                         self.cache.remove(&path);
                         if self.pending.as_ref() == Some(&path) {
@@ -714,7 +714,7 @@ impl App {
                                 d.index = i;
                             }
                         }
-                        self.set_current(path, img);
+                        self.set_current(path, img, source);
                     } else {
                         if !self.directory_scope.as_ref().map_or(false, |scope| scope.contains(&path)) { continue; }
                         // 预读结果：只进缓存
@@ -723,7 +723,7 @@ impl App {
                             .as_ref()
                             .map(|c| c.path.clone())
                             .unwrap_or_default();
-                        self.cache.put(path, img, &keep);
+                        self.cache.put(path, img, &keep, source);
                     }
                 }
                 Msg::Ready(Err((path, err))) => {
@@ -3259,18 +3259,31 @@ mod cache_validity_tests {
     #[test]
     fn edited_or_removed_files_do_not_hit_stale_cache() {
         let (path,image)=fixture(); let mut cache=ImageCache::new();
-        cache.put(path.clone(),image.clone(),&path); assert!(cache.get(&path).is_some());
+        cache.put(path.clone(),image.clone(),&path,ImageCache::stamp(&path).unwrap()); assert!(cache.get(&path).is_some());
         std::fs::write(&path,[1,2]).unwrap(); assert!(cache.get(&path).is_none()); assert_eq!(cache.bytes,0);
-        cache.put(path.clone(),image,&path); std::fs::remove_file(&path).unwrap();
+        cache.put(path.clone(),image,&path,ImageCache::stamp(&path).unwrap()); std::fs::remove_file(&path).unwrap();
         assert!(cache.get(&path).is_none()); assert_eq!(cache.bytes,0);
     }
     #[test]
     fn cache_hits_promote_real_lru_without_copying_pixels() {
         let (a,image)=fixture(); let (b,second)=fixture(); let mut cache=ImageCache::new();
-        cache.put(a.clone(),image.clone(),&a); cache.put(b.clone(),second,&b);
-        assert!(Arc::ptr_eq(&cache.get(&a).unwrap(),&image));
+        cache.put(a.clone(),image.clone(),&a,ImageCache::stamp(&a).unwrap());
+        cache.put(b.clone(),second,&b,ImageCache::stamp(&b).unwrap());
+        assert!(Arc::ptr_eq(&cache.get(&a).unwrap().0,&image));
         assert_eq!(cache.order,vec![b.clone(),a.clone()]); assert_eq!(cache.bytes,8);
         std::fs::remove_file(a).unwrap(); std::fs::remove_file(b).unwrap();
+    }
+
+    #[test]
+    fn saving_between_decode_delivery_and_cache_insert_does_not_relabel_old_pixels() {
+        let (path, image) = fixture();
+        let decoded_version = ImageCache::stamp(&path).unwrap();
+        std::fs::write(&path, [1, 2]).unwrap();
+        let mut cache = ImageCache::new();
+        cache.put(path.clone(), image, &path, decoded_version);
+        assert!(cache.get(&path).is_none());
+        assert_eq!(cache.bytes, 0);
+        std::fs::remove_file(path).unwrap();
     }
 }
 
