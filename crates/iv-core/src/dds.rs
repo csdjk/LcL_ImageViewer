@@ -57,7 +57,7 @@ impl BlockFormat {
 /// DX10 头中 DXGI_FORMAT 枚举值（仅列出本解码器支持的）。
 #[derive(Debug, Clone, Copy)]
 enum DxgiFormat {
-    Rgba8 { bgra: bool },
+    Rgba8 { bgra: bool, alpha: bool },
     Rgba16F,
     Rgba32F,
     Bc(BlockFormat),
@@ -67,18 +67,19 @@ enum DxgiFormat {
 
 fn dxgi_from_u32(v: u32) -> Option<DxgiFormat> {
     Some(match v {
-        28 | 29 => DxgiFormat::Rgba8 { bgra: false }, // R8G8B8A8_UNORM / _SRGB
-        87 => DxgiFormat::Rgba8 { bgra: true },       // B8G8R8A8_UNORM
-        88 => DxgiFormat::Rgba8 { bgra: true },       // B8G8R8X8_UNORM（忽略 X）
+        28 | 29 => DxgiFormat::Rgba8 { bgra: false, alpha: true },
+        87 | 91 => DxgiFormat::Rgba8 { bgra: true, alpha: true },
+        88 | 93 => DxgiFormat::Rgba8 { bgra: true, alpha: false },
         10 => DxgiFormat::Rgba16F,
         2 => DxgiFormat::Rgba32F,
         71 | 72 => DxgiFormat::Bc(BlockFormat::Bc1),
         74 | 75 => DxgiFormat::Bc(BlockFormat::Bc2),
         77 | 78 => DxgiFormat::Bc(BlockFormat::Bc3),
-        80 | 81 => DxgiFormat::Bc(BlockFormat::Bc4),
-        83 | 84 => DxgiFormat::Bc(BlockFormat::Bc5),
-        90 => DxgiFormat::Bc6 { signed: false }, // BC6H_UF16
-        91 => DxgiFormat::Bc6 { signed: true },  // BC6H_SF16
+        // The current BC4/5 decoder is unsigned; do not misread SNORM as UNORM.
+        80 => DxgiFormat::Bc(BlockFormat::Bc4),
+        83 => DxgiFormat::Bc(BlockFormat::Bc5),
+        95 => DxgiFormat::Bc6 { signed: false }, // BC6H_UF16
+        96 => DxgiFormat::Bc6 { signed: true },  // BC6H_SF16
         98 | 99 => DxgiFormat::Bc(BlockFormat::Bc7),
         _ => return None,
     })
@@ -218,7 +219,7 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
                     let (name, alpha) = match dxgi {
                         DxgiFormat::Bc(bc) => (Some(bc.name()), bc.has_alpha()),
                         DxgiFormat::Bc6 { .. } => (Some("BC6H"), false),
-                        DxgiFormat::Rgba8 { .. } => (None, true),
+                        DxgiFormat::Rgba8 { alpha, .. } => (None, alpha),
                         DxgiFormat::Rgba16F | DxgiFormat::Rgba32F => (None, true),
                     };
                     (Some(dxgi), name, alpha, 0, false)
@@ -297,6 +298,12 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         ImageKind::Dds
     };
 
+    let mut notes = Vec::new();
+    if is_cubemap { notes.push("cubemap（显示第 1 面）"); }
+    if is_volume { notes.push("volume（显示第 1 层）"); }
+    if matches!(dxgi, Some(DxgiFormat::Bc6 { .. })) {
+        notes.push("BC6H：8 位预览，未保留 HDR 浮点值");
+    }
     Ok(DecodedImage {
         width,
         height,
@@ -305,11 +312,7 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         compression: compression.map(|s| s.to_string()),
         has_alpha,
         is_hdr,
-        extra_meta: if is_cubemap || is_volume {
-            Some(if is_cubemap { "cubemap（显示第 1 面）" } else { "volume（显示第 1 层）" }.into())
-        } else {
-            None
-        },
+        extra_meta: (!notes.is_empty()).then(|| notes.join("；")),
         frames: Vec::new(),
     })
 }
@@ -381,7 +384,7 @@ fn decode_one_mip(
                 .map_err(|e| DecodeError::Decode(format!("BC6H 解码失败: {e}")))?;
             Ok(PixelData::Rgba8(u32s_to_rgba8(&out)))
         }
-        Some(DxgiFormat::Rgba8 { bgra }) => {
+        Some(DxgiFormat::Rgba8 { bgra, alpha }) => {
             let byte_len = px_count * 4;
             let data = bytes
                 .get(offset..offset + byte_len)
@@ -389,7 +392,7 @@ fn decode_one_mip(
             let mut rgba = Vec::with_capacity(byte_len);
             if bgra {
                 for px in data.chunks_exact(4) {
-                    rgba.extend_from_slice(&[px[2], px[1], px[0], px[3]]);
+                    rgba.extend_from_slice(&[px[2], px[1], px[0], if alpha { px[3] } else { 255 }]);
                 }
             } else {
                 rgba.extend_from_slice(data);

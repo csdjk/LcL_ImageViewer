@@ -20,6 +20,7 @@ impl Msg {
 
 #[derive(Default)]
 struct Requests {
+    generation: u64,
     foreground: Option<PathBuf>,
     prefetch: VecDeque<PathBuf>,
     inflight: Option<PathBuf>,
@@ -28,6 +29,14 @@ struct Requests {
 }
 
 impl Requests {
+    fn invalidate(&mut self) {
+        self.generation += 1;
+        self.foreground = None;
+        self.prefetch.clear();
+        self.inflight = None;
+        self.undelivered.clear();
+    }
+
     fn load(&mut self, path: PathBuf) {
         self.prefetch.clear();
         self.foreground = if self.inflight.as_ref() == Some(&path) || self.undelivered.contains(&path) {
@@ -56,7 +65,7 @@ impl Requests {
 pub struct Loader {
     requests: Arc<(Mutex<Requests>, Condvar)>,
     wake: Arc<Mutex<Option<egui::Context>>>,
-    results: Receiver<Msg>,
+    results: Receiver<(u64, Msg)>,
 }
 
 impl Loader {
@@ -71,14 +80,14 @@ impl Loader {
         let (tx, results) = crossbeam_channel::bounded(2);
         std::thread::Builder::new().name("iv-loader".into()).spawn(move || {
             loop {
-                let path = {
+                let (generation, path) = {
                     let (mutex, signal) = &*worker;
                     let mut state = mutex.lock().unwrap();
                     while !state.stopped && state.foreground.is_none() && state.prefetch.is_empty() {
                         state = signal.wait(state).unwrap();
                     }
                     if state.stopped { break; }
-                    state.next().unwrap()
+                    (state.generation, state.next().unwrap())
                 };
                 let started = Instant::now();
                 crate::perf::mark("decode_start", Some(&path), 0.0);
@@ -89,10 +98,11 @@ impl Loader {
                 {
                     let mut state = worker.0.lock().unwrap();
                     if state.stopped { break; }
+                    if state.generation != generation { continue; }
                     state.inflight = None;
                     state.undelivered.insert(path.clone());
                 }
-                if tx.send(Msg::Ready(result.map(|img| (path, Arc::new(img))))).is_err() { break; }
+                if tx.send((generation, Msg::Ready(result.map(|img| (path, Arc::new(img)))))).is_err() { break; }
                 if let Some(ctx) = &*wake_worker.lock().unwrap() { ctx.request_repaint(); }
             }
         }).expect("创建解码线程失败");
@@ -111,16 +121,27 @@ impl Loader {
         self.requests.1.notify_one();
     }
 
+    /// A new version of the same path must not reuse in-flight/queued old pixels.
+    pub fn reload(&self, path: PathBuf) {
+        let mut state = self.requests.0.lock().unwrap();
+        state.invalidate();
+        state.load(path);
+        self.requests.1.notify_one();
+    }
+
     pub fn cancel_queued(&self) {
         let mut state = self.requests.0.lock().unwrap();
-        state.foreground = None;
-        state.prefetch.clear();
+        state.invalidate();
     }
 
     pub fn poll(&self) -> Option<Msg> {
-        let msg = self.results.try_recv().ok()?;
-        self.requests.0.lock().unwrap().undelivered.remove(msg.path());
-        Some(msg)
+        while let Ok((generation, msg)) = self.results.try_recv() {
+            let mut state = self.requests.0.lock().unwrap();
+            if generation != state.generation { continue; }
+            state.undelivered.remove(msg.path());
+            return Some(msg);
+        }
+        None
     }
 }
 
@@ -180,5 +201,51 @@ mod tests {
         release_tx.send(()).unwrap();
         assert_eq!(started_rx.recv_timeout(Duration::from_secs(3)).unwrap(),p("last"));
         assert!(started_rx.recv_timeout(Duration::from_millis(30)).is_err());
+    }
+
+    #[test]
+    fn reload_same_path_discards_inflight_and_queued_old_versions() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Duration;
+        let (started_tx, started_rx) = crossbeam_channel::unbounded();
+        let (release_tx, release_rx) = crossbeam_channel::bounded(1);
+        let sequence = AtomicUsize::new(0);
+        let loader = Loader::with_decoder(move |_| {
+            let n = sequence.fetch_add(1, Ordering::SeqCst);
+            started_tx.send(n).unwrap();
+            if n == 0 { release_rx.recv_timeout(Duration::from_secs(3)).unwrap(); }
+            Err(DecodeError::Decode(format!("version-{n}")))
+        });
+        loader.load(p("same"));
+        assert_eq!(started_rx.recv_timeout(Duration::from_secs(3)).unwrap(), 0);
+        loader.reload(p("same"));
+        release_tx.send(()).unwrap();
+        assert_eq!(started_rx.recv_timeout(Duration::from_secs(3)).unwrap(), 1);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            if let Some(Msg::Ready(Err((path, error)))) = loader.poll() {
+                assert_eq!(path, p("same"));
+                assert!(error.contains("version-1"));
+                break;
+            }
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        loader.load(p("queued"));
+        assert_eq!(started_rx.recv_timeout(Duration::from_secs(3)).unwrap(), 2);
+        while loader.requests.0.lock().unwrap().undelivered.is_empty() {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        loader.reload(p("queued"));
+        assert_eq!(started_rx.recv_timeout(Duration::from_secs(3)).unwrap(), 3);
+        loop {
+            if let Some(Msg::Ready(Err((_, error)))) = loader.poll() {
+                assert!(error.contains("version-3"));
+                break;
+            }
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+        }
     }
 }

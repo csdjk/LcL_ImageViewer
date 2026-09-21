@@ -281,7 +281,8 @@ def run(args):
         # RON maps accept the same simple string key/value syntax as this JSON subset.
         prefs = {'iv-theme': args.theme, 'iv-backdrop': 'off', 'iv-checkerboard': 'on', 'iv-reduce-motion': 'off'}
         seed = getattr(args, 'seed_preferences', {})
-        allowed = {'iv-always-on-top', 'iv-background-color', 'iv-checkerboard', 'iv-backdrop', 'iv-theme'}
+        allowed = {'iv-always-on-top', 'iv-background-color', 'iv-checkerboard', 'iv-backdrop', 'iv-theme',
+                   'iv-auto-refresh', 'iv-lock-view'}
         if not set(seed) <= allowed or not all(isinstance(v, str) for v in seed.values()):
             raise ValueError('Only explicit appearance preference values can be seeded')
         prefs.update(seed)
@@ -525,7 +526,10 @@ def run(args):
                 u.mouse_event(0x0800, 0, 0, action['delta'] & 0xffffffff, 0)
                 time.sleep(0.3)
             else:
-                raise ValueError(f'Unknown action: {kind}')
+                handler = getattr(args, 'action_handler', None)
+                if handler is None:
+                    raise ValueError(f'Unknown action: {kind}')
+                handler(action, hwnd, shot)
         summary['result'] = 'captured; visual review required'
     finally:
         for release in pressed_releases:
