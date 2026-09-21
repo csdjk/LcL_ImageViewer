@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-TA-01 | 轻量贴图检查首轮：DDS、动画预算、自动刷新与视图锁定 | READY | — | 用户授权 / 当前 main | 见 `docs/轻量贴图检查优化计划.md` | DDS标准样例、内存边界、保存刷新与竞态测试；双主题双尺寸实机、release及main复验；本地提交不发布 |
 | IV-REL-051 | 发布圆形侧边按钮 v0.5.1 | DONE | ChatGPT-AgentDock | 用户明确要求打包发布 / N15 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `CHANGELOG.md`, `docs/releases/**`, `README.md` | 版本统一；正式构建/测试/安装与便携包验证；push main+新tag并设Latest；公开下载hash；不改当前安装 |
 | IV-P1-N15 | 左右切图按钮圆形化 | DONE | ChatGPT-AgentDock | 用户本轮要求 / v0.5.0 当前main | `crates/iv-viewer/src/{ui.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**` | 两侧按钮背景和玻璃遮罩为真圆形；箭头/点击/禁用/显隐保持；测试+实机截图+本地main复验，不发布 |
 | IV-MAC-01 | macOS双架构GitHub打包 | DONE | ChatGPT-AgentDock | 用户明确要求macOS安装包 | `crates/iv-viewer/**`, `crates/iv-core/tests/**`, `Cargo.lock`, `.github/workflows/**`, `tools/macos/**`, `README.md`, `docs/releases/macos.md` | 双架构云端编译/测试/启动及DMG校验；Windows无回归；仅工作流产物不发新Latest |
