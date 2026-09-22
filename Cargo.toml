@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/iv-core", "crates/iv-viewer", "crates/iv-shell"]
 
 [workspace.package]
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 license = "MIT"
 authors = ["LcL"]
