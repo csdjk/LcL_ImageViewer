@@ -6,7 +6,7 @@
 
 **轻量级 Windows 图片查看器，适合日常看图与游戏贴图检查。**
 
-RGBA 通道查看 · 动画播放与逐帧检查 · DDS / TGA / PSD / AVIF · 背景调色板 · 窗口置顶
+RGBA 通道查看 · DDS / TGA / PSD / AVIF · 保存后刷新与视图锁定 · 动画逐帧检查
 
 [![Release](https://img.shields.io/github/v/release/csdjk/LcL_ImageViewer?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases/latest)
 [![Windows x64](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-blue?style=flat-square)](https://github.com/csdjk/LcL_ImageViewer/releases/latest)

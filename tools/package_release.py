@@ -160,6 +160,7 @@ def run(args: argparse.Namespace) -> None:
   左键/中键拖图；画布右键拖动主窗口；右键单击打开菜单。
   设置标题左键/右键拖动：只移动设置弹窗，主窗口不动。
   滚轮：光标中心缩放；F：适配；0：实际大小；N：切换采样。
+  F5：强制重读当前图片；L：锁定切图视图，切换图片保留缩放和位置。
   1/2/3/4：R/G/B/Alpha；5或C：完整显示；O：忽略Alpha。
   上下方向键：Mipmap；Space：动画播放暂停；逗号/句号：逐帧。
   B：图片完整边界；S：向下浏览子文件夹；顶部显示相对路径。
@@ -180,6 +181,8 @@ def run(args: argparse.Namespace) -> None:
 更新下载：https://github.com/csdjk/LcL_ImageViewer/releases/latest
 源代码提交：{commit}
 AVIF 动画支持暂停、逐帧及宽窗口帧进度；10/12位输入以8位显示。
+当前图片默认自动检查保存变化；在设置中可关闭。失败会保留上一有效画面并提示，可保存后重试或按 F5。
+GIF/APNG/WebP/AVIF 保留帧像素预算 256 MiB；BC6H 为 8 位预览，不代表浮点 HDR 保真。
 暂不支持 AVIF HDR/ICC、有限循环次数自动停止；过大动画会明确报错。
 许可：见 LICENSE 及 licenses 目录；更新记录：见 CHANGELOG.md。
 ''', encoding='utf-8-sig')
