@@ -3,7 +3,11 @@
 > 更新时间：2026-09-20。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-P1-01 -->
+<!-- project-next: IV-TA-01 -->
+
+## 当前进行：轻量贴图检查首轮
+
+2026-09-21 用户授权 `IV-TA-01`，Owner Codex，独立分支 `codex/ta-foundation`、工作树 `Temp/worktrees/ta-foundation`。先修正 DDS 识别、统一动画保留帧预算、增加当前文件自动刷新与视图锁定。合同见 `docs/轻量贴图检查优化计划.md`；完成后恢复 `IV-P1-01`。公开版及当前安装保持 v0.5.1。
 
 ## 当前最新正式版：v0.5.1
 
