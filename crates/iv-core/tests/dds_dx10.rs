@@ -1,5 +1,6 @@
 //! Standard DXGI identifiers must select the correct pixel layout.
 use iv_core::decode::{decode_bytes, DecodeError};
+use iv_core::dds::dds_header_size;
 
 fn dds(format: u32, width: u32, height: u32, payload: &[u8]) -> Vec<u8> {
     let mut bytes = vec![0; 148];
@@ -64,4 +65,18 @@ fn dx10_truncated_payload_is_rejected() {
     for format in [95, 96, 91, 93] {
         assert!(decode_bytes(&dds(format, 4, 4, &[0; 3])).is_err());
     }
+}
+
+#[test]
+fn standard_mipmap_flag_exposes_and_decodes_all_levels() {
+    let mut pixels = vec![20, 30, 40, 255].repeat(16);
+    pixels.extend(vec![100, 120, 140, 255].repeat(4));
+    let mut bytes = dds(28, 4, 4, &pixels);
+    bytes[8..12].copy_from_slice(&0x2100Fu32.to_le_bytes());
+    bytes[28..32].copy_from_slice(&2u32.to_le_bytes());
+    assert_eq!(dds_header_size(&bytes), Some((4, 4, 2)));
+    let image = decode_bytes(&bytes).unwrap();
+    assert_eq!(image.mips.len(), 2);
+    assert_eq!(image.mips[0].rgba8_at(0, 0), Some([20, 30, 40, 255]));
+    assert_eq!(image.mips[1].rgba8_at(0, 0), Some([100, 120, 140, 255]));
 }

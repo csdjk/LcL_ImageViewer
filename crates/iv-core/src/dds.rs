@@ -10,7 +10,7 @@
 
 use crate::decode::{DecodeError, DecodedImage, ImageKind, MipLevel, PixelData};
 
-const DDSD_MIPMAPCOUNT: u32 = 0x20_0000;
+const DDSD_MIPMAPCOUNT: u32 = 0x2_0000;
 const DDPF_ALPHAPIXELS: u32 = 0x1;
 const DDPF_FOURCC: u32 = 0x4;
 const DDPF_RGB: u32 = 0x40;
