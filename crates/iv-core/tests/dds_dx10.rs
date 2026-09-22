@@ -1,6 +1,6 @@
 //! Standard DXGI identifiers must select the correct pixel layout.
-use iv_core::decode::{decode_bytes, DecodeError};
 use iv_core::dds::dds_header_size;
+use iv_core::decode::{decode_bytes, DecodeError};
 
 fn dds(format: u32, width: u32, height: u32, payload: &[u8]) -> Vec<u8> {
     let mut bytes = vec![0; 148];

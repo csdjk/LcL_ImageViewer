@@ -56,7 +56,10 @@ def run(args):
         image = Image.open(captures / (action['name'] + '.png')).convert('RGB')
         meta = json.loads((captures / (action['name'] + '.json')).read_text('utf-8'))
         scale = meta['dpi'] / 96
-        center = (round(args.width / 2 * scale), round(args.height / 2 * scale))
+        # The viewer anchors the actual-size texture at the viewport centre;
+        # probe inside the smallest mip rather than on its bottom-right edge.
+        center = (round((args.width / 2 - 20) * scale),
+                  round((args.height / 2 - 20) * scale))
         actual = image.getpixel(center)
         expected = action['rgb']
         assert max(abs(a - b) for a, b in zip(actual, expected)) <= 2, (action['name'], actual, expected)
