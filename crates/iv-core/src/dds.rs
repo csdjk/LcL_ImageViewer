@@ -4,7 +4,7 @@
 //! - 传统 FourCC：DXT1~DXT5 / ATI1 / ATI2 / BC4U / BC5U
 //! - DX10 扩展头：BC1~BC7 全系列、R8G8B8A8、B8G8R8A8、R16G16B16A16_FLOAT、R32G32B32A32_FLOAT
 //! - 未压缩 32bpp（按位掩码识别 ARGB 变体）与 24bpp
-//! - mip 链完整解码；cubemap / texture array 只解第 0 面
+//! - mip 链完整解码；cubemap / texture array / volume 仅显示每级第 1 面或第 1 层
 //!
 //! 解码失败的非法数据一律返回 `Err`，不允许 panic。
 
@@ -135,6 +135,15 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     let caps2 = read_u32(bytes, 112)?;
     let is_cubemap = caps2 & DDSCAPS2_CUBEMAP != 0;
     let is_volume = caps2 & DDSCAPS2_VOLUME != 0;
+    let mut mip_depth = if is_volume {
+        let depth = read_u32(bytes, 24)?;
+        if depth == 0 {
+            return Err(DecodeError::NotAnImage("volume 深度为 0".into()));
+        }
+        depth
+    } else {
+        1
+    };
 
     // 像素格式（DDSPF，偏移 76）
     let pf_size = read_u32(bytes, 76)?;
@@ -260,6 +269,15 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     let mut mip_w = width;
     let mut mip_h = height;
     for _ in 0..mip_count {
+        let level_size = mip_size(mip_w, mip_h, dxgi, bpp)?
+            .checked_mul(mip_depth as usize)
+            .ok_or(DecodeError::Truncated)?;
+        let next_offset = data_offset
+            .checked_add(level_size)
+            .ok_or(DecodeError::Truncated)?;
+        if is_volume && next_offset > bytes.len() {
+            return Err(DecodeError::Truncated);
+        }
         let pixels = decode_one_mip(
             bytes,
             data_offset,
@@ -275,10 +293,11 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
             height: mip_h,
             data: pixels,
         });
-        // 计算本 mip 占用的字节数，推进偏移
-        data_offset += mip_size(mip_w, mip_h, dxgi, bpp)?;
+        // Volume 每级包含全部深度切片；仅显示首层，也须跳过整级。
+        data_offset = next_offset;
         mip_w = (mip_w / 2).max(1);
         mip_h = (mip_h / 2).max(1);
+        mip_depth = (mip_depth / 2).max(1);
         if data_offset > bytes.len() && mips.len() < mip_count as usize {
             // 数据不足，保留已解出的 mip
             break;

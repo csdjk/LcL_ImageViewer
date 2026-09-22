@@ -80,3 +80,22 @@ fn standard_mipmap_flag_exposes_and_decodes_all_levels() {
     assert_eq!(image.mips[0].rgba8_at(0, 0), Some([20, 30, 40, 255]));
     assert_eq!(image.mips[1].rgba8_at(0, 0), Some([100, 120, 140, 255]));
 }
+
+#[test]
+fn volume_mip_advances_past_all_slices_at_each_level() {
+    let mut pixels = vec![20, 30, 40, 255].repeat(16); // mip 0, slice 0
+    pixels.extend(vec![50, 60, 70, 255].repeat(16)); // mip 0, slice 1
+    pixels.extend(vec![100, 120, 140, 255].repeat(4)); // mip 1, slice 0
+    let mut bytes = dds(28, 4, 4, &pixels);
+    bytes[8..12].copy_from_slice(&0x82100Fu32.to_le_bytes());
+    bytes[24..28].copy_from_slice(&2u32.to_le_bytes());
+    bytes[28..32].copy_from_slice(&2u32.to_le_bytes());
+    bytes[112..116].copy_from_slice(&0x200000u32.to_le_bytes());
+    bytes[132..136].copy_from_slice(&4u32.to_le_bytes()); // TEXTURE3D
+    let image = decode_bytes(&bytes).unwrap();
+    assert_eq!(image.mips.len(), 2);
+    assert_eq!(image.mips[0].rgba8_at(0, 0), Some([20, 30, 40, 255]));
+    assert_eq!(image.mips[1].rgba8_at(0, 0), Some([100, 120, 140, 255]));
+    bytes.truncate(bytes.len() - 4);
+    assert!(matches!(decode_bytes(&bytes), Err(DecodeError::Truncated)));
+}
