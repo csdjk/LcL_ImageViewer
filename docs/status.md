@@ -1,13 +1,15 @@
 # LcL ImageViewer — 当前状态
 
-> 更新时间：2026-09-20。以Git、当前构建与GitHub实际回读为准。
+> 更新时间：2026-09-23。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-TA-01 -->
+<!-- project-next: IV-REL-060 -->
 
-## 当前进行：轻量贴图检查首轮
+## 当前进行：v0.6.0 发布
 
-2026-09-21 用户授权 `IV-TA-01`，Owner Codex，独立分支 `codex/ta-foundation`、工作树 `Temp/worktrees/ta-foundation`。先修正 DDS 识别、统一动画保留帧预算、增加当前文件自动刷新与视图锁定。合同见 `docs/轻量贴图检查优化计划.md`；完成后恢复 `IV-P1-01`。公开版及当前安装保持 v0.5.1。
+`IV-TA-01` DONE，集成 `916de47`：修正 DDS 格式与标准 Mipmap/Volume 偏移，统一动画保留帧预算，增加当前图片自动刷新、F5 与视图锁定。分支 124 项 Rust、24 项 Windows 契约、5 项 macOS 边界检查和 113 张真实桌面截图通过；主线复验同组测试及 17 张刷新/Mipmap 截图通过。证据见 `docs/ui-qa/轻量贴图检查首轮验收.md`。
+
+2026-09-23 用户追加授权测试后打包发布。当前 `IV-REL-060` 准备 v0.6.0 安装版与便携版并正式发布；完成前公开版及用户当前安装保持 v0.5.1。发布合同见 `docs/development-plan.md`。
 
 ## 当前最新正式版：v0.5.1
 
