@@ -2,7 +2,7 @@
 
 <!-- project-stage: P1 -->
 
-> 当前阶段：**P1 ACTIVE**。`IV-TA-01` 已集成复验；当前 NEXT 为 `IV-REL-060`，发布后恢复 `IV-P1-01`。
+> 当前阶段：**P1 ACTIVE**。`IV-TA-01` 已集成复验，`IV-REL-060` 已正式发布；当前 NEXT 为 `IV-P1-01`。
 
 ## 执行规则
 
@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-060 | 发布轻量贴图检查 v0.6.0 | IN_PROGRESS | Codex / codex/release-v0.6.0 | 用户明确要求打包发布 / IV-TA-01 DONE / b332f58 | 见 `docs/development-plan.md` | 版本一致、正式静态CRT构建、测试/隔离安装/便携实机、附件hash、push main与新tag并正式设Latest |
+| IV-REL-060 | 发布轻量贴图检查 v0.6.0 | DONE | Codex / codex/release-v0.6.0 | 用户明确要求打包发布 / IV-TA-01 DONE / b332f58 | 见 `docs/development-plan.md` | 源码标签4089599；124项Rust、24项Windows、5项macOS边界，静态CRT、76值隔离注册、41张正式/便携截图；GitHub Latest及三个公开附件下载hash通过。见 `docs/releases/v0.6.0-validation.md` |
 | IV-TA-01 | 轻量贴图检查首轮：DDS、动画预算、自动刷新与视图锁定 | DONE | Codex / codex/ta-foundation | 用户授权 / 6934031 | 见 `docs/轻量贴图检查优化计划.md` | 124项Rust、24项Windows契约、5项macOS边界及113张分支/17张main实机，通过；集成916de47，发布另列IV-REL-060 |
 | IV-REL-051 | 发布圆形侧边按钮 v0.5.1 | DONE | ChatGPT-AgentDock | 用户明确要求打包发布 / N15 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `CHANGELOG.md`, `docs/releases/**`, `README.md` | 版本统一；正式构建/测试/安装与便携包验证；push main+新tag并设Latest；公开下载hash；不改当前安装 |
 | IV-P1-N15 | 左右切图按钮圆形化 | DONE | ChatGPT-AgentDock | 用户本轮要求 / v0.5.0 当前main | `crates/iv-viewer/src/{ui.rs,app.rs}`, `tools/ui-qa/**`, `docs/ui-qa/**` | 两侧按钮背景和玻璃遮罩为真圆形；箭头/点击/禁用/显隐保持；测试+实机截图+本地main复验，不发布 |

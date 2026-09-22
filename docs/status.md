@@ -3,15 +3,15 @@
 > 更新时间：2026-09-23。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
-<!-- project-next: IV-REL-060 -->
+<!-- project-next: IV-P1-01 -->
 
-## 当前进行：v0.6.0 发布
+## 当前最新正式版：v0.6.0
 
-`IV-TA-01` DONE，集成 `916de47`：修正 DDS 格式与标准 Mipmap/Volume 偏移，统一动画保留帧预算，增加当前图片自动刷新、F5 与视图锁定。分支 124 项 Rust、24 项 Windows 契约、5 项 macOS 边界检查和 113 张真实桌面截图通过；主线复验同组测试及 17 张刷新/Mipmap 截图通过。证据见 `docs/ui-qa/轻量贴图检查首轮验收.md`。
+IV-REL-060 DONE。2026-09-22T23:47:02Z 正式发布，Release ID 394194384；GitHub Latest、非草稿、非预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.6.0；源码标签 `4089599b6361103b686c2a4ceda12cf0ba63d82a`。
 
-2026-09-23 用户追加授权测试后打包发布。当前 `IV-REL-060` 准备 v0.6.0 安装版与便携版并正式发布；完成前公开版及用户当前安装保持 v0.5.1。发布合同见 `docs/development-plan.md`。
+`IV-TA-01` DONE，集成 `916de47`：修正 DDS 格式与标准 Mipmap/Volume 偏移，统一动画保留帧预算，增加当前图片自动刷新、F5 与视图锁定。124 项 Rust、24 项 Windows 契约、5 项 macOS 边界检查通过。正式 Windows 静态 CRT 构建、隔离安装/卸载、正式程序及 ZIP 解压程序共 41 张实机截图、三个公开附件重新下载校验均通过。详见 `docs/releases/v0.6.0-validation.md` 与 `docs/ui-qa/轻量贴图检查首轮验收.md`。当前用户安装及文件关联未自动更改。P1 保持 ACTIVE，NEXT 恢复 IV-P1-01。
 
-## 当前最新正式版：v0.5.1
+## 上一正式版：v0.5.1
 
 IV-REL-051 DONE。2026-09-20T11:26:21Z 正式发布，Release ID 392408919，Latest、非草稿/预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.5.1；源码标签 `7bce74beada33ab19ad38ce18f722bcc4236d327`。
 

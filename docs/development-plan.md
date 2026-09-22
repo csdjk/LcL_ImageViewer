@@ -2,7 +2,7 @@
 
 > 本文保存复杂 Task 的执行合同。Task Board 只保留摘要、依赖和状态。
 
-当前用户授权增量：`IV-REL-060`，在已验收的 [轻量贴图检查首轮优化](轻量贴图检查优化计划.md) 基础上发布 v0.6.0；其余 TA 工具后续单独实施。
+`IV-REL-060` 已完成：在已验收的 [轻量贴图检查首轮优化](轻量贴图检查优化计划.md) 基础上发布 v0.6.0。当前 NEXT 恢复 `IV-P1-01`；其余 TA 工具后续单独实施。
 
 ## Task IV-REL-060 — 发布轻量贴图检查 v0.6.0
 
@@ -12,7 +12,9 @@ Gate：`IV-TA-01` DONE，main 已完成测试及真实 Windows 复验；发布�
 
 Allowed Paths：`Cargo.toml`、`Cargo.lock`、`tools/setup.iss`、`tools/package_release.py`、`README.md`、`CHANGELOG.md`、`docs/releases/**`、`docs/ui-qa/**`；Integrator 在 main 更新 `docs/{status.md,task-board.md,development-plan.md}`。忽略产物在 `target/**`、`dist/v0.6.0/**`、`Temp/**`、`ui-verify-shots/**`。
 
-Acceptance：版本资源、Cargo 锁文件、安装器、变更记录与发布说明一致；124 项 Rust、24 项 Windows 契约、5 项 macOS 边界检查；静态 CRT、EXE/DLL 导入与构建证明；隔离 HKCU 安装/卸载、默认目录逻辑；新版本真实 GUI 与便携包启动；ZIP 内容/许可/hash；GitHub main 与 v0.6.0 标签指向一致，公开 Release 的三个附件重新下载核验 hash，并确认非草稿、非预发布、Latest。安装用户当前程序、修改实际文件关联和默认软件不属于发布动作。
+Acceptance：版本资源、Cargo 锁文件、安装器、变更记录与发布说明一致；124 项 Rust、24 项 Windows 契约、5 项 macOS 边界检查；静态 CRT、EXE/DLL 导入与构建证明；隔离 HKCU 安装/卸载、默认目录逻辑；新版本真实 GUI 与便携包启动；ZIP 内容/许可/hash；发布时 GitHub main 与 v0.6.0 标签指向同一源码提交，公开 Release 的三个附件重新下载核验 hash，并确认非草稿、非预发布、Latest。发布后 main 可再加入状态文档提交，但必须包含标签提交。安装用户当前程序、修改实际文件关联和默认软件不属于发布动作。
+
+Result：上述门禁通过，源码标签 `4089599b6361103b686c2a4ceda12cf0ba63d82a`，Release ID 394194384。发布证据见 `docs/releases/v0.6.0-validation.md`。
 
 ## Task IV-P1-N01 — 新拟态 UI（2026-09-14 用户授权）
 
