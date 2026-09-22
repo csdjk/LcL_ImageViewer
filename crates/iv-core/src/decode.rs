@@ -5,6 +5,70 @@ use std::path::Path;
 
 use crate::format::{detect_format, ImageFormat};
 
+/// Retained animation pixels, including the separate first-frame mip.
+/// Codec scratch buffers and GPU copies are outside this budget.
+pub(crate) const MAX_ANIMATION_BYTES: usize = 256 * 1024 * 1024;
+pub(crate) const MAX_ANIMATION_FRAMES: usize = 4096;
+
+#[cfg(test)]
+mod animation_budget_tests {
+    use super::*;
+
+    fn frames(sizes: Vec<(u32, u32)>) -> image::Frames<'static> {
+        image::Frames::new(Box::new(sizes.into_iter().map(|(w, h)| {
+            Ok(image::Frame::from_parts(
+                image::RgbaImage::from_pixel(w, h, image::Rgba([9, 8, 7, 6])),
+                0, 0, image::Delay::from_numer_denom_ms(40, 1),
+            ))
+        })))
+    }
+
+    #[test]
+    fn exact_budget_includes_the_separate_first_frame() {
+        let image = collect_animation_with_budget(
+            frames(vec![(2, 2); 2]), ImageKind::Gif, 48,
+        ).unwrap();
+        assert_eq!(image.frames.len(), 2);
+        assert_eq!(image.frames[1].delay_ms, 40);
+        assert_eq!(image.mips[0].rgba8_at(1, 1), Some([9, 8, 7, 6]));
+        assert!(collect_animation_with_budget(
+            frames(vec![(2, 2); 2]), ImageKind::Gif, 47,
+        ).unwrap_err().to_string().contains("像素预算"));
+    }
+
+    #[test]
+    fn oversized_or_inconsistent_sequences_fail_instead_of_truncating() {
+        assert!(collect_animation_with_budget(
+            frames(vec![(1, 1); MAX_ANIMATION_FRAMES + 1]),
+            ImageKind::Gif, MAX_ANIMATION_BYTES,
+        ).unwrap_err().to_string().contains("帧数"));
+        assert!(collect_animation_with_budget(
+            frames(vec![(2, 2), (1, 1)]), ImageKind::WebP, 100,
+        ).unwrap_err().to_string().contains("尺寸"));
+        assert!(check_animation_budget(usize::MAX, 2, usize::MAX).is_err());
+    }
+}
+
+pub(crate) fn check_animation_budget(
+    frame_bytes: usize,
+    count: usize,
+    limit: usize,
+) -> Result<(), DecodeError> {
+    if count == 0 || count > MAX_ANIMATION_FRAMES {
+        return Err(DecodeError::UnsupportedFormat(
+            "动画帧数超过安全限制（最多 4096 帧）".into(),
+        ));
+    }
+    let total = count.checked_add(1).and_then(|n| frame_bytes.checked_mul(n));
+    if total.is_none_or(|n| n > limit) {
+        return Err(DecodeError::UnsupportedFormat(format!(
+            "动画完整解码超过 {:.2} MiB 像素预算，请使用更小尺寸或更短的动画",
+            limit as f64 / (1024.0 * 1024.0),
+        )));
+    }
+    Ok(())
+}
+
 /// 解码后的图像。所有格式的像素统一为 RGBA。
 #[derive(Debug, Clone)]
 pub struct DecodedImage {
@@ -321,21 +385,33 @@ fn collect_animation(
     frames: image::Frames,
     kind: ImageKind,
 ) -> Result<DecodedImage, DecodeError> {
-    const MAX_FRAMES: usize = 4096; // 防恶意文件撑爆内存
+    collect_animation_with_budget(frames, kind, MAX_ANIMATION_BYTES)
+}
+
+fn collect_animation_with_budget(
+    frames: image::Frames,
+    kind: ImageKind,
+    budget: usize,
+) -> Result<DecodedImage, DecodeError> {
     let mut list: Vec<AnimatedFrame> = Vec::new();
     let mut size: Option<(u32, u32)> = None;
     for fr in frames.into_iter() {
         let fr = fr.map_err(|e| DecodeError::Decode(e.to_string()))?;
         let buf = fr.buffer();
         let (fw, fh) = (buf.width(), buf.height());
+        if fw == 0 || fh == 0 {
+            return Err(DecodeError::Decode("动画合成帧尺寸为零".into()));
+        }
         match size {
             None => size = Some((fw, fh)),
             Some((w, h)) => {
                 if fw != w || fh != h {
-                    continue; // 防御：尺寸不一致的帧跳过
+                    return Err(DecodeError::Decode("动画合成帧尺寸不一致".into()));
                 }
             }
         }
+        // Check before retaining another frame; iterator/codec scratch is additional.
+        check_animation_budget(buf.as_raw().len(), list.len() + 1, budget)?;
         let (num, den) = fr.delay().numer_denom_ms();
         // numer_denom_ms 返回的就是毫秒分数：delay_ms = num / den（不要再乘 1000）
         let ms = if den == 0 {
@@ -349,9 +425,6 @@ fn collect_animation(
             data: PixelData::Rgba8(fr.into_buffer().into_raw()),
             delay_ms,
         });
-        if list.len() >= MAX_FRAMES {
-            break;
-        }
     }
     let (w, h) = size.ok_or_else(|| DecodeError::Decode("动画无有效帧".into()))?;
     let Some(first) = list.first().map(|f| f.data.clone()) else {

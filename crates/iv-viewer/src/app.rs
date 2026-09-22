@@ -48,7 +48,7 @@ struct ImageCache {
     map: HashMap<PathBuf, Arc<DecodedImage>>,
     order: Vec<PathBuf>,
     bytes: usize,
-    stamps: HashMap<PathBuf, (u64, Option<std::time::SystemTime>)>,
+    stamps: HashMap<PathBuf, crate::file_watch::FileState>,
 }
 
 impl ImageCache {
@@ -72,13 +72,12 @@ impl ImageCache {
         mip + frm
     }
 
-    fn stamp(path: &Path) -> Option<(u64, Option<std::time::SystemTime>)> {
-        let meta = std::fs::metadata(path).ok()?;
-        if !meta.is_file() { return None; }
-        Some((meta.len(), meta.modified().ok()))
+    fn stamp(path: &Path) -> Option<crate::file_watch::FileState> {
+        let state = crate::file_watch::FileState::read(path);
+        matches!(state, crate::file_watch::FileState::Present { .. }).then_some(state)
     }
 
-    fn get(&mut self, path: &Path) -> Option<Arc<DecodedImage>> {
+    fn get(&mut self, path: &Path) -> Option<(Arc<DecodedImage>, crate::file_watch::FileState)> {
         if !self.map.contains_key(path) { return None; }
         if Self::stamp(path).as_ref() != self.stamps.get(path) {
             self.remove(path);
@@ -86,7 +85,7 @@ impl ImageCache {
         }
         self.order.retain(|p| p != path);
         self.order.push(path.to_path_buf());
-        self.map.get(path).cloned()
+        Some((self.map.get(path)?.clone(), self.stamps.get(path)?.clone()))
     }
 
     fn remove(&mut self, path: &Path) {
@@ -97,11 +96,12 @@ impl ImageCache {
         self.order.retain(|p| p != path);
     }
 
-    fn put(&mut self, path: PathBuf, img: Arc<DecodedImage>, keep: &Path) {
+    fn put(&mut self, path: PathBuf, img: Arc<DecodedImage>, keep: &Path, stamp: crate::file_watch::FileState) {
         if self.map.contains_key(&path) {
             return;
         }
-        let Some(stamp) = Self::stamp(&path) else { return; };
+        // Stamp pixels with their decoded source, never a later on-disk version.
+        if !matches!(stamp, crate::file_watch::FileState::Present { .. }) { return; }
         // Oversized speculative entries must not evict all useful neighbours.
         if Self::image_bytes(&img) > CACHE_BUDGET_BYTES && path != keep { return; }
         self.stamps.insert(path.clone(), stamp);
@@ -123,8 +123,16 @@ impl ImageCache {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LoadIntent { Open, PreserveView, Reload }
+
 pub struct App {
     loader: Loader,
+    file_watcher: crate::file_watch::FileWatcher,
+    opened_path: Option<PathBuf>,
+    auto_refresh: bool,
+    lock_view: bool,
+    load_intent: LoadIntent,
     scanner: crate::directory::Scanner,
     directory_generation: u64,
     /// 当前浏览会话的固定搜索根；普通切图不修改它。
@@ -267,6 +275,11 @@ impl App {
         let scanner = crate::directory::Scanner::spawn(cc.egui_ctx.clone());
         let mut app = Self {
             loader,
+            file_watcher: crate::file_watch::FileWatcher::spawn(cc.egui_ctx.clone()),
+            opened_path: None,
+            auto_refresh: cc.storage.and_then(|s| s.get_string("iv-auto-refresh")).as_deref() != Some("off"),
+            lock_view: cc.storage.and_then(|s| s.get_string("iv-lock-view")).as_deref() == Some("on"),
+            load_intent: LoadIntent::Open,
             scanner,
             directory_generation: 0,
             directory_scope: None,
@@ -373,11 +386,19 @@ impl App {
 
     fn open_impl(&mut self, path: PathBuf, rescan: bool) {
         let path = std::path::absolute(&path).unwrap_or(path);
+        self.load_intent = if self.lock_view
+            && (self.current.is_some() || self.load_intent != LoadIntent::Open) {
+            LoadIntent::PreserveView
+        } else { LoadIntent::Open };
+        self.opened_path = Some(path.clone());
+        self.file_watcher.set_path(self.auto_refresh.then(|| path.clone()));
         crate::perf::mark("load_request", Some(&path), 0.0);
         self.error_msg = None;
         self.background_menu_pos = None;
-        self.mip_index = 0;
-        self.auto_fit = true;
+        if self.load_intent == LoadIntent::Open {
+            self.mip_index = 0;
+            self.auto_fit = true;
+        }
         let cached = self.cache.get(&path);
         if cached.is_none() {
             self.pending = Some(path.clone());
@@ -395,7 +416,7 @@ impl App {
         } else if let Some(index) = self.directory.as_ref().and_then(|d| d.files.iter().position(|p| p == &path)) {
             self.directory.as_mut().unwrap().index = index;
         }
-        if let Some(img) = cached { self.set_current(path, img); }
+        if let Some((img, source)) = cached { self.set_current(path, img, source); }
     }
 
     fn request_directory_scan(&mut self, anchor: Option<PathBuf>) {
@@ -461,30 +482,67 @@ impl App {
         }
     }
 
-    fn set_current(&mut self, path: PathBuf, img: Arc<DecodedImage>) {
+    fn set_current(&mut self, path: PathBuf, img: Arc<DecodedImage>, source: crate::file_watch::FileState) {
+        let reloading = self.load_intent == LoadIntent::Reload;
+        let preserve_view = self.load_intent != LoadIntent::Open;
         self.mip_index = self.mip_index.min(img.mips.len().saturating_sub(1));
-        if img.is_hdr {
+        if img.is_hdr && !preserve_view {
             self.exposure = 1.0;
         }
-        // 动画状态重置：多帧图自动从头播放
-        self.frame_index = 0;
-        self.playing = img.frames.len() > 1;
+        let preserve_animation = reloading && self.current.as_ref().is_some_and(|c| c.img.frames.len() > 1);
+        self.frame_index = if preserve_animation {
+            self.frame_index.min(img.frames.len().saturating_sub(1))
+        } else { 0 };
+        self.playing = img.frames.len() > 1 && (!preserve_animation || self.playing);
         self.next_frame_at = Instant::now()
-            + Duration::from_millis(img.frames.first().map(|f| f.delay_ms as u64).unwrap_or(100));
-        self.cache.put(path.clone(), img.clone(), &path);
+            + Duration::from_millis(img.frames.get(self.frame_index).map(|f| f.delay_ms as u64).unwrap_or(100));
+        self.cache.put(path.clone(), img.clone(), &path, source);
         self.current = Some(CurrentImage { path, img });
         self.pending = None;
+        self.error_msg = None;
         let upload_started = Instant::now();
         self.upload_current_mip();
+        if reloading && self.frame_index > 0 { self.upload_current_frame(); }
         crate::perf::mark("image_ready", self.current.as_ref().map(|c| c.path.as_path()), upload_started.elapsed().as_secs_f64()*1000.0);
         self.perf_paint_pending = true;
-        self.auto_fit = true;
+        if !preserve_view { self.auto_fit = true; }
         // 主动安排一次适配：auto_fit 只在窗口尺寸变化时触发 fit，
         // 切图时窗口尺寸通常没变，必须走 pending_fit 才能立即居中适配
-        self.pending_fit = true;
+        self.pending_fit = !preserve_view;
+        self.pending_actual = false;
         // 切图时短暂亮出悬浮层，提示目录位置与文件信息
         self.last_move = Instant::now();
-        self.schedule_prefetch();
+        if !reloading { self.schedule_prefetch(); }
+        self.load_intent = LoadIntent::Open;
+    }
+
+    fn reload_current(&mut self) {
+        if self.delete_active() { return; }
+        let Some(path) = self.opened_path.clone() else { return; };
+        self.cache.remove(&path);
+        self.load_intent = if self.current.as_ref().is_some_and(|c| c.path == path) {
+            LoadIntent::Reload
+        } else if self.lock_view && self.load_intent == LoadIntent::PreserveView {
+            LoadIntent::PreserveView
+        } else { LoadIntent::Open };
+        self.pending = Some(path.clone());
+        self.error_msg = None;
+        self.loader.reload(path);
+    }
+
+    fn poll_file_changes(&mut self) {
+        if self.delete_active() { return; }
+        let Some(change) = self.file_watcher.poll() else { return; };
+        if !self.auto_refresh || self.opened_path.as_ref() != Some(&change.path) { return; }
+        match change.state {
+            crate::file_watch::FileState::Present { .. } => self.reload_current(),
+            crate::file_watch::FileState::Unavailable(error) => {
+                self.loader.cancel_queued();
+                self.cache.remove(&change.path);
+                self.pending = None;
+                self.error_msg = Some(format!("文件暂不可读，等待后续保存：{error}"));
+            }
+        }
     }
 
     /// 把当前 mip 像素上传 GPU。
@@ -637,7 +695,11 @@ impl App {
     fn handle_loader_messages(&mut self) {
         while let Some(msg) = self.loader.poll() {
             match msg {
-                Msg::Ready(Ok((path, img))) => {
+                Msg::Outdated(path) => {
+                    self.cache.remove(&path);
+                    if self.pending.as_ref() == Some(&path) { self.reload_current(); }
+                }
+                Msg::Ready(Ok((path, img, source))) => {
                     if !path.is_file() {
                         self.cache.remove(&path);
                         if self.pending.as_ref() == Some(&path) {
@@ -652,7 +714,7 @@ impl App {
                                 d.index = i;
                             }
                         }
-                        self.set_current(path, img);
+                        self.set_current(path, img, source);
                     } else {
                         if !self.directory_scope.as_ref().map_or(false, |scope| scope.contains(&path)) { continue; }
                         // 预读结果：只进缓存
@@ -661,14 +723,18 @@ impl App {
                             .as_ref()
                             .map(|c| c.path.clone())
                             .unwrap_or_default();
-                        self.cache.put(path, img, &keep);
+                        self.cache.put(path, img, &keep, source);
                     }
                 }
                 Msg::Ready(Err((path, err))) => {
                     if self.pending.as_ref() == Some(&path) {
                         self.pending = None;
-                        self.current = None;
-                        self.error_msg = Some(err);
+                        if self.load_intent == LoadIntent::Reload && self.current.is_some() {
+                            self.error_msg = Some(format!("刷新失败，保留上一版本；保存后重试或按 F5：{err}"));
+                        } else {
+                            self.current = None;
+                            self.error_msg = Some(err);
+                        }
                     }
                 }
             }
@@ -757,6 +823,13 @@ impl App {
             return;
         }
         let key = |k: Key| ctx.input(|i| i.modifiers == egui::Modifiers::NONE && i.key_pressed(k));
+        if key(Key::F5) {
+            self.reload_current();
+        }
+        if key(Key::L) {
+            self.lock_view = !self.lock_view;
+            self.last_move = Instant::now();
+        }
         if key(Key::ArrowLeft) || key(Key::PageUp) || key(Key::A) {
             self.step(-1);
         }
@@ -923,6 +996,9 @@ impl App {
                 self.cache.remove(&path);
                 self.current = None;
                 self.pending = None;
+                self.opened_path = None;
+                self.file_watcher.set_path(None);
+                self.loader.cancel_queued();
                 self.playing = false;
                 self.probe_color = None;
                 self.probe_text.clear();
@@ -1681,12 +1757,17 @@ impl App {
             )
             .show(ctx, |ui| {
                 let _frame_resp = frame.show(ui, |ui| {
+                    let content_width = (ctx.screen_rect().width() - 72.0).clamp(120.0, 680.0);
+                    ui.set_max_width(content_width);
                     ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new(format!("无法打开：{err}"))
-                                .size(12.5)
-                                .color(pal.err_text),
-                        );
+                        ui.vertical(|ui| {
+                            ui.set_max_width(content_width - 36.0);
+                            ui.label(
+                                RichText::new(format!("无法打开：{err}"))
+                                    .size(12.5)
+                                    .color(pal.err_text),
+                            );
+                        });
                         if ui::icon_btn_danger(ui, Icon::Close, pal)
                             .on_hover_text("关闭")
                             .clicked()
@@ -1974,6 +2055,16 @@ impl App {
             }
         }
 
+        if self.opened_path.is_some() {
+            if ui::menu_item(ui, "刷新图片", "F5", false, &pal).clicked() {
+                self.reload_current();
+                self.ctx_menu_pos = None;
+            }
+            if ui::menu_item(ui, "锁定切图视图", "L", self.lock_view, &pal).clicked() {
+                self.lock_view = !self.lock_view;
+                self.ctx_menu_pos = None;
+            }
+        }
         if has_image {
             if ui::menu_item(ui, "图像属性…", "", false, &pal).clicked() {
                 self.show_props = true;
@@ -2185,6 +2276,17 @@ impl App {
                         ui::setting_row(ui, pal, "减少动效", "关闭工具栏淡入淡出动画", |ui| {
                             ui::toggle(ui, &mut self.reduce_motion, pal);
                         });
+                        ui::setting_row(ui, pal, "自动刷新", "保存当前图片后更新，保留检查位置", |ui| {
+                            if ui::toggle(ui, &mut self.auto_refresh, pal).changed() {
+                                self.file_watcher.set_path(
+                                    self.opened_path.clone().filter(|_| self.auto_refresh),
+                                );
+                                if self.auto_refresh { self.reload_current(); }
+                            }
+                        });
+                        ui::setting_row(ui, pal, "锁定切图视图", "切图保留缩放、位置、Mip 和曝光 · L", |ui| {
+                            ui::toggle(ui, &mut self.lock_view, pal);
+                        });
                         #[cfg(windows)]
                         ui::setting_row(ui, pal, "桌面磨砂", "柔化窗口后方内容；不可用时回退为主题渐变", |ui| {
                             let mut on = self.backdrop;
@@ -2263,6 +2365,8 @@ impl App {
 impl eframe::App for App {
     /// 退出时持久化主题与外观设置（eframe persistence）。
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("iv-auto-refresh", if self.auto_refresh { "on" } else { "off" }.into());
+        storage.set_string("iv-lock-view", if self.lock_view { "on" } else { "off" }.into());
         storage.set_string("iv-always-on-top", if self.always_on_top { "on" } else { "off" }.into());
         storage.set_string("iv-background-color", ui::background_color_key(self.background_color));
         storage.set_string("iv-image-bounds", if self.show_image_bounds { "on" } else { "off" }.into());
@@ -2292,6 +2396,7 @@ impl eframe::App for App {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_delete(ctx);
+        self.poll_file_changes();
         self.handle_loader_messages();
         self.poll_directory();
         self.update_window_title(ctx);
@@ -3159,18 +3264,31 @@ mod cache_validity_tests {
     #[test]
     fn edited_or_removed_files_do_not_hit_stale_cache() {
         let (path,image)=fixture(); let mut cache=ImageCache::new();
-        cache.put(path.clone(),image.clone(),&path); assert!(cache.get(&path).is_some());
+        cache.put(path.clone(),image.clone(),&path,ImageCache::stamp(&path).unwrap()); assert!(cache.get(&path).is_some());
         std::fs::write(&path,[1,2]).unwrap(); assert!(cache.get(&path).is_none()); assert_eq!(cache.bytes,0);
-        cache.put(path.clone(),image,&path); std::fs::remove_file(&path).unwrap();
+        cache.put(path.clone(),image,&path,ImageCache::stamp(&path).unwrap()); std::fs::remove_file(&path).unwrap();
         assert!(cache.get(&path).is_none()); assert_eq!(cache.bytes,0);
     }
     #[test]
     fn cache_hits_promote_real_lru_without_copying_pixels() {
         let (a,image)=fixture(); let (b,second)=fixture(); let mut cache=ImageCache::new();
-        cache.put(a.clone(),image.clone(),&a); cache.put(b.clone(),second,&b);
-        assert!(Arc::ptr_eq(&cache.get(&a).unwrap(),&image));
+        cache.put(a.clone(),image.clone(),&a,ImageCache::stamp(&a).unwrap());
+        cache.put(b.clone(),second,&b,ImageCache::stamp(&b).unwrap());
+        assert!(Arc::ptr_eq(&cache.get(&a).unwrap().0,&image));
         assert_eq!(cache.order,vec![b.clone(),a.clone()]); assert_eq!(cache.bytes,8);
         std::fs::remove_file(a).unwrap(); std::fs::remove_file(b).unwrap();
+    }
+
+    #[test]
+    fn saving_between_decode_delivery_and_cache_insert_does_not_relabel_old_pixels() {
+        let (path, image) = fixture();
+        let decoded_version = ImageCache::stamp(&path).unwrap();
+        std::fs::write(&path, [1, 2]).unwrap();
+        let mut cache = ImageCache::new();
+        cache.put(path.clone(), image, &path, decoded_version);
+        assert!(cache.get(&path).is_none());
+        assert_eq!(cache.bytes, 0);
+        std::fs::remove_file(path).unwrap();
     }
 }
 

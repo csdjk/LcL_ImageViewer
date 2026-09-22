@@ -12,6 +12,7 @@ mod backdrop;
 #[path = "macos_platform.rs"]
 mod backdrop;
 mod loader;
+mod file_watch;
 mod directory;
 mod perf;
 mod render;

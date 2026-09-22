@@ -11,7 +11,7 @@ const MAX_PIXELS: u32 = 64 * 1024 * 1024;
 const MAX_DIMENSION: u32 = 32768;
 const MAX_IMAGES: u32 = 4096;
 // Retained frame pixels plus the separate first-frame mip. Native scratch memory is additional.
-const MAX_ANIMATION_BYTES: usize = 256 * 1024 * 1024;
+use crate::decode::{check_animation_budget, MAX_ANIMATION_BYTES};
 
 struct Decoder(NonNull<ffi::avifDecoder>);
 
@@ -70,27 +70,6 @@ pub(crate) fn decode_avif(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
 
 pub(crate) fn decode_avif_preview(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     decode(bytes, true, MAX_ANIMATION_BYTES)
-}
-
-fn check_animation_budget(
-    frame_bytes: usize,
-    count: usize,
-    limit: usize,
-) -> Result<(), DecodeError> {
-    if count == 0 || count > MAX_IMAGES as usize {
-        return Err(DecodeError::UnsupportedFormat(
-            "AVIF 动画帧数超过安全限制（最多 4096 帧）".into(),
-        ));
-    }
-    let total = count
-        .checked_add(1)
-        .and_then(|n| frame_bytes.checked_mul(n));
-    if total.is_none_or(|n| n > limit) {
-        return Err(DecodeError::UnsupportedFormat(
-            "AVIF 动画完整解码超过 256 MiB 像素预算，请使用更小尺寸或更短的动画".into(),
-        ));
-    }
-    Ok(())
 }
 
 // Round timestamps, not each interval independently, so 60 fps remains 1000 ms/60 frames.

@@ -4,13 +4,13 @@
 //! - 传统 FourCC：DXT1~DXT5 / ATI1 / ATI2 / BC4U / BC5U
 //! - DX10 扩展头：BC1~BC7 全系列、R8G8B8A8、B8G8R8A8、R16G16B16A16_FLOAT、R32G32B32A32_FLOAT
 //! - 未压缩 32bpp（按位掩码识别 ARGB 变体）与 24bpp
-//! - mip 链完整解码；cubemap / texture array 只解第 0 面
+//! - mip 链完整解码；cubemap / texture array / volume 仅显示每级第 1 面或第 1 层
 //!
 //! 解码失败的非法数据一律返回 `Err`，不允许 panic。
 
 use crate::decode::{DecodeError, DecodedImage, ImageKind, MipLevel, PixelData};
 
-const DDSD_MIPMAPCOUNT: u32 = 0x20_0000;
+const DDSD_MIPMAPCOUNT: u32 = 0x2_0000;
 const DDPF_ALPHAPIXELS: u32 = 0x1;
 const DDPF_FOURCC: u32 = 0x4;
 const DDPF_RGB: u32 = 0x40;
@@ -57,7 +57,7 @@ impl BlockFormat {
 /// DX10 头中 DXGI_FORMAT 枚举值（仅列出本解码器支持的）。
 #[derive(Debug, Clone, Copy)]
 enum DxgiFormat {
-    Rgba8 { bgra: bool },
+    Rgba8 { bgra: bool, alpha: bool },
     Rgba16F,
     Rgba32F,
     Bc(BlockFormat),
@@ -67,18 +67,19 @@ enum DxgiFormat {
 
 fn dxgi_from_u32(v: u32) -> Option<DxgiFormat> {
     Some(match v {
-        28 | 29 => DxgiFormat::Rgba8 { bgra: false }, // R8G8B8A8_UNORM / _SRGB
-        87 => DxgiFormat::Rgba8 { bgra: true },       // B8G8R8A8_UNORM
-        88 => DxgiFormat::Rgba8 { bgra: true },       // B8G8R8X8_UNORM（忽略 X）
+        28 | 29 => DxgiFormat::Rgba8 { bgra: false, alpha: true },
+        87 | 91 => DxgiFormat::Rgba8 { bgra: true, alpha: true },
+        88 | 93 => DxgiFormat::Rgba8 { bgra: true, alpha: false },
         10 => DxgiFormat::Rgba16F,
         2 => DxgiFormat::Rgba32F,
         71 | 72 => DxgiFormat::Bc(BlockFormat::Bc1),
         74 | 75 => DxgiFormat::Bc(BlockFormat::Bc2),
         77 | 78 => DxgiFormat::Bc(BlockFormat::Bc3),
-        80 | 81 => DxgiFormat::Bc(BlockFormat::Bc4),
-        83 | 84 => DxgiFormat::Bc(BlockFormat::Bc5),
-        90 => DxgiFormat::Bc6 { signed: false }, // BC6H_UF16
-        91 => DxgiFormat::Bc6 { signed: true },  // BC6H_SF16
+        // The current BC4/5 decoder is unsigned; do not misread SNORM as UNORM.
+        80 => DxgiFormat::Bc(BlockFormat::Bc4),
+        83 => DxgiFormat::Bc(BlockFormat::Bc5),
+        95 => DxgiFormat::Bc6 { signed: false }, // BC6H_UF16
+        96 => DxgiFormat::Bc6 { signed: true },  // BC6H_SF16
         98 | 99 => DxgiFormat::Bc(BlockFormat::Bc7),
         _ => return None,
     })
@@ -134,6 +135,15 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     let caps2 = read_u32(bytes, 112)?;
     let is_cubemap = caps2 & DDSCAPS2_CUBEMAP != 0;
     let is_volume = caps2 & DDSCAPS2_VOLUME != 0;
+    let mut mip_depth = if is_volume {
+        let depth = read_u32(bytes, 24)?;
+        if depth == 0 {
+            return Err(DecodeError::NotAnImage("volume 深度为 0".into()));
+        }
+        depth
+    } else {
+        1
+    };
 
     // 像素格式（DDSPF，偏移 76）
     let pf_size = read_u32(bytes, 76)?;
@@ -218,7 +228,7 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
                     let (name, alpha) = match dxgi {
                         DxgiFormat::Bc(bc) => (Some(bc.name()), bc.has_alpha()),
                         DxgiFormat::Bc6 { .. } => (Some("BC6H"), false),
-                        DxgiFormat::Rgba8 { .. } => (None, true),
+                        DxgiFormat::Rgba8 { alpha, .. } => (None, alpha),
                         DxgiFormat::Rgba16F | DxgiFormat::Rgba32F => (None, true),
                     };
                     (Some(dxgi), name, alpha, 0, false)
@@ -259,6 +269,15 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     let mut mip_w = width;
     let mut mip_h = height;
     for _ in 0..mip_count {
+        let level_size = mip_size(mip_w, mip_h, dxgi, bpp)?
+            .checked_mul(mip_depth as usize)
+            .ok_or(DecodeError::Truncated)?;
+        let next_offset = data_offset
+            .checked_add(level_size)
+            .ok_or(DecodeError::Truncated)?;
+        if is_volume && next_offset > bytes.len() {
+            return Err(DecodeError::Truncated);
+        }
         let pixels = decode_one_mip(
             bytes,
             data_offset,
@@ -274,10 +293,11 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
             height: mip_h,
             data: pixels,
         });
-        // 计算本 mip 占用的字节数，推进偏移
-        data_offset += mip_size(mip_w, mip_h, dxgi, bpp)?;
+        // Volume 每级包含全部深度切片；仅显示首层，也须跳过整级。
+        data_offset = next_offset;
         mip_w = (mip_w / 2).max(1);
         mip_h = (mip_h / 2).max(1);
+        mip_depth = (mip_depth / 2).max(1);
         if data_offset > bytes.len() && mips.len() < mip_count as usize {
             // 数据不足，保留已解出的 mip
             break;
@@ -297,6 +317,12 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         ImageKind::Dds
     };
 
+    let mut notes = Vec::new();
+    if is_cubemap { notes.push("cubemap（显示第 1 面）"); }
+    if is_volume { notes.push("volume（显示第 1 层）"); }
+    if matches!(dxgi, Some(DxgiFormat::Bc6 { .. })) {
+        notes.push("BC6H：8 位预览，未保留 HDR 浮点值");
+    }
     Ok(DecodedImage {
         width,
         height,
@@ -305,11 +331,7 @@ pub fn decode_dds(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         compression: compression.map(|s| s.to_string()),
         has_alpha,
         is_hdr,
-        extra_meta: if is_cubemap || is_volume {
-            Some(if is_cubemap { "cubemap（显示第 1 面）" } else { "volume（显示第 1 层）" }.into())
-        } else {
-            None
-        },
+        extra_meta: (!notes.is_empty()).then(|| notes.join("；")),
         frames: Vec::new(),
     })
 }
@@ -381,7 +403,7 @@ fn decode_one_mip(
                 .map_err(|e| DecodeError::Decode(format!("BC6H 解码失败: {e}")))?;
             Ok(PixelData::Rgba8(u32s_to_rgba8(&out)))
         }
-        Some(DxgiFormat::Rgba8 { bgra }) => {
+        Some(DxgiFormat::Rgba8 { bgra, alpha }) => {
             let byte_len = px_count * 4;
             let data = bytes
                 .get(offset..offset + byte_len)
@@ -389,7 +411,7 @@ fn decode_one_mip(
             let mut rgba = Vec::with_capacity(byte_len);
             if bgra {
                 for px in data.chunks_exact(4) {
-                    rgba.extend_from_slice(&[px[2], px[1], px[0], px[3]]);
+                    rgba.extend_from_slice(&[px[2], px[1], px[0], if alpha { px[3] } else { 255 }]);
                 }
             } else {
                 rgba.extend_from_slice(data);
