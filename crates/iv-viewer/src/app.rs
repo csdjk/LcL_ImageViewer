@@ -1760,15 +1760,14 @@ impl App {
                     let content_width = (ctx.screen_rect().width() - 72.0).clamp(120.0, 680.0);
                     ui.set_max_width(content_width);
                     ui.horizontal(|ui| {
-                        ui.add_sized(
-                            [content_width - 36.0, 0.0],
-                            egui::Label::new(
+                        ui.vertical(|ui| {
+                            ui.set_max_width(content_width - 36.0);
+                            ui.label(
                                 RichText::new(format!("无法打开：{err}"))
                                     .size(12.5)
                                     .color(pal.err_text),
-                            )
-                            .wrap(true),
-                        );
+                            );
+                        });
                         if ui::icon_btn_danger(ui, Icon::Close, pal)
                             .on_hover_text("关闭")
                             .clicked()
