@@ -643,7 +643,6 @@ pub enum Icon {
     Subfolders,
     Prev,
     Next,
-    Fit,
     Actual,
     Bounds,
     Play,
@@ -717,26 +716,6 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
                 ],
                 st,
             ));
-        }
-        Icon::Fit => {
-            // 四角括号（适配窗口）
-            let s = rect.shrink(1.5 * u);
-            let k = 3.6 * u;
-            for (x, y, dx, dy) in [
-                (s.left(), s.top(), 1.0, 1.0),
-                (s.right(), s.top(), -1.0, 1.0),
-                (s.left(), s.bottom(), 1.0, -1.0),
-                (s.right(), s.bottom(), -1.0, -1.0),
-            ] {
-                p.add(egui::Shape::line(
-                    vec![
-                        Pos2::new(x + k * dx, y),
-                        Pos2::new(x, y),
-                        Pos2::new(x, y + k * dy),
-                    ],
-                    st,
-                ));
-            }
         }
         Icon::Bounds => {
             let b = rect.shrink(3.0 * u);

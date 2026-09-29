@@ -188,7 +188,7 @@ pub struct App {
     last_canvas_size: Vec2,
     /// 缩放百分比浮层剩余显示时间（秒）与值
     zoom_flash: Option<(f32, f32)>,
-    /// 工具栏触发的延迟动作（画布尺寸确定后执行）
+    /// 切图适配和实际大小按钮的延迟动作（画布尺寸确定后执行）
     pending_fit: bool,
     pending_actual: bool,
     /// 动画播放状态（仅当当前图帧数 >1 时有意义）
@@ -1394,12 +1394,6 @@ impl App {
                                 .clicked()
                             {
                                 self.nearest = !self.nearest;
-                            }
-                            if ui::icon_btn(ui, Icon::Fit, false, pal)
-                                .on_hover_text("适配窗口 (F)")
-                                .clicked()
-                            {
-                                self.pending_fit = true;
                             }
                             if ui::icon_btn(ui, Icon::Actual, false, pal)
                                 .on_hover_text("实际大小 (0)")
@@ -2694,7 +2688,7 @@ impl eframe::App for App {
             }
             self.last_canvas_size = canvas_size;
         }
-        // 工具栏按钮触发的动作（此时画布尺寸已知）
+        // 切图适配和实际大小按钮触发的动作（此时画布尺寸已知）
         if self.pending_fit {
             self.fit(canvas_size);
             self.pending_fit = false;
