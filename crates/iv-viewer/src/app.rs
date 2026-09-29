@@ -765,7 +765,7 @@ impl App {
         if let Some(editor) = &mut self.editor {
             if ctx.input(|i| i.key_pressed(Key::Escape)) {
                 if ctx.memory(|m| m.any_popup_open()) { ctx.memory_mut(|m| m.close_popup()); }
-                else { editor.request_close(); }
+                else { editor.escape(); }
             }
             return; // Editor owns keyboard and file drops; never navigate/delete underneath it.
         }
@@ -1057,7 +1057,10 @@ impl App {
         let result = crate::image_edit::Source::new(cur.img.clone(), self.frame_index)
             .and_then(|source| crate::editor::Editor::new(ctx, cur.path.clone(), source));
         match result {
-            Ok(editor) => {
+            Ok(mut editor) => {
+                editor.checkerboard = self.checkerboard;
+                editor.background = self.background_color;
+                ctx.request_repaint();
                 self.editor_resume_playback = self.playing;
                 self.playing = false;
                 self.editor = Some(editor);
@@ -2705,6 +2708,15 @@ impl eframe::App for App {
             }
         }
 
+        // 编辑模式直接接管主窗口的画布和上下工具栏，不在原图上叠放预览弹窗。
+        if self.editor.is_some() {
+            self.handle_global_input(ctx, ctx.screen_rect().size());
+            self.glass_regions.clear();
+            self.draw_editor(ctx, &pal);
+            borderless_chrome(ctx);
+            return;
+        }
+
         // 全窗口画布（图像铺满，UI 以悬浮层叠加其上）。
         // 磨砂开启且有背景快照：画模糊快照 + 主题 tint；
         // 否则（关闭/老系统/首张快照未到）回退不透明对角渐变。
@@ -2894,7 +2906,6 @@ impl eframe::App for App {
             }
         }
         self.draw_delete_dialog(ctx, &pal);
-        self.draw_editor(ctx, &pal);
 
         // 图像绘制（wgpu paint callback 覆盖画布）
         if self.glass_regions.len() > MAX_GLASS {

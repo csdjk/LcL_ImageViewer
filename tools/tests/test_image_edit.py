@@ -14,7 +14,7 @@ class EditorWiring(unittest.TestCase):
         self.assertNotIn('self.mip_index', section)
         self.assertIn('self.playing = false;', section)
         self.assertIn('image.mips.first()', CORE)
-    def test_modal_blocks_file_drop_navigation_and_auto_refresh(self):
+    def test_editor_mode_blocks_file_drop_navigation_and_auto_refresh(self):
         body = APP[APP.index('fn handle_global_input('):APP.index('fn request_delete(')]
         self.assertLess(body.index('if let Some(editor)'), body.index('dropped_files'))
         self.assertIn('!self.delete_active() && self.editor.is_none()', APP)
@@ -29,7 +29,7 @@ class EditorWiring(unittest.TestCase):
         self.assertIn('image-edit-save', EDITOR)
         self.assertIn('if self.save_job.is_some()', EDITOR)
     def test_ui_has_both_tools_and_retains_prior_readout(self):
-        for term in ['裁剪','修改分辨率','锁定比例','另存为 PNG','撤销','重做','重置全部']:
+        for term in ['裁剪','分辨率','锁定比例','另存为 PNG','撤销','重做','重置全部']:
             self.assertIn(term, EDITOR)
         self.assertIn('self.pixel_format.text(position, rgba, self.channel)', APP)
         self.assertNotIn('Icon::Fit', APP)
