@@ -15,6 +15,7 @@ mod loader;
 mod file_watch;
 mod directory;
 mod perf;
+mod pixel_readout;
 mod render;
 #[cfg(windows)]
 mod recycle;

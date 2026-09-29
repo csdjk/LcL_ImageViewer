@@ -14,6 +14,7 @@ use eframe::egui::{
 use iv_core::decode::{DecodedImage, MipLevel, PixelData};
 
 use crate::loader::{Loader, Msg};
+use crate::pixel_readout::{self, PixelFormat};
 use crate::render::{ChannelMode, Renderer, Uniforms, MAX_GLASS};
 use crate::ui::{self, Icon, Palette, ThemeMode};
 use crate::winassoc;
@@ -163,6 +164,9 @@ pub struct App {
     probe_detail: String,
     /// 光标下的像素颜色（状态栏色块 / 右键菜单）
     probe_color: Option<[u8; 4]>,
+    /// 冻结于最近取样的坐标；显示文本按当前通道和格式生成。
+    probe_position: Option<(u32, u32)>,
+    pixel_format: PixelFormat,
     /// 图像属性窗口是否打开
     show_props: bool,
     /// 可固定的完整像素检查器窗口是否打开。
@@ -309,6 +313,8 @@ impl App {
             probe_text: String::new(),
             probe_detail: String::new(),
             probe_color: None,
+            probe_position: None,
+            pixel_format: PixelFormat::from_key(cc.storage.and_then(|s| s.get_string(PixelFormat::STORAGE_KEY)).as_deref()),
             show_props: false,
             show_probe: false,
             show_settings: false,
@@ -1777,6 +1783,46 @@ impl App {
         }
     }
 
+    fn update_probe(&mut self, ctx: &egui::Context, canvas_hover: Option<Pos2>) {
+        // 像素检查器（光标 → 图像坐标 → 像素值）
+        // 右键菜单弹出 / 拖拽时 hover 消失 → 冻结上一帧值；指针离开窗口才清空
+        if ctx.input(|i| i.pointer.latest_pos()).is_none() {
+            self.probe_text.clear();
+            self.probe_detail.clear();
+            self.probe_color = None;
+            self.probe_position = None;
+        } else if let Some(p) = canvas_hover {
+            self.probe_text.clear();
+            self.probe_detail.clear();
+            self.probe_color = None;
+            self.probe_position = None;
+            if let Some((x, y)) = self.pos_to_image(p) {
+                // 动画图取当前帧，静态图取当前 mip（均先在局部取完再写回）
+                let probe = self.current.as_ref().and_then(|cur| {
+                    if cur.img.frames.len() > 1 {
+                        let f = cur.img.frames.get(self.frame_index)?;
+                        let (w, h) = (cur.img.width, cur.img.height);
+                        Some((f.data.rgba8_at(w, h, x, y), f.data.rgba_f32_at(w, h, x, y)))
+                    } else {
+                        let mip = cur.img.mips.get(self.mip_index)?;
+                        Some((mip.rgba8_at(x, y), mip.rgba_f32_at(x, y)))
+                    }
+                });
+                if let Some((Some([r, g, b, a]), f32px)) = probe {
+                    self.probe_color = Some([r, g, b, a]);
+                    self.probe_position = Some((x, y));
+                    let f = f32px.unwrap_or([0.0; 4]);
+                    // 完整检查器仍保留原始全通道 HEX / 字节 / 浮点读数。
+                    self.probe_text = PixelFormat::Hex.text((x, y), [r, g, b, a], ChannelMode::Rgb);
+                    self.probe_detail = format!(
+                        "RGBA ({r:>3}, {g:>3}, {b:>3}, {a:>3})   Float [{:>7.3} {:>7.3} {:>7.3} {:>7.3}]",
+                        f[0], f[1], f[2], f[3],
+                    );
+                }
+            }
+        }
+    }
+
     /// 底部悬浮状态栏：像素检查器 + 状态标记 + 缩放。
     fn draw_bottom_overlay(&mut self, ctx: &egui::Context, pal: &Palette) {
         if self.show_settings || self.bot_alpha <= 0.01 {
@@ -1804,7 +1850,7 @@ impl App {
                                 egui::Rounding::same(2.0),
                                 Color32::from_rgb(0x5a, 0x5a, 0x5a),
                             );
-                            if let Some([r, g, b, a]) = self.probe_color {
+                            if let Some([r, g, b, a]) = self.probe_color.map(|rgba| pixel_readout::swatch(rgba, self.channel)) {
                                 p.rect_filled(
                                     rc,
                                     egui::Rounding::same(2.0),
@@ -1817,30 +1863,26 @@ impl App {
                                 Stroke::new(1.0f32, pal.border),
                             );
                         }
-                        // 默认只保留坐标与 HEX；完整 RGBA/浮点值点击后在检查器中查看。
-                        let (iw, ih) = self
-                            .current
-                            .as_ref()
-                            .map(|c| (c.img.width, c.img.height))
+                        // 按格式/通道/Mip 预留最大宽度；鼠标跨坐标位数和颜色值不让底栏跳动。
+                        let dimensions = self.current_mip().map(|m| (m.width, m.height))
                             .unwrap_or((9999, 9999));
-                        let sample = format!("{iw}, {ih}   #RRGGBBAA");
-                        let slot_w = ui
-                            .fonts(|f| f.layout_no_wrap(sample, mono.clone(), pal.dim))
-                            .size()
-                            .x;
+                        let sample = self.pixel_format.width_sample(dimensions, self.channel);
+                        let empty = pixel_readout::placeholder(self.channel);
+                        let slot_w = ui.fonts(|f| {
+                            f.layout_no_wrap(sample, mono.clone(), pal.dim).size().x
+                                .max(f.layout_no_wrap(empty.clone(), mono.clone(), pal.faint).size().x)
+                        });
                         let (slot, slot_resp) =
                             ui.allocate_exact_size(Vec2::new(slot_w, 20.0), egui::Sense::click());
-                        let probe = self.probe_text.clone();
-                        let (txt, color) = if probe.is_empty() {
-                            ("光标移到图像上查看像素".to_string(), pal.faint)
-                        } else {
-                            (probe, pal.dim)
+                        let (txt, color) = match self.probe_position.zip(self.probe_color) {
+                            Some((position, rgba)) => (self.pixel_format.text(position, rgba, self.channel), pal.dim),
+                            None => (empty, pal.faint),
                         };
                         let galley = ui.fonts(|f| f.layout_no_wrap(txt, mono.clone(), color));
                         let gp = Pos2::new(slot.left(), slot.center().y - galley.size().y / 2.0);
-                        ui.painter().galley(gp, galley, color);
+                        ui.painter().with_clip_rect(slot).galley(gp, galley, color);
                         let slot_resp = slot_resp
-                            .on_hover_text("坐标与 HEX；点击打开可固定、可复制的完整像素检查器");
+                            .on_hover_text("坐标与当前通道的原始像素值；设置可切换颜色格式。点击打开完整像素检查器");
                         if slot_resp.clicked() {
                             self.show_probe = true;
                         }
@@ -1851,7 +1893,7 @@ impl App {
                         if self.nearest {
                             ui.label(RichText::new("近邻").size(11.0).color(pal.accent));
                         }
-                        if self.channel != ChannelMode::Rgb {
+                        if self.channel == ChannelMode::RgbOpaque {
                             ui.label(
                                 RichText::new(self.channel.label())
                                     .size(11.0)
@@ -2270,6 +2312,16 @@ impl App {
                         ui::setting_row(ui, pal, "减少动效", "关闭工具栏淡入淡出动画", |ui| {
                             ui::toggle(ui, &mut self.reduce_motion, pal);
                         });
+                        ui::setting_row(ui, pal, "颜色显示格式", "底栏颜色读数格式；单通道只显示对应分量。归一化为8位值/255（最多3位小数），HEX为RRGGBBAA；HDR原始浮点值在完整像素检查器中。", |ui| {
+                            ComboBox::from_id_source("iv-pixel-format-select")
+                                .selected_text(self.pixel_format.label())
+                                .width(166.0)
+                                .show_ui(ui, |ui| {
+                                    for format in PixelFormat::ALL {
+                                        ui.selectable_value(&mut self.pixel_format, format, format.label());
+                                    }
+                                });
+                        });
                         ui::setting_row(ui, pal, "自动刷新", "保存当前图片后更新，保留检查位置", |ui| {
                             if ui::toggle(ui, &mut self.auto_refresh, pal).changed() {
                                 self.file_watcher.set_path(
@@ -2359,6 +2411,7 @@ impl App {
 impl eframe::App for App {
     /// 退出时持久化主题与外观设置（eframe persistence）。
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string(PixelFormat::STORAGE_KEY, self.pixel_format.key().into());
         storage.set_string("iv-auto-refresh", if self.auto_refresh { "on" } else { "off" }.into());
         storage.set_string("iv-lock-view", if self.lock_view { "on" } else { "off" }.into());
         storage.set_string("iv-always-on-top", if self.always_on_top { "on" } else { "off" }.into());
@@ -2728,6 +2781,9 @@ impl eframe::App for App {
             }
         }
 
+        // 在底栏绘制前读取当前动画帧/Mip，避免切帧和取样延迟一帧。
+        self.update_probe(ctx, canvas_hover);
+
         // 悬浮层自动显隐 + 绘制（Foreground 层，叠加在画布之上）
         // 玻璃区域每帧重建：各悬浮层绘制时收集其矩形与淡入系数
         self.glass_regions.clear();
@@ -2756,50 +2812,6 @@ impl eframe::App for App {
             }
         }
         self.draw_delete_dialog(ctx, &pal);
-
-        // 像素检查器（光标 → 图像坐标 → 像素值）
-        // 右键菜单弹出 / 拖拽时 hover 消失 → 冻结上一帧值；指针离开窗口才清空
-        if ctx.input(|i| i.pointer.latest_pos()).is_none() {
-            self.probe_text.clear();
-            self.probe_detail.clear();
-            self.probe_color = None;
-        } else if let Some(p) = canvas_hover {
-            self.probe_text.clear();
-            self.probe_detail.clear();
-            self.probe_color = None;
-            if let Some((x, y)) = self.pos_to_image(p) {
-                // 动画图取当前帧，静态图取当前 mip（均先在局部取完再写回）
-                let probe = self.current.as_ref().and_then(|cur| {
-                    if cur.img.frames.len() > 1 {
-                        let f = cur.img.frames.get(self.frame_index)?;
-                        let (w, h) = (cur.img.width, cur.img.height);
-                        Some((f.data.rgba8_at(w, h, x, y), f.data.rgba_f32_at(w, h, x, y)))
-                    } else {
-                        let mip = cur.img.mips.get(self.mip_index)?;
-                        Some((mip.rgba8_at(x, y), mip.rgba_f32_at(x, y)))
-                    }
-                });
-                if let Some((Some([r, g, b, a]), f32px)) = probe {
-                    self.probe_color = Some([r, g, b, a]);
-                    let f = f32px.unwrap_or([0.0; 4]);
-                    // 位数填充：坐标 / RGB / 浮点均定宽，底栏槽位宽度不随数值抖动
-                    let (iw, ih) = self
-                        .current
-                        .as_ref()
-                        .map(|c| (c.img.width, c.img.height))
-                        .unwrap_or((9999, 9999));
-                    self.probe_text = format!(
-                        "{x:>xw$}, {y:>yw$}   #{r:02X}{g:02X}{b:02X}{a:02X}",
-                        xw = iw.to_string().len(),
-                        yw = ih.to_string().len(),
-                    );
-                    self.probe_detail = format!(
-                        "RGBA ({r:>3}, {g:>3}, {b:>3}, {a:>3})   Float [{:>7.3} {:>7.3} {:>7.3} {:>7.3}]",
-                        f[0], f[1], f[2], f[3],
-                    );
-                }
-            }
-        }
 
         // 图像绘制（wgpu paint callback 覆盖画布）
         if self.glass_regions.len() > MAX_GLASS {
