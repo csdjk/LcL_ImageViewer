@@ -18,6 +18,7 @@ mod perf;
 mod pixel_readout;
 mod image_edit;
 mod editor;
+mod edit_ops;
 mod render;
 #[cfg(windows)]
 mod recycle;

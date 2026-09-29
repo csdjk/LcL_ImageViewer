@@ -239,11 +239,45 @@ impl Source {
             data,
         })
     }
-    pub fn thumbnail(&self) -> Result<Pixels, String> {
+    /// Shared immutable pixel snapshot for sequential editor operations and undo.
+    pub fn from_pixels(pixels: Pixels, note: String) -> Result<Self, String> {
+        use iv_core::decode::{ImageKind, MipLevel};
+        if pixels.data.len() != pixel_bytes(pixels.width, pixels.height)? {
+            return Err("编辑像素长度不匹配".into());
+        }
+        let mut result = Self::new(
+            Arc::new(DecodedImage {
+                width: pixels.width,
+                height: pixels.height,
+                mips: vec![MipLevel {
+                    width: pixels.width,
+                    height: pixels.height,
+                    data: PixelData::Rgba8(pixels.data),
+                }],
+                kind: ImageKind::Png,
+                compression: None,
+                has_alpha: true,
+                is_hdr: false,
+                extra_meta: None,
+                frames: vec![],
+            }),
+            0,
+        )?;
+        result.note = note;
+        Ok(result)
+    }
+    pub fn rgba(&self) -> Result<&[u8], String> {
+        self.pixels()
+    }
+    pub fn byte_len(&self) -> usize {
+        self.size.0 as usize * self.size.1 as usize * 4
+    }
+    pub fn preview(&self, limit: u32) -> Result<Pixels, String> {
         let mut plan = Plan::full(self.size);
-        let scale = (1024.0 / self.size.0.max(self.size.1) as f64).min(1.0);
+        let scale = (limit.max(1) as f64 / self.size.0.max(self.size.1) as f64).min(1.0);
         plan.width = (self.size.0 as f64 * scale).round().max(1.0) as u32;
         plan.height = (self.size.1 as f64 * scale).round().max(1.0) as u32;
+        plan.filter = Filter::Nearest;
         self.render(plan)
     }
 }
