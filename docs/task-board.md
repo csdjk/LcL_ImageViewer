@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N17 | 底栏像素格式与通道联动 | REVIEW | ChatGPT-AgentDock | 用户本轮要求 / N16 DONE | `crates/iv-viewer/src/{app.rs,main.rs,pixel_readout.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 坐标括号、三格式持久化、单通道读数和灰度色块；原图不变、底栏稳定、双主题双尺寸实机与main复验，不发布 |
+| IV-P1-N17 | 底栏像素格式与通道联动 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N16 DONE | `crates/iv-viewer/src/{app.rs,main.rs,pixel_readout.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 坐标括号、三格式持久化、单通道读数和灰度色块；原图不变、底栏稳定、双主题双尺寸实机与main复验，不发布 |
 | IV-P1-N16 | 顶部缩放入口精简：保留实际大小 | DONE | ChatGPT-AgentDock | 用户明确要求 / v0.6.0当前main | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/tests/test_topbar_zoom_controls.py`, `tools/ui-qa/topbar_actual_only_smoke.py`, `docs/ui-qa/顶部缩放入口精简验收.md`, `README.md` | 删除顶部适配按钮、保留实际大小；F/0、自动适配、刷新和视图锁定不变；测试/Release/双主题双尺寸实机及main复验，不发布 |
 | IV-REL-060 | 发布轻量贴图检查 v0.6.0 | DONE | Codex / codex/release-v0.6.0 | 用户明确要求打包发布 / IV-TA-01 DONE / b332f58 | 见 `docs/development-plan.md` | 源码标签4089599；124项Rust、24项Windows、5项macOS边界，静态CRT、76值隔离注册、41张正式/便携截图；GitHub Latest及三个公开附件下载hash通过。见 `docs/releases/v0.6.0-validation.md` |
 | IV-TA-01 | 轻量贴图检查首轮：DDS、动画预算、自动刷新与视图锁定 | DONE | Codex / codex/ta-foundation | 用户授权 / 6934031 | 见 `docs/轻量贴图检查优化计划.md` | 124项Rust、24项Windows契约、5项macOS边界及113张分支/17张main实机，通过；集成916de47，发布另列IV-REL-060 |
