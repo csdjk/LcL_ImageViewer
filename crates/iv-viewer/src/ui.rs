@@ -644,6 +644,7 @@ pub enum Icon {
     Prev,
     Next,
     Actual,
+    Edit,
     Bounds,
     Play,
     Pause,
@@ -723,6 +724,13 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
             for corner in [b.left_top(), b.right_top(), b.left_bottom(), b.right_bottom()] {
                 p.rect_filled(Rect::from_center_size(corner, Vec2::splat(3.2 * u)), 0.0, color);
             }
+        }
+        Icon::Edit => {
+            let a = c + Vec2::new(-4.5, 4.5) * u;
+            let b = c + Vec2::new(4.0, -4.0) * u;
+            p.line_segment([a, b], Stroke::new(3.0 * u, color));
+            p.line_segment([a + Vec2::new(-1.0, 1.0) * u, a + Vec2::new(2.0, 1.0) * u], st);
+            p.line_segment([b + Vec2::new(-1.5, -1.5) * u, b + Vec2::new(1.5, 1.5) * u], st);
         }
         Icon::Actual => {
             // 方框 + 中心点（实际大小 1:1）

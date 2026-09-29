@@ -23,7 +23,7 @@ eframe = { version = "0.27", default-features = false, features = [
 crossbeam-channel = "0.5"
 rfd = "0.13"
 bytemuck = { version = "1", features = ["derive"] }
-# 仅用于启动时解码窗口图标 PNG
+# 窗口图标与编辑结果的无损 PNG 编码；复用已有 image 依赖
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Native dialog ownership; both AppKit and Win32 use the locked rfd handle version.
 raw-window-handle = "0.5"
