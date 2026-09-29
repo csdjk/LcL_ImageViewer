@@ -16,9 +16,9 @@ class ReadmeGalleryTests(unittest.TestCase):
     def test_each_major_feature_has_a_corresponding_illustration(self):
         section=self.readme.split('## 功能图解\n',1)[1].split('\n## 支持格式',1)[0]
         blocks=re.split(r'(?m)^### ',section)[1:]
-        self.assertEqual(len(blocks),11)
+        self.assertEqual(len(blocks),12)
         for block in blocks:
-            self.assertRegex(block,r'!\[[^\]]+\]\(docs/screenshots/features/v0\.5\.0/[^)]+\)')
+            self.assertRegex(block,r'!\[[^\]]+\]\((?:docs/screenshots/features/v0\.5\.0/[^)]+|docs/ui-qa/editor-preview\.jpg)\)')
 
     def test_readme_images_exist_and_have_descriptive_alt_text(self):
         sources=re.findall(r'!\[([^\]]*)\]\(([^)]+)\)',self.readme)
@@ -50,6 +50,15 @@ class ReadmeGalleryTests(unittest.TestCase):
         self.assertNotRegex(self.readme,r'[CEH]:\\(?:Users|LiChangLong|Work)')
         self.assertNotIn('ui-verify-shots/',self.readme)
         self.assertNotIn('target/',self.readme)
+
+    def test_editor_illustration_has_current_native_provenance(self):
+        p=ROOT/'docs/ui-qa/editor-preview.jpg'
+        meta=json.loads(p.with_suffix('.json').read_text('utf-8'))
+        self.assertRegex(meta['capture_source_commit'],r'^[0-9a-f]{40}$')
+        self.assertEqual(len(meta['sources']),2)
+        self.assertEqual(hashlib.sha256(p.read_bytes()).hexdigest(),meta['sha256'])
+        self.assertLess(p.stat().st_size,400000)
+        self.assertEqual(p.stat().st_size,meta['bytes'])
 
     def test_channel_and_animation_instructions_remain_present(self):
         for term in ['R、G、B、Alpha','忽略透明度','Space','逐帧','拖动帧进度条','图钉','HEX']:

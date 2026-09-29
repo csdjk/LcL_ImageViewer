@@ -167,6 +167,8 @@ pub struct App {
     /// 冻结于最近取样的坐标；显示文本按当前通道和格式生成。
     probe_position: Option<(u32, u32)>,
     pixel_format: PixelFormat,
+    editor: Option<crate::editor::Editor>,
+    editor_resume_playback: bool,
     /// 图像属性窗口是否打开
     show_props: bool,
     /// 可固定的完整像素检查器窗口是否打开。
@@ -314,6 +316,8 @@ impl App {
             probe_detail: String::new(),
             probe_color: None,
             probe_position: None,
+            editor: None,
+            editor_resume_playback: false,
             pixel_format: PixelFormat::from_key(cc.storage.and_then(|s| s.get_string(PixelFormat::STORAGE_KEY)).as_deref()),
             show_props: false,
             show_probe: false,
@@ -537,7 +541,7 @@ impl App {
     }
 
     fn poll_file_changes(&mut self) {
-        if self.delete_active() { return; }
+        if self.delete_active() || self.editor.is_some() { return; }
         let Some(change) = self.file_watcher.poll() else { return; };
         if !self.auto_refresh || self.opened_path.as_ref() != Some(&change.path) { return; }
         match change.state {
@@ -758,6 +762,13 @@ impl App {
                 if ctx.input(|i| i.key_pressed(Key::Escape)) { return; }
             }
         }
+        if let Some(editor) = &mut self.editor {
+            if ctx.input(|i| i.key_pressed(Key::Escape)) {
+                if ctx.memory(|m| m.any_popup_open()) { ctx.memory_mut(|m| m.close_popup()); }
+                else { editor.request_close(); }
+            }
+            return; // Editor owns keyboard and file drops; never navigate/delete underneath it.
+        }
         if self.delete_active() {
             if self.delete_job.is_none() && ctx.input(|i| i.key_pressed(Key::Escape)) {
                 self.delete_prompt = None;
@@ -829,6 +840,7 @@ impl App {
             return;
         }
         let key = |k: Key| ctx.input(|i| i.modifiers == egui::Modifiers::NONE && i.key_pressed(k));
+        if key(Key::E) { self.begin_editor(ctx); return; }
         if key(Key::F5) {
             self.reload_current();
         }
@@ -1035,6 +1047,63 @@ impl App {
                 self.request_directory_scan(anchor);
             }
         }
+        self.last_move = Instant::now();
+    }
+
+    fn begin_editor(&mut self, ctx: &egui::Context) {
+        if self.editor.is_some() || self.delete_active() { return; }
+        if self.pending.is_some() { self.error_msg = Some("图片仍在加载，请稍后再编辑".into()); return; }
+        let Some(cur) = &self.current else { return; };
+        let result = crate::image_edit::Source::new(cur.img.clone(), self.frame_index)
+            .and_then(|source| crate::editor::Editor::new(ctx, cur.path.clone(), source));
+        match result {
+            Ok(editor) => {
+                self.editor_resume_playback = self.playing;
+                self.playing = false;
+                self.editor = Some(editor);
+                self.ctx_menu_pos = None;
+                self.background_menu_pos = None;
+                self.show_settings = false;
+                self.show_props = false;
+                self.show_probe = false;
+                self.right_window_drag = None;
+                self.error_msg = None;
+                ctx.memory_mut(|m| m.close_popup());
+            }
+            Err(e) => self.error_msg = Some(e),
+        }
+    }
+
+    fn draw_editor(&mut self, ctx: &egui::Context, pal: &Palette) {
+        let Some(mut editor) = self.editor.take() else { return; };
+        match editor.show(ctx, pal) {
+            crate::editor::Action::Close => {
+                self.playing = self.editor_resume_playback;
+                self.next_frame_at = Instant::now() + self.current_frame_delay();
+                self.last_move = Instant::now();
+                return;
+            }
+            crate::editor::Action::Open(path) => {
+                self.open(path);
+                self.last_move = Instant::now();
+                return;
+            }
+            crate::editor::Action::Save => {
+                if let Some(hwnd) = self.hwnd.or_else(crate::backdrop::find_own_window) {
+                    let owner = DialogOwner(hwnd);
+                    let mut dialog = rfd::FileDialog::new().set_parent(&owner)
+                        .set_title("另存编辑结果（不会覆盖已有文件）")
+                        .add_filter("PNG 图片（保留透明度）", &["png"])
+                        .set_file_name(editor.suggested_name());
+                    if let Some(parent) = editor.original.parent() { dialog = dialog.set_directory(parent); }
+                    let path = dialog.save_file();
+                    self.dialog_escape_until = Some(Instant::now() + Duration::from_millis(250));
+                    if let Some(path) = path { editor.save_to(ctx, path); }
+                }
+            }
+            crate::editor::Action::None => {}
+        }
+        self.editor = Some(editor);
         self.last_move = Instant::now();
     }
 
@@ -1413,6 +1482,11 @@ impl App {
                                 .clicked()
                             {
                                 self.show_image_bounds = !self.show_image_bounds;
+                            }
+
+                            if ui::icon_btn(ui, Icon::Edit, false, pal)
+                                .on_hover_text("裁剪 / 修改分辨率 (E) · 另存新图片").clicked() {
+                                self.begin_editor(ctx);
                             }
 
                             // —— 动画播放控件（多帧时显示）——
@@ -2102,6 +2176,10 @@ impl App {
             }
         }
         if has_image {
+            if ui::menu_item(ui, "裁剪 / 修改分辨率…", "E", false, &pal).clicked() {
+                self.begin_editor(&ctx);
+                return;
+            }
             if ui::menu_item(ui, "图像属性…", "", false, &pal).clicked() {
                 self.show_props = true;
                 self.ctx_menu_pos = None;
@@ -2442,6 +2520,10 @@ impl eframe::App for App {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.editor.is_some() && ctx.input(|i| i.viewport().close_requested()) {
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+            if let Some(editor) = &mut self.editor { editor.request_close(); }
+        }
         self.poll_delete(ctx);
         self.poll_file_changes();
         self.handle_loader_messages();
@@ -2634,7 +2716,7 @@ impl eframe::App for App {
         let (canvas_rect, canvas_hover) = egui::CentralPanel::default()
             .frame(Frame::default().fill(pal.canvas))
             .show(ctx, |ui| {
-                ui.set_enabled(!self.delete_active());
+                ui.set_enabled(!self.delete_active() && self.editor.is_none());
                 let rect = ui.available_rect_before_wrap();
                 if let Some(tex_id) = backdrop_tex_id {
                     // 伪磨砂：窗口背后画面的模糊快照铺满画布
@@ -2788,7 +2870,7 @@ impl eframe::App for App {
         // 玻璃区域每帧重建：各悬浮层绘制时收集其矩形与淡入系数
         self.glass_regions.clear();
         self.update_overlay_visibility(ctx);
-        if !self.delete_active() {
+        if !self.delete_active() && self.editor.is_none() {
             self.draw_side_navigation(ctx, &pal);
             self.draw_top_overlay(ctx, &pal);
             self.draw_background_menu(ctx, &pal);
@@ -2812,6 +2894,7 @@ impl eframe::App for App {
             }
         }
         self.draw_delete_dialog(ctx, &pal);
+        self.draw_editor(ctx, &pal);
 
         // 图像绘制（wgpu paint callback 覆盖画布）
         if self.glass_regions.len() > MAX_GLASS {
