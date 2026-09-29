@@ -851,7 +851,7 @@ impl App {
             self.request_delete();
             return;
         }
-        if ctx.input(|i|(i.modifiers.ctrl || i.modifiers.command) && i.modifiers.shift && !i.modifiers.alt && i.key_pressed(Key::C)) {
+        if ctx.input(|i|crate::ocr_panel::copy_shortcut(i.modifiers, &i.events)) {
             self.begin_ocr(ctx,true); return;
         }
         let key = |k: Key| ctx.input(|i| i.modifiers == egui::Modifiers::NONE && i.key_pressed(k));

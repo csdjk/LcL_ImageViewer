@@ -24,6 +24,25 @@ fn clipboard_sequence() -> u32 {
     0
 }
 
+/// egui-winit 0.27 translates Ctrl+C (including Shift) to Event::Copy, not Key::C.
+pub fn copy_shortcut(modifiers: egui::Modifiers, events: &[egui::Event]) -> bool {
+    (modifiers.ctrl || modifiers.command)
+        && modifiers.shift
+        && !modifiers.alt
+        && events.iter().any(|e| {
+            matches!(
+                e,
+                egui::Event::Copy
+                    | egui::Event::Key {
+                        key: egui::Key::C,
+                        pressed: true,
+                        repeat: false,
+                        ..
+                    }
+            )
+        })
+}
+
 pub struct Panel {
     pub visible: bool,
     input: Option<Input>,
@@ -285,6 +304,25 @@ impl Panel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_copy_event_and_key_route_require_the_explicit_ocr_chord() {
+        let mut m = egui::Modifiers::CTRL;
+        assert!(!copy_shortcut(m, &[egui::Event::Copy]));
+        m.shift = true;
+        assert!(copy_shortcut(m, &[egui::Event::Copy]));
+        assert!(copy_shortcut(
+            m,
+            &[egui::Event::Key {
+                key: egui::Key::C,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: m
+            }]
+        ));
+        m.alt = true;
+        assert!(!copy_shortcut(m, &[egui::Event::Copy]));
+    }
     #[test]
     fn canceled_or_closed_job_cannot_replace_clipboard() {
         let ctx = egui::Context::default();
