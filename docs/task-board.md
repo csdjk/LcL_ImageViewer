@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N16 | 顶部缩放入口精简：保留实际大小 | REVIEW | ChatGPT-AgentDock | 用户明确要求 / v0.6.0当前main | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/tests/test_topbar_zoom_controls.py`, `tools/ui-qa/topbar_actual_only_smoke.py`, `docs/ui-qa/顶部缩放入口精简验收.md`, `README.md` | 删除顶部适配按钮、保留实际大小；F/0、自动适配、刷新和视图锁定不变；测试/Release/双主题双尺寸实机及main复验，不发布 |
+| IV-P1-N16 | 顶部缩放入口精简：保留实际大小 | DONE | ChatGPT-AgentDock | 用户明确要求 / v0.6.0当前main | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/tests/test_topbar_zoom_controls.py`, `tools/ui-qa/topbar_actual_only_smoke.py`, `docs/ui-qa/顶部缩放入口精简验收.md`, `README.md` | 删除顶部适配按钮、保留实际大小；F/0、自动适配、刷新和视图锁定不变；测试/Release/双主题双尺寸实机及main复验，不发布 |
 | IV-REL-060 | 发布轻量贴图检查 v0.6.0 | DONE | Codex / codex/release-v0.6.0 | 用户明确要求打包发布 / IV-TA-01 DONE / b332f58 | 见 `docs/development-plan.md` | 源码标签4089599；124项Rust、24项Windows、5项macOS边界，静态CRT、76值隔离注册、41张正式/便携截图；GitHub Latest及三个公开附件下载hash通过。见 `docs/releases/v0.6.0-validation.md` |
 | IV-TA-01 | 轻量贴图检查首轮：DDS、动画预算、自动刷新与视图锁定 | DONE | Codex / codex/ta-foundation | 用户授权 / 6934031 | 见 `docs/轻量贴图检查优化计划.md` | 124项Rust、24项Windows契约、5项macOS边界及113张分支/17张main实机，通过；集成916de47，发布另列IV-REL-060 |
 | IV-REL-051 | 发布圆形侧边按钮 v0.5.1 | DONE | ChatGPT-AgentDock | 用户明确要求打包发布 / N15 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `CHANGELOG.md`, `docs/releases/**`, `README.md` | 版本统一；正式构建/测试/安装与便携包验证；push main+新tag并设Latest；公开下载hash；不改当前安装 |
@@ -323,3 +323,7 @@ IV-MAC-01 DONE：集成7cc927f1ee42be5b311abde068b2bb0e5dbf513b，main 110项Rus
 ## IV-P1-N16 领取记录
 
 Owner: ChatGPT-AgentDock；Branch: `codex/topbar-actual-only`；Worktree: `Temp/worktrees/topbar-actual-only`；Base Commit: `5b716e1d6dcab1ee2d5808d77a505fc3204c1a68`。仅精简顶部入口，不移除 F 适配窗口，不改 v0.6.0 刷新或视图锁定；不推送、打包、安装或改关联。
+
+## IV-P1-N16 完成记录
+
+集成 `7be95723788cbabf80a4117c7303673d0894c78c`；移除顶部适配按钮和未使用 Fit 图标，保留实际大小、F/0、自动适配及 v0.6.0 刷新/视图锁定逻辑。主线 124 项 Rust、27 项契约、check 及四组 68 张实机复验通过；Release 构建提交 `5ac120bb684d67dced5d40d6a8216a49eab11525` 与主线可执行源码相同。当前程序 `target/topbar-actual-only/release/imageview.exe`，详情 `docs/ui-qa/顶部缩放入口精简验收.md`。未 push、发布或更新用户安装，长期 NEXT 保持 IV-P1-01。
