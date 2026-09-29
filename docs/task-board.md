@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-EDIT-01 | 裁剪与修改分辨率 | READY | — | 用户新增编辑需求 / N17 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 独立预览、框选/精确裁剪、宽高/比例锁定、透明PNG另存不覆盖；动画仅当前帧且明确提示；测试/双主题双尺寸/导出像素与主线复验，不发布 |
+| IV-EDIT-01 | 裁剪与修改分辨率 | IN_PROGRESS | ChatGPT-AgentDock | 用户新增编辑需求 / N17 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 独立预览、框选/精确裁剪、宽高/比例锁定、透明PNG另存不覆盖；动画仅当前帧且明确提示；测试/双主题双尺寸/导出像素与主线复验，不发布 |
 | IV-P1-N17 | 底栏像素格式与通道联动 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N16 DONE | `crates/iv-viewer/src/{app.rs,main.rs,pixel_readout.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 坐标括号、三格式持久化、单通道读数和灰度色块；原图不变、底栏稳定、双主题双尺寸实机与main复验，不发布 |
 | IV-P1-N16 | 顶部缩放入口精简：保留实际大小 | DONE | ChatGPT-AgentDock | 用户明确要求 / v0.6.0当前main | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/tests/test_topbar_zoom_controls.py`, `tools/ui-qa/topbar_actual_only_smoke.py`, `docs/ui-qa/顶部缩放入口精简验收.md`, `README.md` | 删除顶部适配按钮、保留实际大小；F/0、自动适配、刷新和视图锁定不变；测试/Release/双主题双尺寸实机及main复验，不发布 |
 | IV-REL-060 | 发布轻量贴图检查 v0.6.0 | DONE | Codex / codex/release-v0.6.0 | 用户明确要求打包发布 / IV-TA-01 DONE / b332f58 | 见 `docs/development-plan.md` | 源码标签4089599；124项Rust、24项Windows、5项macOS边界，静态CRT、76值隔离注册、41张正式/便携截图；GitHub Latest及三个公开附件下载hash通过。见 `docs/releases/v0.6.0-validation.md` |
@@ -333,3 +333,7 @@ Owner: ChatGPT-AgentDock；Branch: `codex/topbar-actual-only`；Worktree: `Temp/
 ## N17 领取记录
 
 Owner: ChatGPT-AgentDock；Branch: `codex/pixel-readout-formats`；Worktree: `Temp/worktrees/pixel-readout-formats`；Base: `767997b41c4b6389c2d9c86e9633aa5d6cf00e04`。默认HEX兼容旧偏好，格式仅影响底栏；单通道显式标识分量、灰度色块不叠加源Alpha，完整检查器和复制HEX仍提供原始RGBA。不改系统安装、关联或远端。
+
+## IV-EDIT-01 领取合同
+
+分支 `codex/basic-image-editor`，工作树 `Temp/worktrees/basic-image-editor`，基于本地 `abd1b88`。只读解码像素快照，编辑独立预览，不改变当前原图/通道/像素格式。裁剪和缩放参数可重置、撤销；导出静态8位RGBA PNG，拒绝覆盖已有文件。动画明确仅编辑当前帧，DDS取最高分辨率，HDR浮点明确拒绝。PNG不承诺保留原格式元数据/图层/Mipmap。禁止修改安装/关联/远端，需真实Windows交互及新文件像素验证。
