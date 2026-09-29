@@ -52,6 +52,8 @@ pub struct Editor {
     angle: f64,
     view: CanvasView,
     fit_pending: bool,
+    auto_fit: bool,
+    last_size: (u32, u32),
     last_viewport: Vec2,
     drag: Option<Drag>,
     texture: Option<egui::TextureHandle>,
@@ -122,6 +124,8 @@ impl Editor {
             angle: 0.0,
             view: CanvasView::default(),
             fit_pending: true,
+            auto_fit: true,
+            last_size: (width, height),
             last_viewport: Vec2::ZERO,
             drag: None,
             texture: None,
@@ -225,6 +229,7 @@ impl Editor {
     fn changed(&mut self, ctx: &egui::Context) {
         self.reset_draft();
         self.fit_pending = true;
+        self.auto_fit = true;
         self.texture_revision = None;
         if let Err(e) = self.request_preview(ctx) {
             self.error = Some(e);
@@ -490,6 +495,7 @@ impl Editor {
                 }
                 if ctx.input(|i| i.key_pressed(egui::Key::F)) {
                     self.fit_pending = true;
+                    self.auto_fit = true;
                 }
                 if ctx.input(|i| i.key_pressed(egui::Key::Num0)) {
                     self.view.scale = 1.0;
@@ -498,6 +504,7 @@ impl Editor {
                         [self.last_viewport.x, self.last_viewport.y],
                     );
                     self.fit_pending = false;
+                    self.auto_fit = false;
                 }
                 if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
                     self.apply_draft(ctx);
@@ -846,6 +853,7 @@ impl Editor {
                             0.8,
                         );
                         self.fit_pending = false;
+                        self.auto_fit = false;
                     }
                     ui.label(format!("{:.0}%", self.view.scale * 100.0));
                     if ui
@@ -858,9 +866,11 @@ impl Editor {
                             1.25,
                         );
                         self.fit_pending = false;
+                        self.auto_fit = false;
                     }
                     if ui.button("适配").clicked() {
                         self.fit_pending = true;
+                        self.auto_fit = true;
                     }
                     if ui.button("1:1").clicked() {
                         self.view.scale = 1.0;
@@ -869,6 +879,7 @@ impl Editor {
                             [self.last_viewport.x, self.last_viewport.y],
                         );
                         self.fit_pending = false;
+                        self.auto_fit = false;
                     }
                     ui.checkbox(&mut self.checkerboard, "透明网格");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1006,11 +1017,15 @@ impl Editor {
         let response = ui.allocate_rect(viewport, Sense::click_and_drag());
         let p = ui.painter().with_clip_rect(viewport);
         let size = self.preview_size();
-        if self.last_viewport != viewport.size() {
-            self.fit_pending = true;
-            self.last_viewport = viewport.size();
+        if !self.auto_fit && !self.fit_pending {
+            self.view.offset[0] += (viewport.width() - self.last_viewport.x) * 0.5
+                + (self.last_size.0 as f32 - size.0 as f32) * self.view.scale * 0.5;
+            self.view.offset[1] += (viewport.height() - self.last_viewport.y) * 0.5
+                + (self.last_size.1 as f32 - size.1 as f32) * self.view.scale * 0.5;
         }
-        if self.fit_pending {
+        self.last_viewport = viewport.size();
+        self.last_size = size;
+        if self.fit_pending || self.auto_fit {
             self.view.fit(size, [viewport.width(), viewport.height()]);
             self.fit_pending = false;
         }
@@ -1046,6 +1061,7 @@ impl Editor {
             let zoom = ui.input(|i| i.zoom_delta());
             if let Some(pos) = pointer {
                 if scroll.abs() > 0.5 || zoom != 1.0 {
+                    self.auto_fit = false;
                     self.view.zoom(
                         [pos.x - viewport.min.x, pos.y - viewport.min.y],
                         (scroll / 400.0).exp() * zoom,
@@ -1150,6 +1166,7 @@ impl Editor {
             if let (Some(drag), Some(pos)) = (self.drag, pointer) {
                 match drag {
                     Drag::Pan { start, offset } => {
+                        self.auto_fit = false;
                         self.view.offset =
                             [offset[0] + pos.x - start.x, offset[1] + pos.y - start.y];
                     }

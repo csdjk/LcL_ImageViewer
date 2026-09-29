@@ -1081,6 +1081,7 @@ impl App {
         let Some(mut editor) = self.editor.take() else { return; };
         match editor.show(ctx, pal) {
             crate::editor::Action::Close => {
+                ctx.request_repaint();
                 self.playing = self.editor_resume_playback;
                 self.next_frame_at = Instant::now() + self.current_frame_delay();
                 self.last_move = Instant::now();
