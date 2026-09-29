@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-P1-N16 | 顶部缩放入口精简：保留实际大小 | READY | — | 用户明确要求 / v0.6.0当前main | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/tests/test_topbar_zoom_controls.py`, `tools/ui-qa/topbar_actual_only_smoke.py`, `docs/ui-qa/顶部缩放入口精简验收.md`, `README.md` | 删除顶部适配按钮、保留实际大小；F/0、自动适配、刷新和视图锁定不变；测试/Release/双主题双尺寸实机及main复验，不发布 |
+| IV-P1-N16 | 顶部缩放入口精简：保留实际大小 | IN_PROGRESS | ChatGPT-AgentDock | 用户明确要求 / v0.6.0当前main | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/tests/test_topbar_zoom_controls.py`, `tools/ui-qa/topbar_actual_only_smoke.py`, `docs/ui-qa/顶部缩放入口精简验收.md`, `README.md` | 删除顶部适配按钮、保留实际大小；F/0、自动适配、刷新和视图锁定不变；测试/Release/双主题双尺寸实机及main复验，不发布 |
 | IV-REL-060 | 发布轻量贴图检查 v0.6.0 | DONE | Codex / codex/release-v0.6.0 | 用户明确要求打包发布 / IV-TA-01 DONE / b332f58 | 见 `docs/development-plan.md` | 源码标签4089599；124项Rust、24项Windows、5项macOS边界，静态CRT、76值隔离注册、41张正式/便携截图；GitHub Latest及三个公开附件下载hash通过。见 `docs/releases/v0.6.0-validation.md` |
 | IV-TA-01 | 轻量贴图检查首轮：DDS、动画预算、自动刷新与视图锁定 | DONE | Codex / codex/ta-foundation | 用户授权 / 6934031 | 见 `docs/轻量贴图检查优化计划.md` | 124项Rust、24项Windows契约、5项macOS边界及113张分支/17张main实机，通过；集成916de47，发布另列IV-REL-060 |
 | IV-REL-051 | 发布圆形侧边按钮 v0.5.1 | DONE | ChatGPT-AgentDock | 用户明确要求打包发布 / N15 DONE | `Cargo.toml`, `Cargo.lock`, `tools/setup.iss`, `CHANGELOG.md`, `docs/releases/**`, `README.md` | 版本统一；正式构建/测试/安装与便携包验证；push main+新tag并设Latest；公开下载hash；不改当前安装 |
@@ -319,3 +319,7 @@ IV-REL-050 DONE：v0.5.0 Latest正式发布，ID 392340200；源码 `0fb8b97049b
 IV-MAC-01 REVIEW：分支f1041f891361bcaaa9760b44a754c07e9aae99b2，云端构建源e39c1b22460d16bc99eb56238cc84c9d06d05782，两架构DMG及原生测试、启动、动画像素检查通过，RGBA交互覆盖按架构如实记录。Windows回归通过，进入主线必要复验；不修改Windows正式Release。
 
 IV-MAC-01 DONE：集成7cc927f1ee42be5b311abde068b2bb0e5dbf513b，main 110项Rust、24+5项配置检查通过，代码/打包树与GitHub成功构建源一致。Mac安装包及SHA256保存dist/macos-v0.5.0，具体链接和平台限制见docs/releases/macos.md；未变更Windows正式发布附件。
+
+## IV-P1-N16 领取记录
+
+Owner: ChatGPT-AgentDock；Branch: `codex/topbar-actual-only`；Worktree: `Temp/worktrees/topbar-actual-only`；Base Commit: `5b716e1d6dcab1ee2d5808d77a505fc3204c1a68`。仅精简顶部入口，不移除 F 适配窗口，不改 v0.6.0 刷新或视图锁定；不推送、打包、安装或改关联。
