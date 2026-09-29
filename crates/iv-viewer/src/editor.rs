@@ -1,5 +1,5 @@
 //! Isolated editing surface: immutable source + undoable crop/resize parameters.
-use crate::image_edit::{self, Crop, Filter, Pixels, Plan, Source, MAX_SIDE};
+use crate::image_edit::{self, Crop, Filter, Pixels, Plan, Source};
 use crate::ui::Palette;
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2};
 use std::path::PathBuf;
@@ -375,7 +375,7 @@ impl Editor {
                             if ui
                                 .add(
                                     egui::DragValue::new(&mut self.plan.width)
-                                        .clamp_range(1..=MAX_SIDE)
+                                        .clamp_range(1..=u32::MAX)
                                         .speed(1.0),
                                 )
                                 .changed()
@@ -391,7 +391,7 @@ impl Editor {
                             if ui
                                 .add(
                                     egui::DragValue::new(&mut self.plan.height)
-                                        .clamp_range(1..=MAX_SIDE)
+                                        .clamp_range(1..=u32::MAX)
                                         .speed(1.0),
                                 )
                                 .changed()

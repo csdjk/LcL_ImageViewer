@@ -128,6 +128,9 @@ pub struct Source {
 impl Source {
     pub fn new(image: Arc<DecodedImage>, frame_index: usize) -> Result<Self, String> {
         let animated = image.frames.len() > 1;
+        if animated && frame_index >= image.frames.len() {
+            return Err("当前动画帧已失效，请重新打开图片".into());
+        }
         let size = if animated {
             (image.width, image.height)
         } else {
@@ -520,6 +523,15 @@ mod tests {
         d.is_hdr = true;
         assert!(Source::new(Arc::new(d), 0).is_err());
         assert!(Source::new(Arc::new(decoded(2, 2, vec![0; 4])), 0).is_err());
+        let mut d = decoded(1, 1, vec![0; 4]);
+        d.frames = vec![
+            AnimatedFrame {
+                data: PixelData::Rgba8(vec![0; 4]),
+                delay_ms: 100
+            };
+            2
+        ];
+        assert!(Source::new(Arc::new(d), usize::MAX).is_err());
     }
     #[test]
     fn png_export_roundtrips_and_never_overwrites_any_existing_file() {
