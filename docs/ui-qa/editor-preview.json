@@ -1,21 +1,19 @@
 {
-  "capture_source_commit": "93260f45629a7c22abb0c9c57f92000c10e3a89b",
-  "binary_sha256": "6aa47525ab34452e5df450f9692e89517a2281d9ad671f72fdba26e89e1ce2ec",
-  "sha256": "06dc519bad6280e6bd8fd5d25bda97c10d2f7860bf449dd25a40e16ad7770d15",
-  "bytes": 158258,
+  "capture_source_commit": "24295953fca64f69e8089b5c446e95be18c68c1b",
+  "binary_sha256": "2de219055c207de4d5590cac16c5b5bfe5dbeafaddc915d340b8ea1211450865",
   "sources": [
     {
-      "path": "ui-verify-shots/inline-editor-worker-final-r2/dark-1280/crop-drag.png",
-      "sha256": "31b277340af355cd852ac48258f258ce146b8800a60b68351a18c90d0f073a7d",
-      "crop": "full client",
-      "dpi": 96
+      "path": "ui-verify-shots/editor-controls-release-r1/dark-1280/active-crop.png",
+      "sha256": "e00e8d2da3a593e21ed8eee3652103faa784fd5f30f15d14676773de01f0332e",
+      "state": "active-crop"
     },
     {
-      "path": "ui-verify-shots/inline-editor-worker-final-r2/light-1280/angle-30-draft.png",
-      "sha256": "57975020b89f9e6bcd0f66281ee3541f00d4e5db15e7750384ae075a5a25b07e",
-      "crop": "full client",
-      "dpi": 96
+      "path": "ui-verify-shots/editor-controls-release-r1/light-1280/resize-controls.png",
+      "sha256": "ae37505659dfd17e128a1affb3618254ea39d0c42adc17049e45d96d9fbbc99b",
+      "state": "resize-controls"
     }
   ],
-  "description": "主画布裁剪与任意角度旋转，当前Windows程序截图，非设计稿"
+  "sha256": "215d684157aea6a959078160b7d87487d5b113701ed84f5afb8361745eb93a6f",
+  "bytes": 76443,
+  "composition": "two native 1280x860 screenshots scaled to 640x430 side by side"
 }

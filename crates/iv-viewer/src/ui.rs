@@ -10,6 +10,9 @@ use eframe::egui::{
 /* ================================ 主题 ================================ */
 
 /// 深色 / 浅色主题。
+#[path = "editor_controls.rs"]
+pub mod editor_controls;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ThemeMode {
     Dark,
