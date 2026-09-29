@@ -104,7 +104,7 @@ fn danger_command(ui: &mut egui::Ui, label: &str, enabled: bool) -> egui::Respon
     controls::button(ui, label, enabled, Role::Destructive)
 }
 fn dim(ui: &mut egui::Ui, label: &str, v: &mut u32) -> bool {
-    ui.label(label);
+    controls::caption(ui, label);
     controls::field(ui, egui::DragValue::new(v).clamp_range(1..=u32::MAX).speed(1.0), controls::FIELD_WIDTH).changed()
 }
 impl Editor {
@@ -647,10 +647,10 @@ impl Editor {
                             Mode::Crop => {
                                 let before = self.crop;
                                 let mut c = self.crop;
-                                ui.label("X");
+                                controls::caption(ui, "X");
                                 controls::field(ui, egui::DragValue::new(&mut c.x)
                                     .clamp_range(0..=self.size().0 - 1), 60.0);
-                                ui.label("Y");
+                                controls::caption(ui, "Y");
                                 controls::field(ui, egui::DragValue::new(&mut c.y)
                                     .clamp_range(0..=self.size().1 - 1), 60.0);
                                 c.w = c.w.min(self.size().0 - c.x);
@@ -723,7 +723,7 @@ impl Editor {
                                     self.start_op(ctx, Operation::FlipVertical);
                                 }
                                 controls::group_gap(ui);
-                                ui.label("角度");
+                                controls::caption(ui, "角度");
                                 controls::field(ui, egui::DragValue::new(&mut self.angle)
                                     .clamp_range(-180.0..=180.0).speed(0.2).suffix("°"), 76.0);
                                 if primary_command(ui, "应用旋转", self.pending()).clicked() {
@@ -748,7 +748,7 @@ impl Editor {
                                         self.size().1,
                                     );
                                 }
-                                ui.label("px");
+                                controls::caption(ui, "px");
                                 if controls::toggle(ui, "锁定比例", &mut self.lock_ratio).changed()
                                     && self.lock_ratio
                                 {
