@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-EDIT-02 | 主画布编辑、旋转翻转与缩放完善 | READY | — | 用户本轮要求 / EDIT-01 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 主画布直接编辑、裁剪8手柄与比例、旋转翻转、视图与分辨率分离、撤销/重做、安全新PNG；测试/实机/像素导出后本地合入，不发布 |
+| IV-EDIT-02 | 主画布编辑、旋转翻转与缩放完善 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮要求 / EDIT-01 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 主画布直接编辑、裁剪8手柄与比例、旋转翻转、视图与分辨率分离、撤销/重做、安全新PNG；测试/实机/像素导出后本地合入，不发布 |
 | IV-EDIT-01 | 裁剪与修改分辨率 | DONE | ChatGPT-AgentDock | 用户新增编辑需求 / N17 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 独立预览、框选/精确裁剪、宽高/比例锁定、透明PNG另存不覆盖；动画仅当前帧且明确提示；测试/双主题双尺寸/导出像素与主线复验，不发布 |
 | IV-P1-N17 | 底栏像素格式与通道联动 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N16 DONE | `crates/iv-viewer/src/{app.rs,main.rs,pixel_readout.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 坐标括号、三格式持久化、单通道读数和灰度色块；原图不变、底栏稳定、双主题双尺寸实机与main复验，不发布 |
 | IV-P1-N16 | 顶部缩放入口精简：保留实际大小 | DONE | ChatGPT-AgentDock | 用户明确要求 / v0.6.0当前main | `crates/iv-viewer/src/{app.rs,ui.rs}`, `tools/tests/test_topbar_zoom_controls.py`, `tools/ui-qa/topbar_actual_only_smoke.py`, `docs/ui-qa/顶部缩放入口精简验收.md`, `README.md` | 删除顶部适配按钮、保留实际大小；F/0、自动适配、刷新和视图锁定不变；测试/Release/双主题双尺寸实机及main复验，不发布 |
@@ -338,3 +338,7 @@ Owner: ChatGPT-AgentDock；Branch: `codex/pixel-readout-formats`；Worktree: `Te
 ## IV-EDIT-01 领取合同
 
 分支 `codex/basic-image-editor`，工作树 `Temp/worktrees/basic-image-editor`，基于本地 `abd1b88`。只读解码像素快照，编辑独立预览，不改变当前原图/通道/像素格式。裁剪和缩放参数可重置、撤销；导出静态8位RGBA PNG，拒绝覆盖已有文件。动画明确仅编辑当前帧，DDS取最高分辨率，HDR浮点明确拒绝。PNG不承诺保留原格式元数据/图层/Mipmap。禁止修改安装/关联/远端，需真实Windows交互及新文件像素验证。
+
+## IV-EDIT-02 领取合同
+
+Owner: ChatGPT-AgentDock；Branch: `codex/inline-image-editor`；Worktree: `Temp/worktrees/inline-image-editor`；Base: `8fb39b6`。按本轮用户授权更换编辑交互，不换渲染栈：原窗口顶部上下文工具条、主画布及底栏。可连续应用裁剪/旋转/翻转/分辨率；视图缩放不修改像素；撤销历史按内存限制。另存新PNG保护原图，动画仅当前帧/DDS Mip0/HDR边界保持。预览/导出需原生实测，禁止推送或安装。
