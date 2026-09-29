@@ -648,6 +648,7 @@ pub enum Icon {
     Next,
     Actual,
     Edit,
+    Ocr,
     Bounds,
     Play,
     Pause,
@@ -672,6 +673,15 @@ pub fn paint_icon(p: &egui::Painter, icon: Icon, rect: Rect, color: Color32) {
     let u = rect.width().min(rect.height()) / 16.0; // 以 16px 为设计基准
     let st = Stroke::new(1.5 * u, color);
     match icon {
+        Icon::Ocr => {
+            let q=|x,y|c+Vec2::new(x,y)*u;
+            for (x,y,dx,dy) in [(-7.0,-7.0,1.0,1.0),(7.0,-7.0,-1.0,1.0),(-7.0,7.0,1.0,-1.0),(7.0,7.0,-1.0,-1.0)] {
+                p.line_segment([q(x+3.0*dx,y),q(x,y)],st); p.line_segment([q(x,y),q(x,y+3.0*dy)],st);
+            }
+            p.line_segment([q(-3.5,-3.5),q(3.5,-3.5)],st);
+            p.line_segment([q(0.0,-3.5),q(0.0,4.0)],st);
+            p.line_segment([q(-2.0,4.0),q(2.0,4.0)],st);
+        }
         Icon::Pin => {
             let point = |x, y| c + Vec2::new(x, y) * u;
             p.add(egui::Shape::closed_line(vec![point(-4.0,-6.0), point(4.0,-6.0), point(2.8,-3.0), point(2.8,0.0), point(5.0,2.5), point(-5.0,2.5), point(-2.8,0.0), point(-2.8,-3.0)], st));
