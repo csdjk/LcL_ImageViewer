@@ -97,6 +97,7 @@ fn command(ui: &mut egui::Ui, label: &str, enabled: bool) -> egui::Response {
         egui::Button::new(label).min_size(Vec2::new(58.0, 30.0)),
     )
 }
+
 fn dim(ui: &mut egui::Ui, label: &str, v: &mut u32) -> bool {
     ui.label(label);
     ui.add_sized(
@@ -588,6 +589,7 @@ impl Editor {
                             "重置全部",
                             !busy
                                 && !self.confirm_close
+                                && self.pending_mode.is_none()
                                 && (self.document.current.id != 0 || self.pending()),
                         )
                         .clicked()
@@ -598,7 +600,11 @@ impl Editor {
                         if command(
                             ui,
                             "重做",
-                            !busy && self.document.can_redo() && !self.pending(),
+                            !busy
+                                && !self.confirm_close
+                                && self.pending_mode.is_none()
+                                && self.document.can_redo()
+                                && !self.pending(),
                         )
                         .on_hover_text("Ctrl+Y / Ctrl+Shift+Z")
                         .clicked()
@@ -608,7 +614,10 @@ impl Editor {
                         if command(
                             ui,
                             "撤销",
-                            !busy && (self.document.can_undo() || self.pending()),
+                            !busy
+                                && !self.confirm_close
+                                && self.pending_mode.is_none()
+                                && (self.document.can_undo() || self.pending()),
                         )
                         .on_hover_text("Ctrl+Z")
                         .clicked()
@@ -661,6 +670,11 @@ impl Editor {
                                 }
                                 c.w = c.w.min(self.size().0 - c.x).max(1);
                                 c.h = c.h.min(self.size().1 - c.y).max(1);
+                                if let Some(ratio) = self.ratio() {
+                                    let fit = Crop::centered_ratio((c.w, c.h), ratio);
+                                    c.w = fit.w;
+                                    c.h = fit.h;
+                                }
                                 if c != before {
                                     self.crop = c;
                                 }
@@ -700,6 +714,7 @@ impl Editor {
                                     }
                                 }
                                 if command(ui, "全选", true).clicked() {
+                                    self.crop_ratio = 0;
                                     self.reset_draft();
                                 }
                                 if command(ui, "应用裁剪", self.pending()).clicked() {
