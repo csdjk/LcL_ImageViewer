@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-EDIT-03 | 编辑按钮与参数控件统一 | IN_PROGRESS | ChatGPT-AgentDock | 用户截图要求 / EDIT-02 DONE | `crates/iv-viewer/src/{editor.rs,ui.rs,editor_controls.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 32点统一控件与主次动作、双主题双尺寸及待应用提示；编辑像素不变，本地合入不发布 |
+| IV-EDIT-03 | 编辑按钮与参数控件统一 | REVIEW | ChatGPT-AgentDock | 用户截图要求 / EDIT-02 DONE | `crates/iv-viewer/src/{editor.rs,ui.rs,editor_controls.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 32点统一控件与主次动作、双主题双尺寸及待应用提示；编辑像素不变，本地合入不发布 |
 | IV-EDIT-02 | 主画布编辑、旋转翻转与缩放完善 | DONE | ChatGPT-AgentDock | 用户本轮要求 / EDIT-01 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 主画布直接编辑、裁剪8手柄与比例、旋转翻转、视图与分辨率分离、撤销/重做、安全新PNG；测试/实机/像素导出后本地合入，不发布 |
 | IV-EDIT-01 | 裁剪与修改分辨率 | DONE | ChatGPT-AgentDock | 用户新增编辑需求 / N17 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 独立预览、框选/精确裁剪、宽高/比例锁定、透明PNG另存不覆盖；动画仅当前帧且明确提示；测试/双主题双尺寸/导出像素与主线复验，不发布 |
 | IV-P1-N17 | 底栏像素格式与通道联动 | DONE | ChatGPT-AgentDock | 用户本轮要求 / N16 DONE | `crates/iv-viewer/src/{app.rs,main.rs,pixel_readout.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 坐标括号、三格式持久化、单通道读数和灰度色块；原图不变、底栏稳定、双主题双尺寸实机与main复验，不发布 |
