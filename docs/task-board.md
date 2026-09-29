@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-OCR-01 | 离线OCR与图片文字复制 | READY | ChatGPT-AgentDock | 用户本轮要求 / EDIT-03 DONE | `crates/iv-viewer/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 原图异步离线识别、语言选择与一键复制、原图不变、过期任务不写剪贴板；测试/真实识别/实机/本地合入，不发布 |
+| IV-OCR-01 | 离线OCR与图片文字复制 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮要求 / EDIT-03 DONE | `crates/iv-viewer/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 原图异步离线识别、语言选择与一键复制、原图不变、过期任务不写剪贴板；测试/真实识别/实机/本地合入，不发布 |
 | IV-EDIT-03 | 编辑按钮与参数控件统一 | DONE | ChatGPT-AgentDock | 用户截图要求 / EDIT-02 DONE | `crates/iv-viewer/src/{editor.rs,ui.rs,editor_controls.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 32点统一控件与主次动作、双主题双尺寸及待应用提示；编辑像素不变，本地合入不发布 |
 | IV-EDIT-02 | 主画布编辑、旋转翻转与缩放完善 | DONE | ChatGPT-AgentDock | 用户本轮要求 / EDIT-01 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 主画布直接编辑、裁剪8手柄与比例、旋转翻转、视图与分辨率分离、撤销/重做、安全新PNG；测试/实机/像素导出后本地合入，不发布 |
 | IV-EDIT-01 | 裁剪与修改分辨率 | DONE | ChatGPT-AgentDock | 用户新增编辑需求 / N17 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 独立预览、框选/精确裁剪、宽高/比例锁定、透明PNG另存不覆盖；动画仅当前帧且明确提示；测试/双主题双尺寸/导出像素与主线复验，不发布 |
@@ -348,3 +348,7 @@ Owner: ChatGPT-AgentDock；Branch: `codex/inline-image-editor`；Worktree: `Temp
 ## IV-EDIT-03 领取合同
 
 Owner: ChatGPT-AgentDock；Branch: `codex/editor-controls-style`；Worktree: `Temp/worktrees/editor-controls-style`；Base: `ada1acf24e3588ed28a3ce0972e4bdd1dd5361ec`。统一现有新拟态按钮/输入/下拉/提示栏，不修改编辑像素算法、后台保存、草稿语义或当前安装。
+
+## IV-OCR-01 领取合同
+
+Owner：ChatGPT-AgentDock；分支 `codex/ocr-text`；worktree `Temp/worktrees/ocr-text`；基线 `be04ab86851e2590cd3a2815c1e688c330adbc01`。本轮以Windows内置OCR实现轻量离线识别，不下载或安装语言模型；不改用户图片、已安装版本或文件关联，不推送发布。其他平台明确提示尚未接入，不伪造结果。
