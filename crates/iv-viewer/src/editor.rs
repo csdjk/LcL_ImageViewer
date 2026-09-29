@@ -3,6 +3,7 @@
 use crate::edit_ops::{self, CanvasView, Document, Operation};
 use crate::image_edit::{self, Crop, Filter, Pixels, Plan, Source};
 use crate::ui::{self, Icon, Palette};
+use crate::ui::editor_controls::{self as controls, Role};
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
@@ -94,19 +95,17 @@ fn job<T: Send + 'static>(
     Ok(rx)
 }
 fn command(ui: &mut egui::Ui, label: &str, enabled: bool) -> egui::Response {
-    ui.add_enabled(
-        enabled,
-        egui::Button::new(label).min_size(Vec2::new(58.0, 30.0)),
-    )
+    controls::button(ui, label, enabled, Role::Secondary)
 }
-
+fn primary_command(ui: &mut egui::Ui, label: &str, enabled: bool) -> egui::Response {
+    controls::button(ui, label, enabled, Role::Primary)
+}
+fn danger_command(ui: &mut egui::Ui, label: &str, enabled: bool) -> egui::Response {
+    controls::button(ui, label, enabled, Role::Destructive)
+}
 fn dim(ui: &mut egui::Ui, label: &str, v: &mut u32) -> bool {
     ui.label(label);
-    ui.add_sized(
-        [66.0, 28.0],
-        egui::DragValue::new(v).clamp_range(1..=u32::MAX).speed(1.0),
-    )
-    .changed()
+    controls::field(ui, egui::DragValue::new(v).clamp_range(1..=u32::MAX).speed(1.0), controls::FIELD_WIDTH).changed()
 }
 impl Editor {
     pub fn new(ctx: &egui::Context, original: PathBuf, source: Source) -> Result<Self, String> {
@@ -538,7 +537,7 @@ impl Editor {
         egui::TopBottomPanel::top("iv-inline-edit-tools")
             .frame(frame)
             .show(ctx, |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(6.0, 7.0);
+                controls::configure(ui);
                 ui.horizontal(|ui| {
                     if command(ui, "返回看图", !busy)
                         .on_hover_text("退出编辑；未保存的内容会先确认")
@@ -546,7 +545,7 @@ impl Editor {
                     {
                         self.request_close();
                     }
-                    ui.separator();
+                    controls::group_gap(ui);
                     ui.add_enabled_ui(
                         !busy && !self.confirm_close && self.pending_mode.is_none(),
                         |ui| {
@@ -556,12 +555,8 @@ impl Editor {
                                 (Mode::Rotate, "旋转 / 翻转"),
                                 (Mode::Resize, "分辨率"),
                             ] {
-                                if ui
-                                    .add_sized(
-                                        [if m == Mode::Rotate { 106.0 } else { 62.0 }, 30.0],
-                                        egui::SelectableLabel::new(self.mode == m, name),
-                                    )
-                                    .clicked()
+                                if controls::tab(ui, name, self.mode == m,
+                                    if m == Mode::Rotate { 110.0 } else { 66.0 }).clicked()
                                 {
                                     self.request_mode(m);
                                 }
@@ -653,17 +648,11 @@ impl Editor {
                                 let before = self.crop;
                                 let mut c = self.crop;
                                 ui.label("X");
-                                ui.add_sized(
-                                    [54.0, 28.0],
-                                    egui::DragValue::new(&mut c.x)
-                                        .clamp_range(0..=self.size().0 - 1),
-                                );
+                                controls::field(ui, egui::DragValue::new(&mut c.x)
+                                    .clamp_range(0..=self.size().0 - 1), 60.0);
                                 ui.label("Y");
-                                ui.add_sized(
-                                    [54.0, 28.0],
-                                    egui::DragValue::new(&mut c.y)
-                                        .clamp_range(0..=self.size().1 - 1),
-                                );
+                                controls::field(ui, egui::DragValue::new(&mut c.y)
+                                    .clamp_range(0..=self.size().1 - 1), 60.0);
                                 c.w = c.w.min(self.size().0 - c.x);
                                 c.h = c.h.min(self.size().1 - c.y);
                                 let cw = dim(ui, "宽", &mut c.w);
@@ -686,20 +675,9 @@ impl Editor {
                                     self.crop = c;
                                 }
                                 let old = self.crop_ratio;
-                                egui::ComboBox::from_id_source("iv-crop-ratio")
-                                    .width(88.0)
-                                    .selected_text(
-                                        [
-                                            "自由比例",
-                                            "原图比例",
-                                            "1:1",
-                                            "4:3",
-                                            "3:4",
-                                            "16:9",
-                                            "9:16",
-                                        ][self.crop_ratio],
-                                    )
-                                    .show_ui(ui, |ui| {
+                                controls::combo(ui, "iv-crop-ratio",
+                                    ["自由比例", "原图比例", "1:1", "4:3", "3:4", "16:9", "9:16"][self.crop_ratio],
+                                    108.0, |ui| {
                                         for (i, n) in [
                                             "自由比例",
                                             "原图比例",
@@ -724,7 +702,7 @@ impl Editor {
                                     self.crop_ratio = 0;
                                     self.reset_draft();
                                 }
-                                if command(ui, "应用裁剪", self.pending()).clicked() {
+                                if primary_command(ui, "应用裁剪", self.pending()).clicked() {
                                     self.apply_draft(ctx);
                                 }
                                 if command(ui, "取消", self.pending()).clicked() {
@@ -744,16 +722,11 @@ impl Editor {
                                 if command(ui, "垂直翻转", !self.pending()).clicked() {
                                     self.start_op(ctx, Operation::FlipVertical);
                                 }
-                                ui.separator();
+                                controls::group_gap(ui);
                                 ui.label("角度");
-                                ui.add_sized(
-                                    [64.0, 28.0],
-                                    egui::DragValue::new(&mut self.angle)
-                                        .clamp_range(-180.0..=180.0)
-                                        .speed(0.2)
-                                        .suffix("°"),
-                                );
-                                if command(ui, "应用旋转", self.pending()).clicked() {
+                                controls::field(ui, egui::DragValue::new(&mut self.angle)
+                                    .clamp_range(-180.0..=180.0).speed(0.2).suffix("°"), 76.0);
+                                if primary_command(ui, "应用旋转", self.pending()).clicked() {
                                     self.apply_draft(ctx);
                                 }
                                 if command(ui, "取消", self.pending()).clicked() {
@@ -776,7 +749,7 @@ impl Editor {
                                     );
                                 }
                                 ui.label("px");
-                                if ui.checkbox(&mut self.lock_ratio, "锁定比例").changed()
+                                if controls::toggle(ui, "锁定比例", &mut self.lock_ratio).changed()
                                     && self.lock_ratio
                                 {
                                     self.height = Plan::paired_dimension(
@@ -787,19 +760,14 @@ impl Editor {
                                 }
                                 for (name, n, d) in [("50%", 1, 2), ("100%", 1, 1), ("200%", 2, 1)]
                                 {
-                                    if ui.button(name).clicked() {
+                                    if command(ui, name, true).clicked() {
                                         self.width = (self.size().0 * n / d).max(1);
                                         self.height = (self.size().1 * n / d).max(1);
                                     }
                                 }
-                                egui::ComboBox::from_id_source("iv-inline-filter")
-                                    .width(122.0)
-                                    .selected_text(if self.filter == Filter::Smooth {
-                                        "平滑（双线性）"
-                                    } else {
-                                        "最近邻（像素图）"
-                                    })
-                                    .show_ui(ui, |ui| {
+                                controls::combo(ui, "iv-inline-filter",
+                                    if self.filter == Filter::Smooth { "平滑（双线性）" } else { "最近邻（像素图）" },
+                                    156.0, |ui| {
                                         ui.selectable_value(
                                             &mut self.filter,
                                             Filter::Smooth,
@@ -811,7 +779,7 @@ impl Editor {
                                             "最近邻（像素图）",
                                         );
                                     });
-                                if command(
+                                if primary_command(
                                     ui,
                                     "应用尺寸",
                                     self.pending()
@@ -836,15 +804,14 @@ impl Editor {
                     .inner_margin(egui::Margin::symmetric(14.0, 8.0)),
             )
             .show(ctx, |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(7.0, 6.0);
+                controls::configure(ui);
                 ui.horizontal(|ui| {
                     ui.label(
                         egui::RichText::new(format!("{} × {} px", self.size().0, self.size().1))
                             .strong(),
                     );
-                    ui.separator();
-                    if ui
-                        .button("−")
+                    controls::group_gap(ui);
+                    if command(ui, "−", true)
                         .on_hover_text("缩小视图，不改变像素尺寸")
                         .clicked()
                     {
@@ -856,8 +823,7 @@ impl Editor {
                         self.auto_fit = false;
                     }
                     ui.label(format!("{:.0}%", self.view.scale * 100.0));
-                    if ui
-                        .button("＋")
+                    if command(ui, "＋", true)
                         .on_hover_text("放大视图，不改变像素尺寸")
                         .clicked()
                     {
@@ -868,11 +834,11 @@ impl Editor {
                         self.fit_pending = false;
                         self.auto_fit = false;
                     }
-                    if ui.button("适配").clicked() {
+                    if command(ui, "适配", true).clicked() {
                         self.fit_pending = true;
                         self.auto_fit = true;
                     }
-                    if ui.button("1:1").clicked() {
+                    if command(ui, "1:1", true).clicked() {
                         self.view.scale = 1.0;
                         self.view.center(
                             self.preview_size(),
@@ -881,9 +847,9 @@ impl Editor {
                         self.fit_pending = false;
                         self.auto_fit = false;
                     }
-                    ui.checkbox(&mut self.checkerboard, "透明网格");
+                    controls::toggle(ui, "透明网格", &mut self.checkerboard);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if command(
+                        if primary_command(
                             ui,
                             "另存为 PNG…",
                             !busy
@@ -914,30 +880,31 @@ impl Editor {
                         }
                     });
                 });
+                controls::notice(ui, self.confirm_close || self.pending_mode.is_some(), |ui| {
                 if self.confirm_close {
                     ui.horizontal(|ui| {
                         ui.label("退出并放弃未保存的编辑？");
-                        if command(ui, "放弃编辑", !busy).clicked() {
+                        if danger_command(ui, "放弃编辑", !busy).clicked() {
                             self.close_requested = true;
                         }
-                        if command(ui, "继续编辑", true).clicked() {
+                        if primary_command(ui, "继续编辑", true).clicked() {
                             self.confirm_close = false;
                         }
                     });
                 } else if let Some(mode) = self.pending_mode {
                     ui.horizontal(|ui| {
                         ui.label("当前调整尚未应用");
-                        if command(ui, "应用并切换", !busy).clicked() {
+                        if primary_command(ui, "应用并切换", !busy).clicked() {
                             self.after_apply_mode = Some(mode);
                             self.pending_mode = None;
                             self.apply_draft(ctx);
                         }
-                        if command(ui, "丢弃调整", !busy).clicked() {
+                        if danger_command(ui, "丢弃调整", !busy).clicked() {
                             self.reset_draft();
                             self.mode = mode;
                             self.pending_mode = None;
                         }
-                        if command(ui, "继续调整", !busy).clicked() {
+                        if primary_command(ui, "继续调整", !busy).clicked() {
                             self.pending_mode = None;
                         }
                     });
@@ -995,6 +962,7 @@ impl Editor {
                     )
                     .on_hover_text(text);
                 }
+                });
             });
         self.poll_draft(ctx);
         egui::CentralPanel::default()
