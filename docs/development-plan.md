@@ -138,3 +138,8 @@ IV-P1-N14 DONE：主线 `98abd01e4abbdf34b1a70c0fc4c66d55d137153d` 完成110项R
 ## IV-MAC-01 — 用户授权macOS构建
 
 Base f25287e；独立分支 codex/macos-package，worktree Temp/worktrees/macos-package。允许新增最小平台适配、推送任务分支/集成主线和GitHub Actions构建产物；不创建或修改正式Release/Latest、不改用户安装。保留核心解码/渲染，Windows API使用平台条件隔离，macOS以原生打开面板、Cmd+O、系统废纸篓和中文系统字体适配。Windows桌面磨砂及Explorer缩略图不伪装为Mac可用。公开仓库使用标准macos-14 ARM及macos-15-intel runner；未提供开发者证书，不假称公证。DMG拖入Applications，包包含许可、版本与源commit/hash。两架构执行测试和窗口启动截图，Windows回归及main复验；失败保留日志并修复。
+
+
+## Task IV-REL-070 — 发布主画布编辑与OCR v0.7.0
+
+2026-10-08 用户授权打包发布。先恢复 IV-OCR-01 同一工作树，通过真实OCR/剪贴板/双主题窗口及全部测试后集成本地main；然后独立release工作树统一版本，主线静态CRT EXE/DLL正式构建、安装隔离/便携/GUI测试，生成安装版、ZIP和SHA256。推送保留现有所有提交与旧版本，不强推；正式Release设Latest后回读并重新公开下载核验。用户安装、真实文件关联、系统语言包和默认程序不修改。本次正式附件仅Windows x64，macOS原预览流程保留，不伪装为支持OCR。

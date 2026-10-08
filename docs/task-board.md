@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-REL-070 | 编辑、像素读数与OCR正式发布v0.7.0 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮发布授权 / OCR收尾后集成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完成OCR、统一版本、正式构建/安装/便携验证；原子push与Latest发布、公开下载hash，不改用户安装 |
 | IV-OCR-01 | 离线OCR与图片文字复制 | IN_PROGRESS | ChatGPT-AgentDock | 用户本轮要求 / EDIT-03 DONE | `crates/iv-viewer/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 原图异步离线识别、语言选择与一键复制、原图不变、过期任务不写剪贴板；测试/真实识别/实机/本地合入，不发布 |
 | IV-EDIT-03 | 编辑按钮与参数控件统一 | DONE | ChatGPT-AgentDock | 用户截图要求 / EDIT-02 DONE | `crates/iv-viewer/src/{editor.rs,ui.rs,editor_controls.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 32点统一控件与主次动作、双主题双尺寸及待应用提示；编辑像素不变，本地合入不发布 |
 | IV-EDIT-02 | 主画布编辑、旋转翻转与缩放完善 | DONE | ChatGPT-AgentDock | 用户本轮要求 / EDIT-01 DONE | `crates/iv-viewer/**`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 主画布直接编辑、裁剪8手柄与比例、旋转翻转、视图与分辨率分离、撤销/重做、安全新PNG；测试/实机/像素导出后本地合入，不发布 |
