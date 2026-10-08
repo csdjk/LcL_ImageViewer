@@ -1,0 +1,16 @@
+{
+  "capture_source_commit": "015f5b56d2f4495e33f995e0a416ca2806d1c0bf",
+  "binary_sha256": "4d8c1bdc71468472fa18fdda7dfa49a39243905e6b7e5b7323ec3cb36a9bf05a",
+  "real_ocr_and_clipboard_verified": true,
+  "sources": [
+    "ocr-release070-worker/native/dark-880.png"
+  ],
+  "bytes": 54897,
+  "sha256": "5f2f70f48c811a3c43f7e8dee7cee59e5df82f670eaf542102e71ca622258e7a",
+  "dpi": 96,
+  "logical_client": [
+    880,
+    560
+  ],
+  "note": "真实系统OCR结果，英文字母可能误识别；未修改图片中的识别文本。"
+}
