@@ -109,6 +109,24 @@ pub fn copy_text(text: &str, keep_lines: bool) -> Option<String> {
         text.split_whitespace().collect::<Vec<_>>().join(" ")
     })
 }
+// WinRT inserts one separator between its Chinese word tokens. Remove only that
+// single separator between Han characters; keep Latin spacing and wider layout gaps.
+fn compact_chinese_tokens(text: &str) -> String {
+    let han = |c: char| matches!(c as u32,0x3400..=0x4dbf|0x4e00..=0x9fff|0xf900..=0xfaff|0x20000..=0x2ffff);
+    let chars: Vec<_> = text.chars().collect();
+    chars
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &c)| {
+            if c == ' ' && i > 0 && i + 1 < chars.len() && han(chars[i - 1]) && han(chars[i + 1]) {
+                None
+            } else {
+                Some(c)
+            }
+        })
+        .collect()
+}
+
 fn joined_lines(lines: impl IntoIterator<Item = String>) -> String {
     let mut text = String::new();
     for line in lines {
@@ -325,6 +343,11 @@ pub fn recognize(
         text_lines.push(line);
     }
     let text = joined_lines(text_lines);
+    let text = if recognized_language.starts_with("zh") {
+        compact_chinese_tokens(&text)
+    } else {
+        text
+    };
     let _ = bitmap.Close();
     let _ = writer.Close();
     Ok(Report {
@@ -357,6 +380,17 @@ mod tests {
             extra_meta: None,
             frames: vec![],
         }
+    }
+    #[test]
+    fn chinese_token_spacing_keeps_latin_words_and_column_gaps() {
+        assert_eq!(
+            compact_chinese_tokens("图 片 文 字识别 Game UI 123"),
+            "图片文字识别 Game UI 123"
+        );
+        assert_eq!(
+            compact_chinese_tokens("甲  乙\n中 文 A B"),
+            "甲  乙\n中文 A B"
+        );
     }
     #[test]
     fn dimensions_are_bounded_without_upscaling() {
