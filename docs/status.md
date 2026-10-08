@@ -1,11 +1,20 @@
 # LcL ImageViewer — 当前状态
 
-> 更新时间：2026-09-29。以Git、当前构建与GitHub实际回读为准。
+> 更新时间：2026-10-08。以Git、当前构建与GitHub实际回读为准。
 
 <!-- project-stage: P1 -->
 <!-- project-next: IV-P1-01 -->
 
-## OCR收尾完成（待纳入v0.7.0）
+## 当前最新正式版：v0.7.0
+
+IV-REL-070 DONE。2026-10-08T08:56:40Z 正式发布，Release ID 406624457，Latest、非草稿/预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.7.0；标签源码 `9b0eba0f5c150b14092c53f72b0fc7d9014341ab`。
+
+包含主画布裁剪/旋转翻转/分辨率与统一编辑控件、像素格式和单通道读数、顶部按钮精简、Windows本机OCR和复制。160项Rust、50项Python、5项Mac边界、静态CRT、76项隔离注册与82张实机截图通过；三个公开附件及README引用资源hash核验通过。详见 `docs/releases/v0.7.0-validation.md`。
+
+本地安装包 `dist/v0.7.0/LcL-ImageViewer-Setup-v0.7.0-win64.exe`，便携ZIP同目录。用户当前安装/默认程序未自动修改；本次未发布新的macOS DMG。下方“未发布”是历史任务阶段记录，上述功能现均已纳入v0.7.0。
+
+
+## OCR收尾完成（已纳入v0.7.0）
 
 IV-OCR-01 DONE：Windows本地识别、顶部结果面板、右键及Ctrl+Shift+C识别复制、语言选择、校对与换行复制已完成。160项Rust、50项Python、主线check及同源码二进制运行复验通过，真实OCR四种主题/尺寸及剪贴板读回/恢复通过，README新增实机图。英文相似字符仍可能误识别，不承诺识别率；macOS暂无OCR。本次用户已授权后续v0.7.0打包发布，实际公开结果见后续发布记录。
 
@@ -42,7 +51,7 @@ IV-P1-N16 DONE：删除顶部“适配窗口”按钮及无用图标，仅保留
 
 124 项 Rust、27 项契约、check 与 Release 构建通过；双主题、880×560/1280×860 实机及主线复验通过，使用实际图像像素边界确认按钮/0 恢复 100%，F 与初始适配一致。运行 `target/topbar-actual-only/release/imageview.exe` 查看；已发布 v0.6.0 和用户安装未自动更新。详情 `docs/ui-qa/顶部缩放入口精简验收.md`。
 
-## 当前最新正式版：v0.6.0
+## 上一正式版：v0.6.0
 
 IV-REL-060 DONE。2026-09-22T23:47:02Z 正式发布，Release ID 394194384；GitHub Latest、非草稿、非预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.6.0；源码标签 `4089599b6361103b686c2a4ceda12cf0ba63d82a`。
 
