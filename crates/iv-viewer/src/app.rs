@@ -167,6 +167,8 @@ pub struct App {
     /// 冻结于最近取样的坐标；显示文本按当前通道和格式生成。
     probe_position: Option<(u32, u32)>,
     pixel_format: PixelFormat,
+    ocr: crate::ocr_panel::Panel,
+    ocr_resume_playback: bool,
     editor: Option<crate::editor::Editor>,
     editor_resume_playback: bool,
     /// 图像属性窗口是否打开
@@ -316,6 +318,8 @@ impl App {
             probe_detail: String::new(),
             probe_color: None,
             probe_position: None,
+            ocr: crate::ocr_panel::Panel::new(cc.storage.and_then(|s|s.get_string("iv-ocr-language")), cc.storage.and_then(|s|s.get_string("iv-ocr-keep-lines")).as_deref()!=Some("off")),
+            ocr_resume_playback: false,
             editor: None,
             editor_resume_playback: false,
             pixel_format: PixelFormat::from_key(cc.storage.and_then(|s| s.get_string(PixelFormat::STORAGE_KEY)).as_deref()),
@@ -762,6 +766,14 @@ impl App {
                 if ctx.input(|i| i.key_pressed(Key::Escape)) { return; }
             }
         }
+        if self.ocr.visible {
+            if ctx.input(|i|i.key_pressed(Key::Escape)) {
+                if ctx.memory(|m|m.any_popup_open()){ctx.memory_mut(|m|m.close_popup());}
+                else {self.close_ocr();}
+            }
+            if !ctx.wants_keyboard_input() && ctx.input(|i|i.modifiers==egui::Modifiers::NONE && i.key_pressed(Key::T)){self.toggle_theme(ctx);}
+            return; // Text selection/copy keys and drops must not act on the image underneath.
+        }
         if let Some(editor) = &mut self.editor {
             if ctx.input(|i| i.key_pressed(Key::Escape)) {
                 if ctx.memory(|m| m.any_popup_open()) { ctx.memory_mut(|m| m.close_popup()); }
@@ -838,6 +850,9 @@ impl App {
             && i.modifiers == egui::Modifiers::NONE && i.key_pressed(Key::Backspace))) {
             self.request_delete();
             return;
+        }
+        if ctx.input(|i|crate::ocr_panel::copy_shortcut(i.modifiers, &i.events)) {
+            self.begin_ocr(ctx,true); return;
         }
         let key = |k: Key| ctx.input(|i| i.modifiers == egui::Modifiers::NONE && i.key_pressed(k));
         if key(Key::E) { self.begin_editor(ctx); return; }
@@ -1050,7 +1065,38 @@ impl App {
         self.last_move = Instant::now();
     }
 
+    fn begin_ocr(&mut self, ctx: &egui::Context, copy: bool) {
+        if self.editor.is_some() || self.delete_active() { return; }
+        if self.pending.is_some() { self.error_msg=Some("图片仍在加载，请稍后识别".into()); return; }
+        let Some(cur)=&self.current else{return;};
+        match crate::ocr::Input::new(cur.img.clone(), cur.path.clone(), self.frame_index) {
+            Ok(input)=>{
+                if !self.ocr.visible { self.ocr_resume_playback=self.playing; }
+                self.playing=false;
+                self.ctx_menu_pos=None; self.background_menu_pos=None;
+                self.show_props=false; self.show_probe=false; self.show_settings=false;
+                self.right_window_drag=None;
+                ctx.memory_mut(|m|m.close_popup());
+                self.ocr.open(ctx,input,copy); self.last_move=Instant::now();
+            }
+            Err(e)=>self.error_msg=Some(e),
+        }
+    }
+    fn close_ocr(&mut self) {
+        self.ocr.dismiss();
+        self.playing=self.ocr_resume_playback;
+        self.ocr_resume_playback=false;
+        self.next_frame_at=Instant::now()+self.current_frame_delay();
+        self.last_move=Instant::now();
+    }
+    fn draw_ocr(&mut self,ctx:&egui::Context,pal:&Palette) {
+        let visible=self.ocr.visible;
+        self.ocr.show(ctx,pal);
+        if visible && !self.ocr.visible { self.close_ocr(); }
+    }
+
     fn begin_editor(&mut self, ctx: &egui::Context) {
+        if self.ocr.visible { self.close_ocr(); }
         if self.editor.is_some() || self.delete_active() { return; }
         if self.pending.is_some() { self.error_msg = Some("图片仍在加载，请稍后再编辑".into()); return; }
         let Some(cur) = &self.current else { return; };
@@ -1253,7 +1299,7 @@ impl App {
             self.last_move = Instant::now();
         }
         // 菜单展开时保持入口可见，关闭后再开始一秒计时。
-        if self.background_menu_pos.is_some() { self.last_move = Instant::now(); }
+        if self.background_menu_pos.is_some() || self.ocr.visible { self.last_move = Instant::now(); }
         let has_image = self.current.is_some();
         let idle = self.last_move.elapsed();
         let recent = idle < OVERLAY_HIDE_DELAY;
@@ -1491,6 +1537,11 @@ impl App {
                             if ui::icon_btn(ui, Icon::Edit, false, pal)
                                 .on_hover_text("裁剪 / 修改分辨率 (E) · 另存新图片").clicked() {
                                 self.begin_editor(ctx);
+                            }
+
+                            if ui::icon_btn(ui, Icon::Ocr, self.ocr.visible, pal)
+                                .on_hover_text("识别图片文字 (OCR) · Ctrl+Shift+C 识别并复制").clicked() {
+                                self.begin_ocr(ctx,false);
                             }
 
                             // —— 动画播放控件（多帧时显示）——
@@ -2180,6 +2231,9 @@ impl App {
             }
         }
         if has_image {
+            if ui::menu_item(ui, "识别并复制图片文字", "Ctrl+Shift+C", false, &pal).clicked() {
+                self.begin_ocr(&ctx,true);
+            }
             if ui::menu_item(ui, "裁剪 / 修改分辨率…", "E", false, &pal).clicked() {
                 self.begin_editor(&ctx);
                 return;
@@ -2493,6 +2547,8 @@ impl App {
 impl eframe::App for App {
     /// 退出时持久化主题与外观设置（eframe persistence）。
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("iv-ocr-language",self.ocr.language_key());
+        storage.set_string("iv-ocr-keep-lines",if self.ocr.keep_lines(){"on"}else{"off"}.into());
         storage.set_string(PixelFormat::STORAGE_KEY, self.pixel_format.key().into());
         storage.set_string("iv-auto-refresh", if self.auto_refresh { "on" } else { "off" }.into());
         storage.set_string("iv-lock-view", if self.lock_view { "on" } else { "off" }.into());
@@ -2531,6 +2587,10 @@ impl eframe::App for App {
         self.poll_delete(ctx);
         self.poll_file_changes();
         self.handle_loader_messages();
+        if self.current.as_ref().is_none_or(|c|!self.ocr.is_current(&c.img,self.frame_index)) {
+            self.ocr.invalidate(); self.ocr_resume_playback=false;
+        }
+        self.ocr.poll(ctx);
         self.poll_directory();
         self.update_window_title(ctx);
         self.apply_topmost(ctx);
@@ -2894,6 +2954,7 @@ impl eframe::App for App {
             self.draw_props_window(ctx, &pal);
             self.draw_probe_window(ctx, &pal);
             self.draw_settings_window(ctx, &pal);
+            self.draw_ocr(ctx, &pal);
             // 无边框：边缘八向缩放（光标提示 + BeginResize），置于所有悬浮层之后
             if let Some(drag) = &self.right_window_drag {
                 if ctx.input(|i| i.pointer.button_down(PointerButton::Secondary)) && drag.advance() {

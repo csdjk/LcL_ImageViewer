@@ -19,7 +19,7 @@ class TopbarZoomControlsTests(unittest.TestCase):
         self.assertEqual(toolbar.count('Icon::Actual'), 1)
         self.assertNotIn('Icon::Fit', toolbar)
         controls = toolbar[toolbar.index('// —— 视图控制 ——'):toolbar.index('// —— 动画播放控件')]
-        self.assertEqual(re.findall(r'Icon::(\w+)', controls), ['Grid', 'Actual', 'Bounds', 'Edit'])
+        self.assertEqual(re.findall(r'Icon::(\w+)', controls), ['Grid', 'Actual', 'Bounds', 'Edit', 'Ocr'])
         self.assertIn('self.pending_actual = true;', controls)
         self.assertNotIn('add_space', controls)
 

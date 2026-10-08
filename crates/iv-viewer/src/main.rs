@@ -16,6 +16,8 @@ mod file_watch;
 mod directory;
 mod perf;
 mod pixel_readout;
+mod ocr;
+mod ocr_panel;
 mod image_edit;
 mod editor;
 mod edit_ops;
