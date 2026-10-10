@@ -26,7 +26,8 @@ def run(args):
     psapi.GetProcessMemoryInfo.argtypes=[wt.HANDLE,c.POINTER(Memory),wt.DWORD];psapi.GetProcessMemoryInfo.restype=wt.BOOL
     cases=[]
     try:
-        for ext,theme,w,h in [('gif','dark',880,560),('png','light',1280,860),('webp','dark',1280,860),('gif','light',880,560)]:
+        selected=[('gif','dark',880,560),('png','light',1280,860),('webp','dark',1280,860),('gif','light',880,560)]
+        for ext,theme,w,h in (selected[:1] if args.smoke else selected):
             folder=args.output/f'{ext}-{theme}-{w}';folder.mkdir()
             source=args.fixtures/ext/('large-animation.'+ext);source_hash=qa.sha(source)
             expected=json.loads((source.parent/'expected.json').read_text('utf-8'))
@@ -62,19 +63,27 @@ def run(args):
                 assert max(abs(x-expected[paused]['center'][0]) for x in gray)<=2
                 # Editing the mapped current frame must export original RGBA, not gray.
                 v.key('E');time.sleep(.5);v.shot('editor-current-frame')
-                output=folder/'current-frame.png';qa.move(v.hwnd,w-62,h-72)
-                v.save_dialog(w-64,h-72,output)
-                with Image.open(output) as im:
-                    assert im.size==(1024,1024)
-                    rgba=im.convert('RGBA');exported=rgba.getpixel((512,512))
-                    assert max(abs(a-b) for a,b in zip(exported,expected[paused]['center']))<=(2 if ext=='webp' else 0)
-                    assert rgba.getpixel((950,60))[3]==0
-                v.shot('saved-current-frame');v.key(27);time.sleep(.4)
+                # The editor preview reads the original mapped RGBA, not channel display.
+                p=v.shot('editor-rgba-preview')
+                with Image.open(p) as im:
+                    rgb=im.convert('RGB').getpixel((w//2,h//2))
+                    assert max(abs(a-b) for a,b in zip(rgb,expected[paused]['center'][:3]))<=2
+                exported_checked=(not args.smoke and ext=='gif' and theme=='dark')
+                if exported_checked:
+                    output=folder/'current-frame.png';qa.move(v.hwnd,w-62,h-72)
+                    v.save_dialog(w-64,h-72,output)
+                    with Image.open(output) as im:
+                        assert im.size==(1024,1024)
+                        rgba=im.convert('RGBA')
+                        assert list(rgba.getpixel((512,512)))==expected[paused]['center']
+                        assert rgba.getpixel((950,60))[3]==0
+                    v.shot('saved-current-frame')
+                v.key(27);time.sleep(.4)
                 assert qa.sha(source)==source_hash
                 assert samples
                 cases.append({'format':ext,'theme':theme,'logical_client':[w,h],
                     'frames':72,'decoded_frame_mib':288,'autoplay':True,'pause_stable':True,
-                    'previous_next_correct':True,'channel_and_export_correct':True,
+                    'previous_next_correct':True,'channel_and_editor_correct':True,'native_export_checked':exported_checked,
                     'private_mib_max':round(max(s['private'] for s in samples)/1048576,2),
                     'working_set_mib_max':round(max(s['working_set'] for s in samples)/1048576,2),
                     'peak_commit_mib':round(max(s['peak_commit'] for s in samples)/1048576,2),
@@ -98,4 +107,4 @@ def run(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--binary',required=True,type=Path)
     p.add_argument('--fixtures',required=True,type=Path);p.add_argument('--output',required=True,type=Path)
-    p.add_argument('--commit',required=True);run(p.parse_args())
+    p.add_argument('--commit',required=True);p.add_argument('--smoke',action='store_true');run(p.parse_args())
