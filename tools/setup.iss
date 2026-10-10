@@ -51,6 +51,7 @@ Source: "{#BuildDir}\iv_shell.dll"; DestDir: "{app}"; Flags: ignoreversion resta
 
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\formats\AVIF第三方许可.txt"; DestDir: "{app}\licenses"; DestName: "AVIF-third-party-notices.txt"; Flags: ignoreversion
+Source: "..\docs\formats\动画缓存第三方许可.txt"; DestDir: "{app}\licenses"; DestName: "animation-cache-third-party-notices.txt"; Flags: ignoreversion
 Source: "..\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

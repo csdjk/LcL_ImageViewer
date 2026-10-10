@@ -64,6 +64,7 @@ impl ThumbnailProvider {
         // 统一成 RGBA8（HDR 先 tonemap）
         let rgba8: Vec<u8> = match &mip.data {
             PixelData::Rgba8(v) => v.clone(),
+            PixelData::Rgba8Mapped(v) => v.as_slice().to_vec(),
             PixelData::RgbaF32(v) => v.chunks_exact(4).flat_map(|p| [
                 tonemap_u8(p[0]), tonemap_u8(p[1]), tonemap_u8(p[2]),
                 (p[3].clamp(0.0, 1.0) * 255.0).round() as u8,

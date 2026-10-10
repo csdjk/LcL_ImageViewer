@@ -170,6 +170,7 @@ impl Source {
         };
         match data {
             PixelData::Rgba8(v) => Ok(v),
+            PixelData::Rgba8Mapped(v) => Ok(v.as_slice()),
             _ => Err("暂不编辑浮点像素数据".into()),
         }
     }

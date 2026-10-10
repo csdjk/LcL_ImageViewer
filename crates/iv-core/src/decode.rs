@@ -5,69 +5,7 @@ use std::path::Path;
 
 use crate::format::{detect_format, ImageFormat};
 
-/// Retained animation pixels, including the separate first-frame mip.
-/// Codec scratch buffers and GPU copies are outside this budget.
-pub(crate) const MAX_ANIMATION_BYTES: usize = 256 * 1024 * 1024;
-pub(crate) const MAX_ANIMATION_FRAMES: usize = 4096;
-
-#[cfg(test)]
-mod animation_budget_tests {
-    use super::*;
-
-    fn frames(sizes: Vec<(u32, u32)>) -> image::Frames<'static> {
-        image::Frames::new(Box::new(sizes.into_iter().map(|(w, h)| {
-            Ok(image::Frame::from_parts(
-                image::RgbaImage::from_pixel(w, h, image::Rgba([9, 8, 7, 6])),
-                0, 0, image::Delay::from_numer_denom_ms(40, 1),
-            ))
-        })))
-    }
-
-    #[test]
-    fn exact_budget_includes_the_separate_first_frame() {
-        let image = collect_animation_with_budget(
-            frames(vec![(2, 2); 2]), ImageKind::Gif, 48,
-        ).unwrap();
-        assert_eq!(image.frames.len(), 2);
-        assert_eq!(image.frames[1].delay_ms, 40);
-        assert_eq!(image.mips[0].rgba8_at(1, 1), Some([9, 8, 7, 6]));
-        assert!(collect_animation_with_budget(
-            frames(vec![(2, 2); 2]), ImageKind::Gif, 47,
-        ).unwrap_err().to_string().contains("像素预算"));
-    }
-
-    #[test]
-    fn oversized_or_inconsistent_sequences_fail_instead_of_truncating() {
-        assert!(collect_animation_with_budget(
-            frames(vec![(1, 1); MAX_ANIMATION_FRAMES + 1]),
-            ImageKind::Gif, MAX_ANIMATION_BYTES,
-        ).unwrap_err().to_string().contains("帧数"));
-        assert!(collect_animation_with_budget(
-            frames(vec![(2, 2), (1, 1)]), ImageKind::WebP, 100,
-        ).unwrap_err().to_string().contains("尺寸"));
-        assert!(check_animation_budget(usize::MAX, 2, usize::MAX).is_err());
-    }
-}
-
-pub(crate) fn check_animation_budget(
-    frame_bytes: usize,
-    count: usize,
-    limit: usize,
-) -> Result<(), DecodeError> {
-    if count == 0 || count > MAX_ANIMATION_FRAMES {
-        return Err(DecodeError::UnsupportedFormat(
-            "动画帧数超过安全限制（最多 4096 帧）".into(),
-        ));
-    }
-    let total = count.checked_add(1).and_then(|n| frame_bytes.checked_mul(n));
-    if total.is_none_or(|n| n > limit) {
-        return Err(DecodeError::UnsupportedFormat(format!(
-            "动画完整解码超过 {:.2} MiB 像素预算，请使用更小尺寸或更短的动画",
-            limit as f64 / (1024.0 * 1024.0),
-        )));
-    }
-    Ok(())
-}
+use crate::animation_storage::{AnimationBuilder, MEMORY_BUDGET, MAX_FRAME_BYTES};
 
 /// 解码后的图像。所有格式的像素统一为 RGBA。
 #[derive(Debug, Clone)]
@@ -123,11 +61,30 @@ impl MipLevel {
 pub enum PixelData {
     /// RGBA，每像素 4 字节
     Rgba8(Vec<u8>),
+    /// Lossless frame view into an exclusively owned temporary animation cache.
+    Rgba8Mapped(crate::MappedPixels),
     /// RGBA f32，每像素 16 字节（线性空间）
     RgbaF32(Vec<f32>),
 }
 
 impl PixelData {
+    /// Borrow original RGBA8 pixels regardless of animation backing storage.
+    pub fn as_rgba8(&self) -> Option<&[u8]> {
+        match self {
+            Self::Rgba8(v) => Some(v),
+            Self::Rgba8Mapped(v) => Some(v.as_slice()),
+            Self::RgbaF32(_) => None,
+        }
+    }
+    /// Logical pixel bytes, also used to keep speculative image caching conservative.
+    pub fn byte_len(&self) -> usize {
+        match self {
+            Self::Rgba8(v) => v.len(), Self::Rgba8Mapped(v) => v.len(),
+            Self::RgbaF32(v) => v.len().saturating_mul(4),
+        }
+    }
+    pub fn is_disk_backed(&self) -> bool { matches!(self, Self::Rgba8Mapped(_)) }
+
     /// 取 (x, y) 处的 RGBA（u8 形式；HDR clamp）。`width/height` 为图像尺寸。
     pub fn rgba8_at(&self, width: u32, height: u32, x: u32, y: u32) -> Option<[u8; 4]> {
         if x >= width || y >= height {
@@ -136,6 +93,7 @@ impl PixelData {
         let i = (y as usize * width as usize + x as usize) * 4;
         match self {
             PixelData::Rgba8(v) => v.get(i..i + 4).map(|s| [s[0], s[1], s[2], s[3]]),
+            PixelData::Rgba8Mapped(v) => v.as_slice().get(i..i + 4).map(|s| [s[0], s[1], s[2], s[3]]),
             PixelData::RgbaF32(v) => {
                 let r = v.get(i)?;
                 let g = v.get(i + 1)?;
@@ -166,6 +124,10 @@ impl PixelData {
                     s[2] as f32 / 255.0,
                     s[3] as f32 / 255.0,
                 ])
+            }
+            PixelData::Rgba8Mapped(v) => {
+                let s = v.as_slice().get(i..i + 4)?;
+                Some([s[0] as f32 / 255.0, s[1] as f32 / 255.0, s[2] as f32 / 255.0, s[3] as f32 / 255.0])
             }
             PixelData::RgbaF32(v) => Some([
                 *v.get(i)?,
@@ -228,6 +190,8 @@ pub enum DecodeError {
     NotAnImage(String),
     /// 识别出格式但暂不支持该变体
     UnsupportedFormat(String),
+    /// A resource safety limit, not an unsupported image format.
+    ResourceLimit(String),
     /// 文件被截断
     Truncated,
     /// 解码过程中失败
@@ -241,6 +205,7 @@ impl fmt::Display for DecodeError {
         match self {
             DecodeError::NotAnImage(s) => write!(f, "不是有效的图像文件: {s}"),
             DecodeError::UnsupportedFormat(s) => write!(f, "暂不支持的格式: {s}"),
+            DecodeError::ResourceLimit(s) => write!(f, "资源限制: {s}"),
             DecodeError::Truncated => write!(f, "文件数据不完整（截断）"),
             DecodeError::Decode(s) => write!(f, "解码失败: {s}"),
             DecodeError::Io(s) => write!(f, "读取失败: {s}"),
@@ -385,7 +350,7 @@ fn collect_animation(
     frames: image::Frames,
     kind: ImageKind,
 ) -> Result<DecodedImage, DecodeError> {
-    collect_animation_with_budget(frames, kind, MAX_ANIMATION_BYTES)
+    collect_animation_with_budget(frames, kind, MEMORY_BUDGET)
 }
 
 fn collect_animation_with_budget(
@@ -393,7 +358,8 @@ fn collect_animation_with_budget(
     kind: ImageKind,
     budget: usize,
 ) -> Result<DecodedImage, DecodeError> {
-    let mut list: Vec<AnimatedFrame> = Vec::new();
+    let mut storage = AnimationBuilder::new(budget);
+    let mut has_alpha = false;
     let mut size: Option<(u32, u32)> = None;
     for fr in frames.into_iter() {
         let fr = fr.map_err(|e| DecodeError::Decode(e.to_string()))?;
@@ -410,8 +376,7 @@ fn collect_animation_with_budget(
                 }
             }
         }
-        // Check before retaining another frame; iterator/codec scratch is additional.
-        check_animation_budget(buf.as_raw().len(), list.len() + 1, budget)?;
+        has_alpha |= buf.as_raw().chunks_exact(4).any(|p| p[3] != 255);
         let (num, den) = fr.delay().numer_denom_ms();
         // numer_denom_ms 返回的就是毫秒分数：delay_ms = num / den（不要再乘 1000）
         let ms = if den == 0 {
@@ -421,21 +386,15 @@ fn collect_animation_with_budget(
         };
         // 浏览器惯例：过短延时（GIF 里常见 0）按 100ms
         let delay_ms = if ms < 10 { 100 } else { ms };
-        list.push(AnimatedFrame {
-            data: PixelData::Rgba8(fr.into_buffer().into_raw()),
-            delay_ms,
-        });
+        storage.push(fr.into_buffer().into_raw(), delay_ms)?;
     }
+    let list = storage.finish()?;
     let (w, h) = size.ok_or_else(|| DecodeError::Decode("动画无有效帧".into()))?;
     let Some(first) = list.first().map(|f| f.data.clone()) else {
         return Err(DecodeError::Decode("动画无有效帧".into()));
     };
-    // 第一帧扫描是否真有透明像素
-    let has_alpha = match &first {
-        PixelData::Rgba8(v) => v.chunks_exact(4).any(|p| p[3] != 255),
-        PixelData::RgbaF32(v) => v.chunks_exact(4).any(|p| p[3] < 1.0),
-    };
     let animated = list.len() > 1;
+    let disk_backed = first.is_disk_backed();
     Ok(DecodedImage {
         width: w,
         height: h,
@@ -449,7 +408,7 @@ fn collect_animation_with_budget(
         has_alpha,
         is_hdr: false,
         extra_meta: if animated {
-            Some(format!("动画 · {} 帧", list.len()))
+            Some(format!("动画 · {} 帧{}", list.len(), if disk_backed { " · 临时磁盘缓存（原始画质）" } else { "" }))
         } else {
             None
         },
@@ -457,12 +416,21 @@ fn collect_animation_with_budget(
     })
 }
 
+fn set_animation_limits(dec: &mut impl image::ImageDecoder) -> Result<(), DecodeError> {
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(32768);
+    limits.max_image_height = Some(32768);
+    limits.max_alloc = Some(MAX_FRAME_BYTES as u64);
+    dec.set_limits(limits).map_err(|e| DecodeError::ResourceLimit(e.to_string()))
+}
+
 /// GIF：统一走动画收集（静态 GIF 自动退化为单帧静态图）。
 fn decode_gif(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     use image::codecs::gif::GifDecoder;
     use image::AnimationDecoder;
-    let dec = GifDecoder::new(std::io::Cursor::new(bytes))
+    let mut dec = GifDecoder::new(std::io::Cursor::new(bytes))
         .map_err(|e| DecodeError::Decode(e.to_string()))?;
+    set_animation_limits(&mut dec)?;
     collect_animation(dec.into_frames(), ImageKind::Gif)
 }
 
@@ -470,9 +438,10 @@ fn decode_gif(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
 fn decode_webp(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     use image::codecs::webp::WebPDecoder;
     use image::AnimationDecoder;
-    let dec = WebPDecoder::new(std::io::Cursor::new(bytes))
+    let mut dec = WebPDecoder::new(std::io::Cursor::new(bytes))
         .map_err(|e| DecodeError::Decode(e.to_string()))?;
     if dec.has_animation() {
+        set_animation_limits(&mut dec)?;
         collect_animation(dec.into_frames(), ImageKind::WebP)
     } else {
         static_decoder(dec, ImageKind::WebP)
@@ -483,9 +452,10 @@ fn decode_webp(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
 fn decode_png(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
     use image::codecs::png::PngDecoder;
     use image::AnimationDecoder;
-    let dec = PngDecoder::new(std::io::Cursor::new(bytes))
+    let mut dec = PngDecoder::new(std::io::Cursor::new(bytes))
         .map_err(|e| DecodeError::Decode(e.to_string()))?;
-    if dec.is_apng().unwrap_or(false) {
+    if dec.is_apng().map_err(|e| DecodeError::Decode(e.to_string()))? {
+        set_animation_limits(&mut dec)?;
         let apng = dec.apng().map_err(|e| DecodeError::Decode(e.to_string()))?;
         return collect_animation(apng.into_frames(), ImageKind::Png);
     }
@@ -541,4 +511,41 @@ fn decode_hdr(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
         extra_meta: None,
         frames: Vec::new(),
     })
+}
+
+#[cfg(test)]
+mod animation_cache_tests {
+    use super::*;
+    fn frames(sizes: Vec<(u32,u32)>) -> image::Frames<'static> {
+        image::Frames::new(Box::new(sizes.into_iter().enumerate().map(|(i,(w,h))| {
+            Ok(image::Frame::from_parts(image::RgbaImage::from_pixel(w,h,
+                image::Rgba([9,8,i as u8,if i==0 {255} else {6}])),0,0,
+                image::Delay::from_numer_denom_ms(40+i as u32,1)))
+        })))
+    }
+    #[test]
+    fn exceeding_memory_budget_spills_without_changing_pixels_or_delays() {
+        let small=collect_animation_with_budget(frames(vec![(2,2);2]),ImageKind::Gif,48).unwrap();
+        let mapped=collect_animation_with_budget(frames(vec![(2,2);2]),ImageKind::Gif,47).unwrap();
+        assert_eq!(mapped.frames.len(),2);
+        assert!(mapped.frames[0].data.is_disk_backed());
+        assert!(mapped.has_alpha); // Includes later transparent frames, not just the first.
+        for (a,b) in small.frames.iter().zip(&mapped.frames) {
+            assert_eq!(a.data.as_rgba8(),b.data.as_rgba8()); assert_eq!(a.delay_ms,b.delay_ms);
+        }
+        assert_eq!(mapped.mips[0].data.as_rgba8(),mapped.frames[0].data.as_rgba8());
+    }
+    #[test]
+    fn invalid_sequence_is_not_silently_shortened() {
+        assert!(collect_animation_with_budget(frames(vec![(2,2),(1,1)]),ImageKind::WebP,1).is_err());
+        let it=vec![Ok(image::Frame::new(image::RgbaImage::new(2,2))),
+            Err(image::ImageError::IoError(std::io::Error::new(std::io::ErrorKind::UnexpectedEof,"fixture EOF")))];
+        assert!(collect_animation_with_budget(image::Frames::new(Box::new(it.into_iter())),ImageKind::Png,1).is_err());
+    }
+    #[test]
+    fn mapped_frame_limit_still_rejects_overlong_animation() {
+        let err=collect_animation_with_budget(frames(vec![(1,1);4097]),ImageKind::Gif,1).unwrap_err();
+        assert!(matches!(err,DecodeError::ResourceLimit(_)));
+        assert!(!err.to_string().contains("不支持的格式"));
+    }
 }

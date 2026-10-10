@@ -1298,6 +1298,7 @@ version = "0.7.0"
 dependencies = [
  "image 0.25.10",
  "libavif-sys",
+ "memmap2",
  "texture2ddecoder",
 ]
 

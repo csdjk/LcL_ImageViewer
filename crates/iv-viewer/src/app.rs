@@ -63,10 +63,9 @@ impl ImageCache {
     }
 
     fn image_bytes(img: &DecodedImage) -> usize {
-        let px_bytes = |d: &PixelData| match d {
-            PixelData::Rgba8(v) => v.len(),
-            PixelData::RgbaF32(v) => v.len() * 4,
-        };
+        // Count logical bytes for mapped animations too, so the LRU cannot retain
+        // multiple huge temporary files as if their pixel buffers were free.
+        let px_bytes = |d: &PixelData| d.byte_len();
         let mip: usize = img.mips.iter().map(|m| px_bytes(&m.data)).sum();
         // 动画帧也计入预算（动画图内存大头在这里）
         let frm: usize = img.frames.iter().map(|f| px_bytes(&f.data)).sum();

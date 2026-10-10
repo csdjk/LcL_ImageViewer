@@ -37,10 +37,13 @@ class ReleasePackagingTests(unittest.TestCase):
         sources = package.portable_sources(ROOT, Path('compiled'))
         self.assertEqual(set(sources), {'imageview.exe', 'iv_shell.dll', 'LICENSE', 'CHANGELOG.md',
                          'register_thumbnail.ps1', 'unregister_thumbnail.ps1',
-                         'licenses/AVIF-third-party-notices.txt'})
+                         'licenses/AVIF-third-party-notices.txt', 'licenses/animation-cache-third-party-notices.txt'})
         notice = sources['licenses/AVIF-third-party-notices.txt'].read_text(encoding='utf-8')
         self.assertIn('Alliance for Open Media', notice)
         self.assertIn('PATENTS', notice)
+        mapped_notice=sources['licenses/animation-cache-third-party-notices.txt'].read_text('utf-8')
+        self.assertIn('memmap2 0.9.11',mapped_notice)
+        self.assertIn('Permission is hereby granted',mapped_notice)
 
     def test_workspace_lock_and_installer_versions_match(self):
         version = tomllib.loads((ROOT/'Cargo.toml').read_text('utf-8'))['workspace']['package']['version']

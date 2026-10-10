@@ -4,14 +4,14 @@ use std::{ffi::CStr, mem::MaybeUninit, ptr::NonNull};
 
 use libavif_sys as ffi;
 
-use crate::decode::{AnimatedFrame, DecodeError, DecodedImage, ImageKind, MipLevel, PixelData};
+use crate::decode::{DecodeError, DecodedImage, ImageKind, MipLevel, PixelData};
 
 const MAX_FILE_BYTES: usize = 128 * 1024 * 1024;
 const MAX_PIXELS: u32 = 64 * 1024 * 1024;
 const MAX_DIMENSION: u32 = 32768;
 const MAX_IMAGES: u32 = 4096;
 // Retained frame pixels plus the separate first-frame mip. Native scratch memory is additional.
-use crate::decode::{check_animation_budget, MAX_ANIMATION_BYTES};
+use crate::animation_storage::{AnimationBuilder, check_storage, MEMORY_BUDGET, STORAGE_BUDGET};
 
 struct Decoder(NonNull<ffi::avifDecoder>);
 
@@ -65,11 +65,11 @@ fn result(code: ffi::avifResult) -> Result<(), DecodeError> {
 }
 
 pub(crate) fn decode_avif(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
-    decode(bytes, false, MAX_ANIMATION_BYTES)
+    decode(bytes, false, MEMORY_BUDGET)
 }
 
 pub(crate) fn decode_avif_preview(bytes: &[u8]) -> Result<DecodedImage, DecodeError> {
-    decode(bytes, true, MAX_ANIMATION_BYTES)
+    decode(bytes, true, MEMORY_BUDGET)
 }
 
 // Round timestamps, not each interval independently, so 60 fps remains 1000 ms/60 frames.
@@ -136,14 +136,9 @@ fn decode(
     }
     let frame_count = if preview_only { 1 } else { count as usize };
     if frame_count > 1 {
-        check_animation_budget(raw_bytes, frame_count, animation_budget)?;
+        check_storage(raw_bytes, frame_count, STORAGE_BUDGET)?;
     }
-    let mut frames = Vec::new();
-    if frame_count > 1 {
-        frames
-            .try_reserve_exact(frame_count)
-            .map_err(|_| DecodeError::Decode("AVIF 动画帧列表内存不足".into()))?;
-    }
+    let mut storage = AnimationBuilder::new(animation_budget);
     let mut first_mip = None;
     let mut notes = Vec::new();
     let mut has_alpha = false;
@@ -175,23 +170,8 @@ fn decode(
         }
         let pixels = image.into_raw();
         if frame_count > 1 {
-            if index == 0 {
-                // Accounted for in the budget, retained for initial upload and thumbnail parity.
-                let mut copy = Vec::new();
-                copy.try_reserve_exact(pixels.len())
-                    .map_err(|_| DecodeError::Decode("AVIF 首帧缓存内存不足".into()))?;
-                copy.extend_from_slice(&pixels);
-                first_mip = Some(MipLevel {
-                    width: size.0,
-                    height: size.1,
-                    data: PixelData::Rgba8(copy),
-                });
-            }
             let timing = unsafe { (*ptr).imageTiming };
-            frames.push(AnimatedFrame {
-                data: PixelData::Rgba8(pixels),
-                delay_ms: frame_delay_ms(&timing)?,
-            });
+            storage.push(pixels, frame_delay_ms(&timing)?)?;
         } else {
             first_mip = Some(MipLevel {
                 width: size.0,
@@ -200,6 +180,13 @@ fn decode(
             });
         }
     }
+    let frames = if frame_count > 1 {
+        let frames = storage.finish()?;
+        let size = dimensions.ok_or_else(|| DecodeError::Decode("AVIF 缺少尺寸".into()))?;
+        first_mip = Some(MipLevel { width: size.0, height: size.1, data: frames[0].data.clone() });
+        if frames[0].data.is_disk_backed() { notes.push("临时磁盘缓存（原始画质）".into()); }
+        frames
+    } else { Vec::new() };
     let mip = first_mip.ok_or_else(|| DecodeError::Decode("AVIF 缺少首帧".into()))?;
     Ok(DecodedImage {
         width: mip.width,
@@ -408,18 +395,21 @@ mod tests {
     }
 
     #[test]
-    fn total_animation_budget_includes_first_mip_and_rejects_overflow() {
-        assert!(check_animation_budget(100, 2, 300).is_ok());
-        assert!(check_animation_budget(100, 2, 299).is_err());
-        assert!(check_animation_budget(usize::MAX, 2, usize::MAX).is_err());
-        assert!(check_animation_budget(4, 4097, usize::MAX).is_err());
-        assert!(check_animation_budget(4, 0, usize::MAX).is_err());
+    fn animation_storage_limit_rejects_overflow() {
+        assert!(check_storage(100, 2, 300).is_ok());
+        assert!(check_storage(100, 2, 199).is_err());
+        assert!(check_storage(usize::MAX, 2, usize::MAX).is_err());
+        assert!(check_storage(4, 4097, usize::MAX).is_err());
+        assert!(check_storage(4, 0, usize::MAX).is_err());
     }
 
     #[test]
     fn preview_does_not_reserve_or_decode_the_complete_animation() {
         let bytes = include_bytes!("../tests/fixtures/avif/animated.avif");
-        assert!(decode(bytes, false, 1).is_err());
+        let full = decode(bytes, false, 1).unwrap();
+        assert_eq!(full.frames.len(), 2);
+        assert!(full.frames[0].data.is_disk_backed());
+        assert_eq!(full.frames[0].data.as_rgba8(), decode(bytes, false, MEMORY_BUDGET).unwrap().frames[0].data.as_rgba8());
         let preview = decode(bytes, true, 1).unwrap();
         assert!(preview.frames.is_empty());
         assert_eq!((preview.width, preview.height), (160, 96));
