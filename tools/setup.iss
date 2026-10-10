@@ -1,10 +1,10 @@
 ; LcL ImageViewer 安装包脚本（Inno Setup 7）
-; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageViewer-Setup-v0.7.0-win64.exe
+; 编译：ISCC.exe tools\setup.iss  →  输出 dist\LcL-ImageViewer-Setup-v0.7.1-win64.exe
 ; Per-user installation; prefer D:, fall back to local app data. Registry: HKCU.
 
 #define MyAppName "LcL ImageViewer"
 #ifndef MyAppVersion
-#define MyAppVersion "0.7.0"
+#define MyAppVersion "0.7.1"
 #endif
 #ifndef BuildDir
 #define BuildDir "..\target\release"
