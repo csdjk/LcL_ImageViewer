@@ -24,3 +24,6 @@ texture2ddecoder = "0.1"
 
 # Bundled AVIF decoder: static linking, no system codec or runtime DLL required.
 libavif-sys = { version = "0.17", default-features = false, features = ["codec-aom"] }
+
+# Read-only private animation cache; version already locked by the viewer stack.
+memmap2 = "=0.9.11"

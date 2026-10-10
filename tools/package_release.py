@@ -114,6 +114,7 @@ def portable_sources(root: Path, binary_dir: Path) -> dict[str, Path]:
         'register_thumbnail.ps1': root/'tools/register_thumbnail.ps1',
         'unregister_thumbnail.ps1': root/'tools/unregister_thumbnail.ps1',
         'licenses/AVIF-third-party-notices.txt': root/'docs/formats/AVIF第三方许可.txt',
+        'licenses/animation-cache-third-party-notices.txt': root/'docs/formats/动画缓存第三方许可.txt',
     }
 
 
@@ -187,7 +188,8 @@ def run(args: argparse.Namespace) -> None:
 源代码提交：{commit}
 AVIF 动画支持暂停、逐帧及宽窗口帧进度；10/12位输入以8位显示。
 当前图片默认自动检查保存变化；在设置中可关闭。失败会保留上一有效画面并提示，可保存后重试或按 F5。
-GIF/APNG/WebP/AVIF 保留帧像素预算 256 MiB；BC6H 为 8 位预览，不代表浮点 HDR 保真。
+GIF/APNG/WebP/AVIF 大动画自动使用临时磁盘缓存，保留原始帧；单动画展开数据上限8 GiB。
+缓存释放后自动删除；需要系统临时目录有空间。BC6H 为8位预览，不代表浮点HDR保真。
 暂不支持 AVIF HDR/ICC、有限循环次数自动停止；过大动画会明确报错。
 许可：见 LICENSE 及 licenses 目录；更新记录：见 CHANGELOG.md。
 ''', encoding='utf-8-sig')

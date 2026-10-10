@@ -5,6 +5,8 @@
 //! - 对畸形文件必须返回 `Err`，绝不 panic（该库会跑在 Explorer 缩略图进程里）
 
 mod avif;
+mod animation_storage;
+pub use animation_storage::MappedPixels;
 pub mod dds;
 pub mod decode;
 pub mod format;

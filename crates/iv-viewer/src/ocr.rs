@@ -78,6 +78,7 @@ impl Input {
         };
         match p {
             PixelData::Rgba8(v) => Ok(v),
+            PixelData::Rgba8Mapped(v) => Ok(v.as_slice()),
             _ => Err("OCR 暂不支持浮点像素".into()),
         }
     }

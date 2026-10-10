@@ -328,6 +328,7 @@ impl Renderer {
 
         let (format, bytes, bytes_per_pixel): (wgpu::TextureFormat, std::borrow::Cow<'_, [u8]>, u32) = match data {
             PixelData::Rgba8(v) => (wgpu::TextureFormat::Rgba8Unorm, std::borrow::Cow::Borrowed(v.as_slice()), 4),
+            PixelData::Rgba8Mapped(v) => (wgpu::TextureFormat::Rgba8Unorm, std::borrow::Cow::Borrowed(v.as_slice()), 4),
             PixelData::RgbaF32(v) => {
                 // Rgba16Float 纹理：f32 → f16
                 let mut out = Vec::with_capacity(v.len() * 2);
