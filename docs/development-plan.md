@@ -143,3 +143,7 @@ Base f25287e；独立分支 codex/macos-package，worktree Temp/worktrees/macos-
 ## Task IV-REL-070 — 发布主画布编辑与OCR v0.7.0
 
 2026-10-08 用户授权打包发布。先恢复 IV-OCR-01 同一工作树，通过真实OCR/剪贴板/双主题窗口及全部测试后集成本地main；然后独立release工作树统一版本，主线静态CRT EXE/DLL正式构建、安装隔离/便携/GUI测试，生成安装版、ZIP和SHA256。推送保留现有所有提交与旧版本，不强推；正式Release设Latest后回读并重新公开下载核验。用户安装、真实文件关联、系统语言包和默认程序不修改。本次正式附件仅Windows x64，macOS原预览流程保留，不伪装为支持OCR。
+
+## IV-REL-071 — 大动画缓存修复正式发布（用户授权）
+
+Base 2af93c5；分支 codex/release-v0.7.1；worktree Temp/worktrees/release-v0.7.1。保持已经验收的缓存算法，统一版本和发布说明。main固定源码执行workspace测试、超旧256MiB完整帧专项、正式静态CRT EXE/DLL、隔离安装/卸载、便携内容与真实窗口验证；发布main和新v0.7.1标签、不强推，先上传校验草稿附件再设Latest，并公开下载核对SHA256。保留旧版本、不自动安装或改文件关联；本次仅Windows x64，不发布macOS DMG。
