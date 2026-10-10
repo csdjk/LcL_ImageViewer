@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-ANIM-01 | 大动画有界缓存与预算报错修复 | IN_PROGRESS | ChatGPT-AgentDock / codex/large-animation-cache | 用户截图问题 / v0.7.0 | `crates/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `README.md`, `docs/ui-qa/**`, `docs/formats/**` | 超过旧256MiB动画完整打开并保真；小动画内存、大动画私有临时文件缓存；测试与实机/本地main复验，不发布 |
+| IV-ANIM-01 | 大动画有界缓存与预算报错修复 | IN_PROGRESS | ChatGPT-AgentDock / codex/large-animation-cache | 用户截图问题 / v0.7.0 | `crates/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `tools/{package_release.py,setup.iss}`, `README.md`, `docs/ui-qa/**`, `docs/formats/**` | 超过旧256MiB动画完整打开并保真；小动画内存、大动画私有临时文件缓存；测试与实机/本地main复验，不发布 |
 | IV-REL-070 | 编辑、像素读数与OCR正式发布v0.7.0 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / OCR收尾后集成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完成OCR、统一版本、正式构建/安装/便携验证；原子push与Latest发布、公开下载hash，不改用户安装 |
 | IV-OCR-01 | 离线OCR与图片文字复制 | DONE | ChatGPT-AgentDock | 用户本轮要求 / EDIT-03 DONE | `crates/iv-viewer/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 原图异步离线识别、语言选择与一键复制、原图不变、过期任务不写剪贴板；测试/真实识别/实机/本地合入，不发布 |
 | IV-EDIT-03 | 编辑按钮与参数控件统一 | DONE | ChatGPT-AgentDock | 用户截图要求 / EDIT-02 DONE | `crates/iv-viewer/src/{editor.rs,ui.rs,editor_controls.rs}`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 32点统一控件与主次动作、双主题双尺寸及待应用提示；编辑像素不变，本地合入不发布 |
