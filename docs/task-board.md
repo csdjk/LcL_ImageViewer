@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-071 | 大动画缓存修复正式发布v0.7.1 | REVIEW | ChatGPT-AgentDock | 用户本轮发布授权 / ANIM-01 DONE | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完整帧缓存和正式EXE/DLL验证；版本/许可/安装便携/实机；push main和新标签、Latest及公开hash，不改用户安装 |
+| IV-REL-071 | 大动画缓存修复正式发布v0.7.1 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / ANIM-01 DONE | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完整帧缓存和正式EXE/DLL验证；版本/许可/安装便携/实机；push main和新标签、Latest及公开hash，不改用户安装 |
 | IV-ANIM-01 | 大动画有界缓存与预算报错修复 | DONE | ChatGPT-AgentDock / codex/large-animation-cache | 用户截图问题 / v0.7.0 | `crates/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `tools/{package_release.py,setup.iss}`, `README.md`, `docs/ui-qa/**`, `docs/formats/**` | 超过旧256MiB动画完整打开并保真；小动画内存、大动画私有临时文件缓存；测试与实机/本地main复验，不发布 |
 | IV-REL-070 | 编辑、像素读数与OCR正式发布v0.7.0 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / OCR收尾后集成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完成OCR、统一版本、正式构建/安装/便携验证；原子push与Latest发布、公开下载hash，不改用户安装 |
 | IV-OCR-01 | 离线OCR与图片文字复制 | DONE | ChatGPT-AgentDock | 用户本轮要求 / EDIT-03 DONE | `crates/iv-viewer/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `docs/ui-qa/**`, `README.md` | 原图异步离线识别、语言选择与一键复制、原图不变、过期任务不写剪贴板；测试/真实识别/实机/本地合入，不发布 |
