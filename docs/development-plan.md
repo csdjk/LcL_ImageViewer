@@ -147,3 +147,7 @@ Base f25287e；独立分支 codex/macos-package，worktree Temp/worktrees/macos-
 ## IV-REL-071 — 大动画缓存修复正式发布（用户授权）
 
 Base 2af93c5；分支 codex/release-v0.7.1；worktree Temp/worktrees/release-v0.7.1。保持已经验收的缓存算法，统一版本和发布说明。main固定源码执行workspace测试、超旧256MiB完整帧专项、正式静态CRT EXE/DLL、隔离安装/卸载、便携内容与真实窗口验证；发布main和新v0.7.1标签、不强推，先上传校验草稿附件再设Latest，并公开下载核对SHA256。保留旧版本、不自动安装或改文件关联；本次仅Windows x64，不发布macOS DMG。
+
+## IV-MAINT-01 — 本地磁盘清理（2026-10-14）
+
+用户要求删除当前项目冗余文件以释放空间。仅删除主工作区`target/`中除`distribution071/`之外的可再生构建目录及旧Cargo缓存标记；保留当前正式构建、全部`dist/`、测试输入、源码、Git历史、39个既有工作树和验收证据。删除前验证绝对路径属于主工作区target、无重解析点、无Git跟踪内容且没有编译或查看器进程占用；不使用全仓git clean。保留区域逐文件SHA256和各工作树Git状态/分支在清理前后应一致；记录项目逻辑字节数和磁盘可用空间，不用重新构建填回缓存。任务分支只提交`docs/maintenance/磁盘清理-2026-10-14.md`，审查合入main后同步状态。不改业务源码、安装或系统关联，不push。
