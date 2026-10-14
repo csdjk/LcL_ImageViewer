@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-MAINT-01 | 清理历史编译缓存与重复构建产物 | IN_PROGRESS | Codex / codex/storage-cleanup-20261014 | 用户2026-10-14明确要求 / 干净main | 运行清理仅`target/**`，保留`target/distribution071/**`；分支仅`docs/maintenance/磁盘清理-2026-10-14.md` | 清理前后逐文件SHA256核对保留内容、工作树状态和分支；记录字节数；不改业务源码与正式包 |
+| IV-MAINT-01 | 清理历史编译缓存与重复构建产物 | DONE | Codex / codex/storage-cleanup-20261014 | 用户2026-10-14明确要求 / 干净main | 运行清理仅`target/**`，保留`target/distribution071/**`；分支仅`docs/maintenance/磁盘清理-2026-10-14.md` | 清理前后逐文件SHA256核对保留内容、工作树状态和分支；记录字节数；不改业务源码与正式包 |
 | IV-REL-071 | 大动画缓存修复正式发布v0.7.1 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / ANIM-01 DONE | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完整帧缓存和正式EXE/DLL验证；版本/许可/安装便携/实机；push main和新标签、Latest及公开hash，不改用户安装 |
 | IV-ANIM-01 | 大动画有界缓存与预算报错修复 | DONE | ChatGPT-AgentDock / codex/large-animation-cache | 用户截图问题 / v0.7.0 | `crates/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `tools/{package_release.py,setup.iss}`, `README.md`, `docs/ui-qa/**`, `docs/formats/**` | 超过旧256MiB动画完整打开并保真；小动画内存、大动画私有临时文件缓存；测试与实机/本地main复验，不发布 |
 | IV-REL-070 | 编辑、像素读数与OCR正式发布v0.7.0 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / OCR收尾后集成 | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完成OCR、统一版本、正式构建/安装/便携验证；原子push与Latest发布、公开下载hash，不改用户安装 |
@@ -360,3 +360,7 @@ Owner：ChatGPT-AgentDock；分支 `codex/ocr-text`；worktree `Temp/worktrees/o
 ## IV-MAINT-01 领取记录
 
 2026-10-14按本轮用户明确清理请求创建READY任务并由Codex领取为IN_PROGRESS。Base `21c19461d5c7203440e0f88ac2af2876de1cc9e1`；branch `codex/storage-cleanup-20261014`，worktree `Temp/worktrees/storage-cleanup-20261014`。39个既有任务工作树仅核对，不删除。Coordinator只在main维护协调文档；任务工作树仅提交清理记录，实际删除限定为主工作区的旧target产物。清理后长期NEXT仍为IV-P1-01。
+
+## IV-MAINT-01 完成记录
+
+任务记录`b9dbb3e`已合入main；删除43.93 GiB（47,165,749,848字节）旧构建产物，当前项目约2.78 GiB。清理前后23,313文件SHA256一致；main再次复核23,065文件及39个原工作树/既有分支标签均通过。完整保留distribution071、dist与素材证据；本次任务临时工作树已移除。业务源码/工具无diff，未重新构建/GUI测试，未安装/发布/push。长期NEXT仍为IV-P1-01。详见`docs/maintenance/磁盘清理-2026-10-14.md`。

@@ -151,3 +151,5 @@ Base 2af93c5；分支 codex/release-v0.7.1；worktree Temp/worktrees/release-v0.
 ## IV-MAINT-01 — 本地磁盘清理（2026-10-14）
 
 用户要求删除当前项目冗余文件以释放空间。仅删除主工作区`target/`中除`distribution071/`之外的可再生构建目录及旧Cargo缓存标记；保留当前正式构建、全部`dist/`、测试输入、源码、Git历史、39个既有工作树和验收证据。删除前验证绝对路径属于主工作区target、无重解析点、无Git跟踪内容且没有编译或查看器进程占用；不使用全仓git clean。保留区域逐文件SHA256和各工作树Git状态/分支在清理前后应一致；记录项目逻辑字节数和磁盘可用空间，不用重新构建填回缓存。任务分支只提交`docs/maintenance/磁盘清理-2026-10-14.md`，审查合入main后同步状态。不改业务源码、安装或系统关联，不push。
+
+IV-MAINT-01 DONE：任务记录b9dbb3e已合入main，精确删除47,165,749,848字节；保留文件SHA256、工作树状态、既有分支/标签与正式包hash通过，main再次复核通过。当前项目含审计约2.78 GiB，当前可运行正式入口distribution071保持。仅本地提交，未push，长期NEXT不变。
