@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-SHELL-01 | 当前图片设为壁纸与资源管理器视图排序 | IN_PROGRESS | Codex | 用户2026-11-07要求 | `crates/iv-viewer/**`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 原图/存档不变；读取Explorer实际视图次序；壁纸成功/失败明确；相关测试、Release及双主题双尺寸实机；本地合入 |
+| IV-SHELL-01 | 当前图片设为壁纸与资源管理器视图排序 | DONE | Codex | 用户2026-11-07要求 | `crates/iv-viewer/**`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 原图/存档不变；读取Explorer实际视图次序；壁纸成功/失败明确；相关测试、Release及双主题双尺寸实机；本地合入 |
 | IV-MAINT-01 | 清理历史编译缓存与重复构建产物 | DONE | Codex / codex/storage-cleanup-20261014 | 用户2026-10-14明确要求 / 干净main | 运行清理仅`target/**`，保留`target/distribution071/**`；分支仅`docs/maintenance/磁盘清理-2026-10-14.md` | 清理前后逐文件SHA256核对保留内容、工作树状态和分支；记录字节数；不改业务源码与正式包 |
 | IV-REL-071 | 大动画缓存修复正式发布v0.7.1 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / ANIM-01 DONE | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完整帧缓存和正式EXE/DLL验证；版本/许可/安装便携/实机；push main和新标签、Latest及公开hash，不改用户安装 |
 | IV-ANIM-01 | 大动画有界缓存与预算报错修复 | DONE | ChatGPT-AgentDock / codex/large-animation-cache | 用户截图问题 / v0.7.0 | `crates/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `tools/{package_release.py,setup.iss}`, `README.md`, `docs/ui-qa/**`, `docs/formats/**` | 超过旧256MiB动画完整打开并保真；小动画内存、大动画私有临时文件缓存；测试与实机/本地main复验，不发布 |
@@ -367,3 +367,5 @@ Owner：ChatGPT-AgentDock；分支 `codex/ocr-text`；worktree `Temp/worktrees/o
 任务记录`b9dbb3e`已合入main；删除43.93 GiB（47,165,749,848字节）旧构建产物，当前项目约2.78 GiB。清理前后23,313文件SHA256一致；main再次复核23,065文件及39个原工作树/既有分支标签均通过。完整保留distribution071、dist与素材证据；本次任务临时工作树已移除。业务源码/工具无diff，未重新构建/GUI测试，未安装/发布/push。长期NEXT仍为IV-P1-01。详见`docs/maintenance/磁盘清理-2026-10-14.md`。
 
 IV-SHELL-01：Owner Codex；branch `codex/wallpaper-explorer-order`；worktree `Temp/worktrees/wallpaper-explorer-order`；Base b2443be。用户确认跟随Explorer日期/大小/升降序。读取匹配窗口视图顺序，无窗口或递归模式采用自然名称顺序并显示来源；多窗口冲突显式提示。复用target默认开发输出，保留冻结distribution071。测试使用隔离profile；不push、不安装发布。
+
+IV-SHELL-01 DONE：集成e18cf65；167项Rust、50项Python、check/Release、Explorer六种排序与38张真实窗口截图通过，原生壁纸设置及轮播配置恢复通过；main同源码复验及实时改序后手动刷新通过。交付target/release/imageview.exe；未push、安装、发布。
