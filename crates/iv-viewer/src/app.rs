@@ -155,6 +155,8 @@ pub struct App {
     exposure: f32,
     renderer: Option<Renderer>,
     error_msg: Option<String>,
+    wallpaper_job: Option<Receiver<Result<(), String>>>,
+    wallpaper_status: Option<String>,
     delete_prompt: Option<crate::recycle::Target>,
     delete_job: Option<(PathBuf, Receiver<Result<(), String>>)>,
     /// 底部状态栏文本（像素检查器，每帧更新）
@@ -311,6 +313,8 @@ impl App {
             exposure: 1.0,
             renderer,
             error_msg: None,
+            wallpaper_job: None,
+            wallpaper_status: None,
             delete_prompt: None,
             delete_job: None,
             probe_text: String::new(),
@@ -2113,6 +2117,11 @@ impl App {
         };
         let safe_rect = ctx.screen_rect().shrink(8.0);
         let menu_height = (safe_rect.height() - 16.0).max(240.0);
+        // Reserve the full image menu before its first layout, so newly added rows
+        // do not make the popup jump between frames at the bottom edge.
+        let reserved_height = if self.current.is_some() { 528.0_f32.min(safe_rect.height()) } else { 150.0 };
+        let pos = Pos2::new(pos.x.clamp(safe_rect.left(), (safe_rect.right()-256.0).max(safe_rect.left())),
+            pos.y.clamp(safe_rect.top(), (safe_rect.bottom()-reserved_height).max(safe_rect.top())));
         let area = egui::Area::new(egui::Id::new("iv-ctxmenu"))
             .order(egui::Order::Foreground)
             .fixed_pos(pos)
@@ -2220,6 +2229,10 @@ impl App {
         }
 
         if self.opened_path.is_some() {
+            if ui::menu_item(ui, "刷新文件夹排序", "", false, &pal).on_hover_text(self.browse_description()).clicked() {
+                self.request_directory_scan(self.opened_path.clone());
+                self.ctx_menu_pos=None;
+            }
             if ui::menu_item(ui, "刷新图片", "F5", false, &pal).clicked() {
                 self.reload_current();
                 self.ctx_menu_pos = None;
@@ -2227,6 +2240,23 @@ impl App {
             if ui::menu_item(ui, "锁定切图视图", "L", self.lock_view, &pal).clicked() {
                 self.lock_view = !self.lock_view;
                 self.ctx_menu_pos = None;
+            }
+        }
+        #[cfg(windows)]
+        if has_image {
+            let label = if self.wallpaper_job.is_some() { "正在设置壁纸…" } else { "设为桌面壁纸" };
+            if ui::menu_item(ui, label, "", false, &pal).clicked() && self.wallpaper_job.is_none() {
+                if let Some(cur) = &self.current {
+                    let image = cur.img.clone(); let frame = self.frame_index;
+                    let (tx,rx) = mpsc::channel(); let wake = ctx.clone();
+                    match std::thread::Builder::new().name("iv-wallpaper".into()).spawn(move || {
+                        let _ = tx.send(crate::wallpaper::set(&image,frame)); wake.request_repaint();
+                    }) {
+                        Ok(_) => { self.wallpaper_job=Some(rx); self.wallpaper_status=Some("正在设置桌面壁纸…".into()); },
+                        Err(e) => self.wallpaper_status=Some(format!("无法启动壁纸任务：{e}")),
+                    }
+                }
+                self.ctx_menu_pos=None;
             }
         }
         if has_image {
@@ -2582,6 +2612,18 @@ impl eframe::App for App {
         if self.editor.is_some() && ctx.input(|i| i.viewport().close_requested()) {
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
             if let Some(editor) = &mut self.editor { editor.request_close(); }
+        }
+        if let Some(job)=&self.wallpaper_job {
+            match job.try_recv() {
+                Ok(result) => { self.wallpaper_status=Some(match result { Ok(())=>"已设为桌面壁纸（动画取当前帧，透明区域为黑色）".into(),Err(e)=>format!("设置壁纸失败：{e}") }); self.wallpaper_job=None; },
+                Err(mpsc::TryRecvError::Disconnected) => { self.wallpaper_status=Some("壁纸任务意外中断".into()); self.wallpaper_job=None; },
+                Err(mpsc::TryRecvError::Empty)=>{},
+            }
+        }
+        if let Some(message)=self.wallpaper_status.clone() {
+            let mut open=true;
+            egui::Window::new("桌面壁纸").open(&mut open).anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO).collapsible(false).resizable(false).default_width(360.0).show(ctx,|ui| { ui.label(message); });
+            if !open { self.wallpaper_status=None; }
         }
         self.poll_delete(ctx);
         self.poll_file_changes();
