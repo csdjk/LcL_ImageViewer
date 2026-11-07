@@ -14,6 +14,10 @@ mod backdrop;
 mod loader;
 mod file_watch;
 mod directory;
+#[cfg(windows)]
+mod explorer_order;
+#[cfg(windows)]
+mod wallpaper;
 mod perf;
 mod pixel_readout;
 mod ocr;

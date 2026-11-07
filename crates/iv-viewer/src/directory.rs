@@ -39,6 +39,7 @@ impl Scope {
 #[derive(Clone, Debug, Default)]
 pub struct ScanStats {
     pub files: usize,
+    pub ordering: String,
     pub entries: usize,
     pub directories: usize,
     pub skipped_links: usize,
@@ -53,7 +54,7 @@ impl ScanStats {
         self.limit.is_some() || self.skipped_errors > 0 || self.skipped_depth > 0
     }
     pub fn description(&self) -> String {
-        let mut text = format!("已找到 {} 张图片，检查 {} 个目录", self.files, self.directories);
+        let mut text = format!("已找到 {} 张图片，检查 {} 个目录\n{}", self.files, self.directories, self.ordering);
         if let Some(limit) = self.limit {
             text.push_str(&format!("\n达到{limit}，当前仅包含部分结果；请打开更小的子文件夹继续浏览。"));
         }
@@ -229,7 +230,32 @@ fn scan(scope: &Scope, anchor: Option<&Path>, limits: Limits,
     }
     if cancelled() { return None; }
     // 后台排序一次，按相对路径排列；发布时保留当前图片而不是重置到第一张。
+    #[cfg(not(windows))]
     files.sort_by_cached_key(|path| path.strip_prefix(&scope.root).unwrap_or(path).to_string_lossy().to_lowercase());
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        let mut keyed: Vec<_> = files.into_iter().map(|p| {
+            let key: Vec<u16> = p.strip_prefix(&scope.root).unwrap_or(&p).as_os_str().encode_wide().chain(Some(0)).collect(); (p,key)
+        }).collect();
+        keyed.sort_by(|a,b| natural_compare(&a.1,&b.1).then_with(||a.0.cmp(&b.0)));
+        files = keyed.into_iter().map(|(p,_)|p).collect();
+    }
+    stats.ordering = "排序：文件名自然顺序（默认）".into();
+    #[cfg(windows)]
+    if !scope.recursive {
+        match crate::explorer_order::read(&scope.root) {
+            Ok(Some(order)) => {
+                // Map Explorer absolute names back to the scanner's paths (including relative roots).
+                let ranks: std::collections::HashMap<_,_> = order.iter().enumerate()
+                    .filter_map(|(i,p)| p.file_name().map(|n|(n.to_string_lossy().to_lowercase(),i))).collect();
+                files.sort_by_key(|p| ranks.get(&p.file_name().unwrap_or_default().to_string_lossy().to_lowercase()).copied().unwrap_or(usize::MAX));
+                stats.ordering = "排序：资源管理器当前视图；未显示的新文件排在末尾".into();
+            },
+            Ok(None) => stats.ordering = "排序：文件名自然顺序（未找到此目录的资源管理器窗口）".into(),
+            Err(e) => stats.ordering = format!("排序：文件名自然顺序；读取资源管理器失败：{e}"),
+        }
+    } else { stats.ordering = "排序：相对路径（包含子文件夹）".into(); }
     if cancelled() { return None; }
     stats.files = files.len(); stats.elapsed_ms = started.elapsed().as_millis() as u64;
     Some((files, stats))
@@ -378,5 +404,21 @@ mod tests {
         // 单独移除本测试建立的目录链接，不递归进入目标。
         std::fs::remove_dir(&link).unwrap();
         assert_eq!(files.len(), 4); assert!(stats.skipped_links > 0);
+    }
+}
+
+#[cfg(windows)]
+fn natural_compare(a: &[u16], b: &[u16]) -> std::cmp::Ordering {
+    #[link(name="shlwapi")]
+    extern "system" { fn StrCmpLogicalW(a: *const u16,b: *const u16)->i32; }
+    unsafe { StrCmpLogicalW(a.as_ptr(),b.as_ptr()).cmp(&0) }
+}
+#[cfg(all(test,windows))]
+mod natural_tests {
+    #[test]
+    fn numeric_names_follow_explorer_natural_comparison() {
+        let mut names=vec!["图片10.png","图片2.png","图片1.png"];
+        names.sort_by(|a,b|super::natural_compare(&a.encode_utf16().chain(Some(0)).collect::<Vec<_>>(),&b.encode_utf16().chain(Some(0)).collect::<Vec<_>>()));
+        assert_eq!(names, ["图片1.png","图片2.png","图片10.png"]);
     }
 }
