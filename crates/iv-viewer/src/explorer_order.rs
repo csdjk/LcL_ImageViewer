@@ -44,9 +44,16 @@ unsafe fn read_inner(root: &Path) -> windows::core::Result<Option<Vec<PathBuf>>>
         let count = items.GetCount()?;
         if count > 250_000 { return Err(windows::core::Error::new(windows::core::HRESULT(0x80004005u32 as i32), "Explorer视图超过25万项")); }
         let mut order = Vec::new();
+        let mut charged = 0usize;
         for j in 0..count {
             let path = path_of(&items.GetItemAt(j)?)?;
-            if iv_core::format::has_supported_ext(&path) && path.is_file() { order.push(path); }
+            if iv_core::format::has_supported_ext(&path) && path.is_file() {
+                charged = charged.saturating_add(path.as_os_str().len().saturating_mul(4).saturating_add(128));
+                if order.len() >= 50_000 || charged > 32 * 1024 * 1024 {
+                    return Err(windows::core::Error::new(windows::core::HRESULT(0x80004005u32 as i32), "Explorer图片顺序超过5万项或32 MiB路径预算"));
+                }
+                order.push(path);
+            }
         }
         if found.as_ref().is_some_and(|previous| previous != &order) {
             return Err(windows::core::Error::new(windows::core::HRESULT(0x80004005u32 as i32), "同一目录的多个Explorer窗口排序不同，请只保留目标窗口后刷新顺序"));
