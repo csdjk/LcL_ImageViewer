@@ -22,7 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
-| IV-REL-080 | 发布v0.8.0、升级本地安装与清理 | IN_PROGRESS | Codex | 用户2026-11-07明确授权 / SHELL-01 DONE | 版本/发布说明/打包文档；正式构建、dist、安装与明确可再生清理 | 固定源码、正式静态CRT/包hash/GUI；Release公开回读；沿用安装目录与选项升级；保护源码和必要证据 |
+| IV-REL-080 | 发布v0.8.0、升级本地安装与清理 | DONE | Codex | 用户2026-11-07明确授权 / SHELL-01 DONE | 版本/发布说明/打包文档；正式构建、dist、安装与明确可再生清理 | 固定源码、正式静态CRT/包hash/GUI；Release公开回读；沿用安装目录与选项升级；保护源码和必要证据 |
 | IV-SHELL-01 | 当前图片设为壁纸与资源管理器视图排序 | DONE | Codex | 用户2026-11-07要求 | `crates/iv-viewer/**`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 原图/存档不变；读取Explorer实际视图次序；壁纸成功/失败明确；相关测试、Release及双主题双尺寸实机；本地合入 |
 | IV-MAINT-01 | 清理历史编译缓存与重复构建产物 | DONE | Codex / codex/storage-cleanup-20261014 | 用户2026-10-14明确要求 / 干净main | 运行清理仅`target/**`，保留`target/distribution071/**`；分支仅`docs/maintenance/磁盘清理-2026-10-14.md` | 清理前后逐文件SHA256核对保留内容、工作树状态和分支；记录字节数；不改业务源码与正式包 |
 | IV-REL-071 | 大动画缓存修复正式发布v0.7.1 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / ANIM-01 DONE | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完整帧缓存和正式EXE/DLL验证；版本/许可/安装便携/实机；push main和新标签、Latest及公开hash，不改用户安装 |
@@ -372,3 +372,5 @@ IV-SHELL-01：Owner Codex；branch `codex/wallpaper-explorer-order`；worktree `
 IV-SHELL-01 DONE：集成e18cf65；167项Rust、50项Python、check/Release、Explorer六种排序与38张真实窗口截图通过，原生壁纸设置及轮播配置恢复通过；main同源码复验及实时改序后手动刷新通过。交付target/release/imageview.exe；未push、安装、发布。
 
 IV-REL-080领取：Owner Codex；branch codex/release-v0.8.0；worktree Temp/worktrees/release-v0.8.0；Base be3c8d6。用户授权推送、发布、新安装包及本地升级与清理。沿用既有安装路径/选项，保护偏好和默认应用选择。静态CRT复用标准target/windows-release目录，dist/v0.8.0冻结正式交付；运行日志复用Temp/release-latest。清理只按明确可再生/重复清单，不按名称批量丢弃历史证据。
+
+IV-REL-080 DONE：构建源码/tag 9005be0，Release 437265199公开Latest和3附件下载hash通过；本机0.8.0已升级并运行核验，原位置/选项/偏好/UserChoice保持，无需重启。167/50/5测试、76项安装隔离和9张正式/便携/安装版截图通过。主要清理4.26 GiB及两个本轮已合并工作树，20,539保留文件hash一致；自动审批拦截的2,996字节隔离壁纸测试图保留并记录。收尾main与发布tag已推送；长期NEXT不变。详见docs/releases/v0.8.0-validation.md。

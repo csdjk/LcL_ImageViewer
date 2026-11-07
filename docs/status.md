@@ -5,11 +5,19 @@
 <!-- project-stage: P1 -->
 <!-- project-next: IV-P1-01 -->
 
-## 本地新增：桌面壁纸与资源管理器排序
+## 当前最新正式版：v0.8.0
 
-IV-SHELL-01 DONE。右键新增“设为桌面壁纸”和“刷新文件夹排序”。单目录优先读取匹配Explorer窗口实际顺序，覆盖名称/日期/大小及升降序；改序后手动刷新。没有窗口时自然名称排序，递归按相对路径；冲突或失败在说明中明确提示。壁纸取原图像素/动画当前帧，保留系统布局，HDR暂不支持。
+IV-REL-080 DONE（主要清理完成；两张隔离测试图因自动审批拦截保留）。2026-11-07T02:22:56Z正式发布，Release ID 437265199，GitHub Latest、非草稿/预发布；[发布页](https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.8.0)。带注释标签 v0.8.0 指向构建源码 `9005be0b9e6664b5cefad901cc99f5e4e16420d3`，main/标签与收尾记录已推送。
 
-167项Rust、50项Python、check/Release与main复核通过；Explorer六种排序、38张深浅主题/880×560与1280×860截图、原生壁纸回读和轮播配置恢复通过。运行`target/release/imageview.exe`；当前安装与v0.7.1发布包未更新，未push或发布。详见[壁纸与资源管理器排序验收](ui-qa/壁纸与资源管理器排序验收.md)。长期NEXT仍为IV-P1-01。
+包含右键“设为桌面壁纸”“刷新文件夹排序”，单目录跟随匹配 Explorer 的实际视图顺序；无窗口/递归使用自然名称顺序并说明来源。167项Rust、50项Python、5项macOS边界、静态CRT、76项隔离注册/安装卸载、ZIP清单与3个公开附件下载hash通过；功能验收六种Explorer排序、原生壁纸往返与38张截图通过，正式/便携/本机安装版另有9张运行截图。
+
+本机已从v0.7.1升级到v0.8.0；安装载荷hash、注册版本、实际运行通过，无需重启。保留原目录、偏好、thumbs/assoc任务和10种扩展名UserChoice。正式运行入口：`target/windows-release/x86_64-pc-windows-msvc/release/imageview.exe`；安装包/ZIP：`dist/v0.8.0/`。
+
+清理删除4.26 GiB（4,570,011,293逻辑字节）编译缓存/重复载荷，磁盘可用空间增加3.87 GiB；20,539个保留文件逐一hash一致。另移除本轮两个已合并的临时工作树，分支和提交保留；旧39个工作树、源码、全部正式包、v0.7.1回滚程序和历史证据保留。自动审批拦截最后批量命令，仅返回“blocked by policy”；2张隔离壁纸测试PNG共2,996字节仍保留，未绕过重试删除。详见[发布安装与清理验收](releases/v0.8.0-validation.md)。长期NEXT仍为IV-P1-01，阶段门禁不变。
+
+## 桌面壁纸与资源管理器排序（已纳入v0.8.0）
+
+IV-SHELL-01 DONE。原图像素/动画当前帧设为壁纸，保留系统布局，HDR暂不支持。支持Explorer名称/日期/大小升降序；改序后可右键手动刷新，多窗口冲突或读取失败明确提示。详见[功能验收](ui-qa/壁纸与资源管理器排序验收.md)。旧target/release已清理，当前正式入口见上。
 
 ## 本地空间清理（2026-10-14）
 
@@ -17,7 +25,7 @@ IV-MAINT-01 DONE：已删除43.93 GiB（47,165,749,848字节）旧编译缓存�
 
 清理时保留的v0.7.1正式入口是`target/distribution071/x86_64-pc-windows-msvc/release/imageview.exe`，`dist/v0.7.1/`安装包仍在。下方历史记录中的其他target程序路径已清理，需要时重新编译；首次重建将补回依赖缓存。本轮仅清理本地文件与维护记录，没有重新构建、GUI验收、安装、发布或push。详情见[磁盘清理记录](maintenance/磁盘清理-2026-10-14.md)，长期NEXT仍为IV-P1-01，阶段门禁不变。
 
-## 当前最新正式版：v0.7.1
+## 上一正式版：v0.7.1
 
 IV-REL-071 DONE。2026-10-10T04:31:56Z发布，Release ID 408644251；GitHub Latest、非草稿/预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.7.1；源码标签`b132da4f4683d4f3742685a28184879f12385f6a`。
 
@@ -33,7 +41,7 @@ IV-ANIM-01 DONE：修复GIF/APNG/WebP/动态AVIF全部帧展开超过256 MiB就�
 
 64 MiB仅是帧堆数据转存阈值，不是进程总内存上限；系统映射驻留页、GPU与解码工作区另计。需要系统临时目录有空间；首次打开仍需完整解码，单动画展开数据最多8 GiB、4096帧。修复现已纳入v0.7.1并推送；用户安装不会自动更新。
 
-## 上一正式版：v0.7.0
+## 历史正式版：v0.7.0
 
 IV-REL-070 DONE。2026-10-08T08:56:40Z 正式发布，Release ID 406624457，Latest、非草稿/预发布。发布页：https://github.com/csdjk/LcL_ImageViewer/releases/tag/v0.7.0；标签源码 `9b0eba0f5c150b14092c53f72b0fc7d9014341ab`。
 
