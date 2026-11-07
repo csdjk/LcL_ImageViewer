@@ -157,3 +157,7 @@ IV-MAINT-01 DONE：任务记录b9dbb3e已合入main，精确删除47,165,749,848
 ## IV-SHELL-01 — 壁纸与Explorer排序（2026-11-07）
 
 用户确认跟随Explorer当前日期/大小/升降序；独立分支codex/wallpaper-explorer-order完成后已合入main复验。实现原生壁纸快照和后台设置、原生视图顺序读取、无窗口/递归/冲突说明及手动刷新；167项Rust、50项Python、check/Release和原生/实机验证通过，状态DONE。主线运行target/release/imageview.exe，冻结distribution071与安装/远端保持。详见docs/ui-qa/壁纸与资源管理器排序验收.md；不扩大P1长期门禁。
+
+## IV-REL-080 — v0.8.0发布、本机升级与清理
+
+用户于2026-11-07明确授权提交发布、升级本机和清理。版本/锁文件/安装器/说明统一0.8.0；固定main源码正式静态CRT构建，检查EXE/DLL资源与依赖、包manifest/hash和正式GUI，已有功能验收按同源码复用。先推送main/新tag、草稿上传digest核验，再公开Latest及独立下载核验；不覆盖旧发布。安装沿用原位置及任务，备份最小偏好并验证安装载荷hash/注册版本和真实运行。保留v0.7.1回滚包、v0.8.0正式包、源代码、用户/历史证据；清理明确可再生缓存和本轮重复载荷，记录实际字节与保留内容核验。
