@@ -22,6 +22,7 @@
 
 | ID | Task | Status | Owner | Depends On | Allowed Paths | Acceptance |
 |---|---|---|---|---|---|---|
+| IV-SHELL-01 | 当前图片设为壁纸与资源管理器视图排序 | READY | Codex | 用户2026-11-07要求 | `crates/iv-viewer/**`, `README.md`, `tools/ui-qa/**`, `docs/ui-qa/**` | 原图/存档不变；读取Explorer实际视图次序；壁纸成功/失败明确；相关测试、Release及双主题双尺寸实机；本地合入 |
 | IV-MAINT-01 | 清理历史编译缓存与重复构建产物 | DONE | Codex / codex/storage-cleanup-20261014 | 用户2026-10-14明确要求 / 干净main | 运行清理仅`target/**`，保留`target/distribution071/**`；分支仅`docs/maintenance/磁盘清理-2026-10-14.md` | 清理前后逐文件SHA256核对保留内容、工作树状态和分支；记录字节数；不改业务源码与正式包 |
 | IV-REL-071 | 大动画缓存修复正式发布v0.7.1 | DONE | ChatGPT-AgentDock | 用户本轮发布授权 / ANIM-01 DONE | `Cargo.toml`, `Cargo.lock`, `tools/**`, `README.md`, `CHANGELOG.md`, `docs/releases/**`, `docs/ui-qa/**` | 完整帧缓存和正式EXE/DLL验证；版本/许可/安装便携/实机；push main和新标签、Latest及公开hash，不改用户安装 |
 | IV-ANIM-01 | 大动画有界缓存与预算报错修复 | DONE | ChatGPT-AgentDock / codex/large-animation-cache | 用户截图问题 / v0.7.0 | `crates/**`, `Cargo.lock`, `tools/tests/**`, `tools/ui-qa/**`, `tools/{package_release.py,setup.iss}`, `README.md`, `docs/ui-qa/**`, `docs/formats/**` | 超过旧256MiB动画完整打开并保真；小动画内存、大动画私有临时文件缓存；测试与实机/本地main复验，不发布 |
