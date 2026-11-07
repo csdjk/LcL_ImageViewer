@@ -2117,6 +2117,11 @@ impl App {
         };
         let safe_rect = ctx.screen_rect().shrink(8.0);
         let menu_height = (safe_rect.height() - 16.0).max(240.0);
+        // Reserve the full image menu before its first layout, so newly added rows
+        // do not make the popup jump between frames at the bottom edge.
+        let reserved_height = if self.current.is_some() { 528.0_f32.min(safe_rect.height()) } else { 150.0 };
+        let pos = Pos2::new(pos.x.clamp(safe_rect.left(), (safe_rect.right()-256.0).max(safe_rect.left())),
+            pos.y.clamp(safe_rect.top(), (safe_rect.bottom()-reserved_height).max(safe_rect.top())));
         let area = egui::Area::new(egui::Id::new("iv-ctxmenu"))
             .order(egui::Order::Foreground)
             .fixed_pos(pos)
@@ -2617,7 +2622,7 @@ impl eframe::App for App {
         }
         if let Some(message)=self.wallpaper_status.clone() {
             let mut open=true;
-            egui::Window::new("桌面壁纸").open(&mut open).collapsible(false).resizable(false).default_width(360.0).show(ctx,|ui| { ui.label(message); });
+            egui::Window::new("桌面壁纸").open(&mut open).anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO).collapsible(false).resizable(false).default_width(360.0).show(ctx,|ui| { ui.label(message); });
             if !open { self.wallpaper_status=None; }
         }
         self.poll_delete(ctx);
